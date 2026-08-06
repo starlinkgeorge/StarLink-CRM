@@ -5,7 +5,7 @@ from getpass import getpass
 from sqlalchemy import select
 
 from app.db.session import get_session_factory
-from app.models.user import User, UserRole
+from app.models.user import User
 from app.security import hash_password
 
 
@@ -20,7 +20,7 @@ def main() -> None:
     try:
         if session.scalar(select(User.id).where(User.email == email)) is not None:
             raise SystemExit("A user with this email already exists.")
-        session.add(User(name=name, email=email, password_hash=hash_password(password), role=UserRole.ADMIN))
+        session.add(User(name=name, email=email, password_hash=hash_password(password), role="Admin"))
         session.commit()
     finally:
         session.close()
