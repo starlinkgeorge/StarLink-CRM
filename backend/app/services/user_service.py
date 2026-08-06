@@ -3,7 +3,9 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.user import User
+from app.security import hash_password
 from app.schemas.user import UserCreate
+from app.services.access_service import ensure_user_management_access
 from app.services.errors import ConflictError, NotFoundError
 
 
@@ -21,7 +23,9 @@ def get_user(session: Session, user_id: int) -> User:
 def create_user(session: Session, payload: UserCreate) -> User:
     if session.scalar(select(User.id).where(User.email == payload.email)) is not None:
         raise ConflictError("A user with this email already exists.")
-    user = User(**payload.model_dump())
+    data = payload.model_dump()
+    password = data.pop("password")
+    user = User(**data, password_hash=hash_password(password))
     session.add(user)
     try:
         session.commit()

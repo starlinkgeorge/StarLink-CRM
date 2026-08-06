@@ -33,6 +33,10 @@ Reusable customer labels. `tags` contains `id`, unique `name`, and `created_at`.
 
 Sales activity records: `id`, `customer_id`, `user_id`, `type`, `content`, `next_followup_date`, and `created_at`. Types are `Email`, `WhatsApp`, `Phone`, and `Meeting`.
 
+### `refresh_tokens`
+
+Revocable login-session records: `id`, `user_id`, unique `token_hash`, `expires_at`, `revoked_at`, and `created_at`. The raw JWT refresh token is never persisted. `users.last_login_at` records the most recent successful login.
+
 ## Relationships
 
 ```text
@@ -41,6 +45,7 @@ users 1 ──< followups (user_id; deletion restricted to preserve history)
 customers 1 ──< contacts (deleted with customer)
 customers 1 ──< followups (deleted with customer)
 customers >──< tags (through customer_tags)
+users 1 ──< refresh_tokens (deleted with user)
 ```
 
 `users.updated_at` and `customers.updated_at` are updated by PostgreSQL triggers, including when maintenance SQL changes a record directly. Foreign-key columns and common filtering fields are indexed.

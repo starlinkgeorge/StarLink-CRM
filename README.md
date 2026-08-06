@@ -57,9 +57,26 @@ alembic upgrade head
 
 See [docs/database-design.md](docs/database-design.md) for the CRM data model.
 
-## API phase 1
+## Authentication and API access
 
-No authentication is included yet. The following endpoints are available under `/api/v1`:
+Set a unique, high-entropy `JWT_SECRET_KEY` in `.env` before running the backend. Passwords are bcrypt hashes; API clients submit `password` only to create users or log in, and password values are never returned.
+
+Obtain tokens with `POST /api/v1/auth/login` using `email` and `password`. Send the access token on protected API calls:
+
+```text
+Authorization: Bearer <access_token>
+```
+
+`POST /api/v1/auth/refresh` rotates a valid refresh token. Refresh token values are never stored in the database; only SHA-256 token digests are stored.
+
+Create the first administrator only from a trusted local terminal after applying migrations:
+
+```bash
+cd backend
+python scripts/create_admin.py
+```
+
+Roles: `Admin` manages all records and users; `Sales` reads and manages only customers assigned to itself; `Viewer` has read-only CRM access. All endpoints below require authentication:
 
 | Resource | Endpoints |
 | --- | --- |

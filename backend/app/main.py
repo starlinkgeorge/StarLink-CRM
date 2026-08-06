@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from app.api import contacts, customers, followups, users
+from app.api import auth, contacts, customers, followups, users
 from app.config import get_settings
 
 settings = get_settings()
@@ -13,6 +13,7 @@ app = FastAPI(
 )
 
 app.include_router(users.router, prefix=settings["api_prefix"])
+app.include_router(auth.router, prefix=settings["api_prefix"])
 app.include_router(customers.router, prefix=settings["api_prefix"])
 app.include_router(contacts.router, prefix=settings["api_prefix"])
 app.include_router(followups.router, prefix=settings["api_prefix"])

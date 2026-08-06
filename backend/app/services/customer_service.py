@@ -4,7 +4,8 @@ from sqlalchemy.orm import Session, selectinload
 from app.models.customer import Customer
 from app.models.user import User
 from app.schemas.customer import CustomerCreate, CustomerUpdate
-from app.services.errors import NotFoundError
+from app.models.user import UserRole
+from app.services.errors import ForbiddenError, NotFoundError
 
 
 def _validate_owner(session: Session, owner_id: int | None) -> None:
@@ -12,8 +13,12 @@ def _validate_owner(session: Session, owner_id: int | None) -> None:
         raise NotFoundError("Customer owner not found.")
 
 
-def list_customers(session: Session, limit: int, offset: int, query: str | None) -> tuple[list[Customer], int]:
+def list_customers(
+    session: Session, limit: int, offset: int, query: str | None, owner_id: int | None = None
+) -> tuple[list[Customer], int]:
     filters = []
+    if owner_id is not None:
+        filters.append(Customer.owner_id == owner_id)
     if query:
         term = f"%{query.strip()}%"
         filters.append(
@@ -44,8 +49,14 @@ def get_customer(session: Session, customer_id: int, include_relations: bool = F
     return customer
 
 
-def create_customer(session: Session, payload: CustomerCreate) -> Customer:
+def create_customer(session: Session, payload: CustomerCreate, creator: User) -> Customer:
+    if creator.role is UserRole.VIEWER:
+        raise ForbiddenError("Viewer accounts have read-only access.")
     data = payload.model_dump()
+    if creator.role is UserRole.SALES:
+        if data["owner_id"] not in (None, creator.id):
+            raise ForbiddenError("Sales users may only create customers for themselves.")
+        data["owner_id"] = creator.id
     _validate_owner(session, data["owner_id"])
     customer = Customer(**data)
     session.add(customer)
@@ -54,9 +65,11 @@ def create_customer(session: Session, payload: CustomerCreate) -> Customer:
     return customer
 
 
-def update_customer(session: Session, customer_id: int, payload: CustomerUpdate) -> Customer:
+def update_customer(session: Session, customer_id: int, payload: CustomerUpdate, editor: User) -> Customer:
     customer = get_customer(session, customer_id)
     changes = payload.model_dump(exclude_unset=True)
+    if editor.role is UserRole.SALES and "owner_id" in changes and changes["owner_id"] != editor.id:
+        raise ForbiddenError("Sales users may not reassign customers.")
     if "owner_id" in changes:
         _validate_owner(session, changes["owner_id"])
     for field, value in changes.items():

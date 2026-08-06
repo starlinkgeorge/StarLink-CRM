@@ -8,7 +8,7 @@ from app.models.user import UserRole
 class UserCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     email: str = Field(min_length=3, max_length=320)
-    password_hash: str = Field(min_length=1, max_length=255)
+    password: str = Field(min_length=8, max_length=72)
     role: UserRole = UserRole.SALES
 
 

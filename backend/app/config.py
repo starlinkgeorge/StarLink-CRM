@@ -9,4 +9,7 @@ def get_settings() -> dict[str, str]:
         "environment": getenv("APP_ENV", "development"),
         "api_prefix": getenv("API_PREFIX", "/api/v1"),
         "database_url": getenv("DATABASE_URL", ""),
+        "jwt_secret_key": getenv("JWT_SECRET_KEY", ""),
+        "jwt_access_token_minutes": getenv("JWT_ACCESS_TOKEN_MINUTES", "15"),
+        "jwt_refresh_token_days": getenv("JWT_REFRESH_TOKEN_DAYS", "14"),
     }

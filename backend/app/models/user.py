@@ -1,6 +1,7 @@
 import enum
+from datetime import datetime
 
-from sqlalchemy import Enum, String
+from sqlalchemy import DateTime, Enum, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -23,6 +24,10 @@ class User(TimestampMixin, Base):
     role: Mapped[UserRole] = mapped_column(
         Enum(UserRole, name="user_role", native_enum=True), nullable=False, default=UserRole.SALES
     )
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     owned_customers: Mapped[list["Customer"]] = relationship(back_populates="owner")
     followups: Mapped[list["FollowUp"]] = relationship(back_populates="user")
+    refresh_tokens: Mapped[list["RefreshToken"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )

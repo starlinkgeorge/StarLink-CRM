@@ -4,3 +4,7 @@ class NotFoundError(Exception):
 
 class ConflictError(Exception):
     """Raised when a requested change violates a business uniqueness rule."""
+
+
+class ForbiddenError(Exception):
+    """Raised when an authenticated user lacks access to a resource."""
