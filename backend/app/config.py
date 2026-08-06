@@ -8,4 +8,5 @@ def get_settings() -> dict[str, str]:
     return {
         "environment": getenv("APP_ENV", "development"),
         "api_prefix": getenv("API_PREFIX", "/api/v1"),
+        "database_url": getenv("DATABASE_URL", ""),
     }

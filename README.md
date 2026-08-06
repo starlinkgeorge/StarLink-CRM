@@ -46,6 +46,17 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 The API health endpoint is available at `http://localhost:8000/api/v1/health`.
 
+### Database migration
+
+Set `DATABASE_URL` to a PostgreSQL connection string, then run the initial schema migration:
+
+```bash
+cd backend
+alembic upgrade head
+```
+
+See [docs/database-design.md](docs/database-design.md) for the CRM data model.
+
 ### Full local stack with Docker
 
 ```bash
