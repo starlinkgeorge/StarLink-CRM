@@ -9,10 +9,15 @@ from app.models.user import User
 from app.security import hash_password
 
 
+def sanitize_input(value: str) -> str:
+    """Remove invalid Unicode code points before storing input in PostgreSQL."""
+    return value.encode("utf-8", errors="ignore").decode("utf-8").strip()
+
+
 def main() -> None:
-    name = input("Administrator name: ").strip()
-    email = input("Administrator email: ").strip().lower()
-    password = getpass("Administrator password: ")
+    name = sanitize_input(input("Administrator name: "))
+    email = sanitize_input(input("Administrator email: ")).lower()
+    password = sanitize_input(getpass("Administrator password: "))
     if not name or not email or len(password) < 8 or len(password) > 72:
         raise SystemExit("Name, email, and an 8-72 character password are required.")
 
