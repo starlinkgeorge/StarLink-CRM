@@ -1,8 +1,13 @@
 """Create the first StarLink CRM administrator without exposing public registration."""
 
 from getpass import getpass
+from pathlib import Path
+import sys
 
 from sqlalchemy import select
+
+# Allow this standalone script to import the sibling /app package in the container.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.db.session import get_session_factory
 from app.models.user import User
