@@ -22,7 +22,14 @@ class User(TimestampMixin, Base):
     email: Mapped[str] = mapped_column(String(320), nullable=False, unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[UserRole] = mapped_column(
-        Enum(UserRole, name="user_role", native_enum=True), nullable=False, default=UserRole.SALES
+        Enum(
+            UserRole,
+            name="user_role",
+            native_enum=True,
+            values_callable=lambda enum_class: [member.value for member in enum_class],
+        ),
+        nullable=False,
+        default=UserRole.SALES,
     )
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 

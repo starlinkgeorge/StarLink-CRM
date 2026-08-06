@@ -44,12 +44,22 @@ class Customer(TimestampMixin, Base):
     website: Mapped[Optional[str]] = mapped_column(String(255))
     source: Mapped[Optional[str]] = mapped_column(String(80), index=True)
     level: Mapped[CustomerLevel] = mapped_column(
-        Enum(CustomerLevel, name="customer_level", native_enum=True),
+        Enum(
+            CustomerLevel,
+            name="customer_level",
+            native_enum=True,
+            values_callable=lambda enum_class: [member.value for member in enum_class],
+        ),
         nullable=False,
         default=CustomerLevel.C,
     )
     status: Mapped[CustomerStatus] = mapped_column(
-        Enum(CustomerStatus, name="customer_status", native_enum=True),
+        Enum(
+            CustomerStatus,
+            name="customer_status",
+            native_enum=True,
+            values_callable=lambda enum_class: [member.value for member in enum_class],
+        ),
         nullable=False,
         default=CustomerStatus.LEAD,
         index=True,
