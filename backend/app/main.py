@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 
+from app.api import contacts, customers, followups, users
 from app.config import get_settings
 
 settings = get_settings()
@@ -10,6 +11,11 @@ app = FastAPI(
     openapi_url=f"{settings['api_prefix']}/openapi.json",
     docs_url=f"{settings['api_prefix']}/docs",
 )
+
+app.include_router(users.router, prefix=settings["api_prefix"])
+app.include_router(customers.router, prefix=settings["api_prefix"])
+app.include_router(contacts.router, prefix=settings["api_prefix"])
+app.include_router(followups.router, prefix=settings["api_prefix"])
 
 
 @app.get(f"{settings['api_prefix']}/health", tags=["system"])

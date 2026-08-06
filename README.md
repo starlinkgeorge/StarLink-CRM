@@ -57,6 +57,26 @@ alembic upgrade head
 
 See [docs/database-design.md](docs/database-design.md) for the CRM data model.
 
+## API phase 1
+
+No authentication is included yet. The following endpoints are available under `/api/v1`:
+
+| Resource | Endpoints |
+| --- | --- |
+| Users | `GET /users`, `POST /users`, `GET /users/{id}` |
+| Customers | `GET /customers?limit=20&offset=0&q=keyword`, `POST /customers`, `GET /customers/{id}`, `PUT /customers/{id}`, `DELETE /customers/{id}` |
+| Contacts | `POST /contacts`, `GET /contacts/{id}`, `PUT /contacts/{id}` |
+| Follow-ups | `POST /followups`, `GET /followups?customer_id={id}` |
+
+The customer `q` parameter searches company name, primary contact name, country, and email. Customer details include related contacts, tags, and follow-up records. Interactive API documentation is available at `/api/v1/docs` while the backend is running.
+
+Run API tests after installing backend development dependencies:
+
+```bash
+cd backend
+pytest
+```
+
 ### Full local stack with Docker
 
 ```bash
