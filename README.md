@@ -84,6 +84,7 @@ Roles: `Admin` manages all records and users; `Sales` reads and manages only cus
 | Customers | `GET /customers?limit=20&offset=0&q=keyword`, `POST /customers`, `GET /customers/{id}`, `PUT /customers/{id}`, `DELETE /customers/{id}` |
 | Contacts | `POST /contacts`, `GET /contacts/{id}`, `PUT /contacts/{id}` |
 | Follow-ups | `POST /followups`, `GET /followups?customer_id={id}` |
+| Dashboard | `GET /dashboard/stats` |
 
 The customer `q` parameter searches company name, primary contact name, country, and email. Customer details include related contacts, tags, and follow-up records. Interactive API documentation is available at `/api/v1/docs` while the backend is running.
 
@@ -93,6 +94,10 @@ Run API tests after installing backend development dependencies:
 cd backend
 pytest
 ```
+
+## Frontend CRM interface
+
+The React frontend includes login, dashboard, customer list, customer detail, customer creation, and follow-up creation pages. Set `VITE_API_BASE_URL` in `frontend/.env` if the backend is not running at the local default, then run `npm install` and `npm run dev` from `frontend/`.
 
 ### Full local stack with Docker
 

@@ -12,4 +12,5 @@ def get_settings() -> dict[str, str]:
         "jwt_secret_key": getenv("JWT_SECRET_KEY", ""),
         "jwt_access_token_minutes": getenv("JWT_ACCESS_TOKEN_MINUTES", "15"),
         "jwt_refresh_token_days": getenv("JWT_REFRESH_TOKEN_DAYS", "14"),
+        "cors_origins": getenv("CORS_ORIGINS", "http://localhost:5173"),
     }

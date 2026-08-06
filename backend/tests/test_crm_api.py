@@ -40,6 +40,9 @@ def test_customer_lifecycle_with_contacts_and_followups(client: TestClient) -> N
     )
     assert create_customer.status_code == 201
     customer = create_customer.json()
+    stats = client.get("/api/v1/dashboard/stats", headers=sales_token)
+    assert stats.status_code == 200
+    assert stats.json()["customer_count"] == 1
 
     contact = client.post(
         "/api/v1/contacts",
@@ -56,6 +59,8 @@ def test_customer_lifecycle_with_contacts_and_followups(client: TestClient) -> N
         }, headers=sales_token,
     )
     assert followup.status_code == 201
+    stats_after_followup = client.get("/api/v1/dashboard/stats", headers=sales_token)
+    assert stats_after_followup.json()["followup_count"] == 1
 
     detail = client.get(f"/api/v1/customers/{customer['id']}", headers=sales_token)
     assert detail.status_code == 200

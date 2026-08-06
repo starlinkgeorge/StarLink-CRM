@@ -1,32 +1,8 @@
-:root {
-  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
-  color: #172033;
-  background: #f6f8fb;
-}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-* { box-sizing: border-box; }
-
-body { margin: 0; }
-
-.app-shell {
-  min-height: 100vh;
-  display: grid;
-  place-items: center;
-  padding: 2rem;
-}
-
-section {
-  width: min(100%, 42rem);
-  padding: 3rem;
-  border-radius: 1rem;
-  background: #fff;
-  box-shadow: 0 12px 36px rgb(23 32 51 / 10%);
-}
-
-.eyebrow {
-  color: #52647e;
-  font-size: 0.875rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+@layer base {
+  body { @apply m-0 bg-slate-50 font-sans text-slate-900; }
+  button, input, select, textarea { font: inherit; }
 }

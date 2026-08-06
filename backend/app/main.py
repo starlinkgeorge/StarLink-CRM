@@ -1,6 +1,7 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import auth, contacts, customers, followups, users
+from app.api import auth, contacts, customers, dashboard, followups, users
 from app.config import get_settings
 
 settings = get_settings()
@@ -12,8 +13,17 @@ app = FastAPI(
     docs_url=f"{settings['api_prefix']}/docs",
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[origin.strip() for origin in settings["cors_origins"].split(",") if origin.strip()],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
+)
+
 app.include_router(users.router, prefix=settings["api_prefix"])
 app.include_router(auth.router, prefix=settings["api_prefix"])
+app.include_router(dashboard.router, prefix=settings["api_prefix"])
 app.include_router(customers.router, prefix=settings["api_prefix"])
 app.include_router(contacts.router, prefix=settings["api_prefix"])
 app.include_router(followups.router, prefix=settings["api_prefix"])
