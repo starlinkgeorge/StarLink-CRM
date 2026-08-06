@@ -2,11 +2,12 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-COPY backend/pyproject.toml ./
+COPY backend/requirements.txt ./requirements.txt
+RUN python -m pip install --no-cache-dir --prefer-binary -r requirements.txt
+
 COPY backend/app ./app
 COPY backend/alembic ./alembic
 COPY backend/alembic.ini ./alembic.ini
-RUN pip install --no-cache-dir .
 
 EXPOSE 8000
 

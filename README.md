@@ -106,6 +106,8 @@ cp .env.example .env
 docker compose up --build
 ```
 
+The backend image installs its explicit runtime dependency list from `backend/requirements.txt`; it does not build the local Python package during image construction.
+
 ## Project layout
 
 ```text
