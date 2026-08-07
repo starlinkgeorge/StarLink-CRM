@@ -6,7 +6,14 @@ Run inside the backend container with:
     python scripts/import_product_catalog.py
 """
 
+from pathlib import Path
+import sys
+
 from sqlalchemy import select
+
+# Support both ``python scripts/import_product_catalog.py`` and module-style
+# execution from the backend container's /app working directory.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.db.session import get_session_factory
 from app.models.product import Product, ProductCategory
