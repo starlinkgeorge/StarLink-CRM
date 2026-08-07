@@ -1,5 +1,6 @@
 from io import BytesIO
 import ipaddress
+from os import getenv
 from pathlib import Path
 import re
 import socket
@@ -43,6 +44,9 @@ def _fetch_public_image(url: str | None) -> bytes | None:
     parsed = urlparse(url)
     if parsed.scheme not in {"http", "https"} or not parsed.hostname:
         return None
+    local_data = _read_catalog_image(url)
+    if local_data is not None:
+        return local_data
     try:
         addresses = socket.getaddrinfo(parsed.hostname, parsed.port or 443)
         for address in addresses:
@@ -58,6 +62,40 @@ def _fetch_public_image(url: str | None) -> bytes | None:
             return data if len(data) <= 5_000_000 else None
     except (OSError, ValueError):
         return None
+
+
+def _read_catalog_image(url: str) -> bytes | None:
+    """Read catalogue images copied into the backend image.
+
+    Product records currently store frontend URLs such as
+    ``http://localhost:5173/product-images/SL-F-001.jpg``. A backend container
+    cannot fetch its host's loopback URL, so only the known product-images path
+    is mapped to a local, bounded directory before public URL fetching runs.
+    """
+    parsed = urlparse(url)
+    if not parsed.path.startswith("/product-images/"):
+        return None
+    filename = Path(parsed.path).name
+    if not re.fullmatch(r"[A-Za-z0-9_-]+\.(?:jpe?g|png|webp)", filename, re.IGNORECASE):
+        return None
+
+    roots = [
+        Path(getenv("PRODUCT_IMAGE_DIR", "/app/product-images")),
+        Path(__file__).resolve().parents[2] / "product-images",
+        Path(__file__).resolve().parents[3] / "frontend" / "public" / "product-images",
+    ]
+    for root in roots:
+        try:
+            resolved_root = root.resolve()
+            candidate = (resolved_root / filename).resolve()
+            if candidate.parent != resolved_root or not candidate.is_file():
+                continue
+            data = candidate.read_bytes()
+            if len(data) <= 5_000_000:
+                return data
+        except OSError:
+            continue
+    return None
 
 
 def _picture(url: str | None):

@@ -120,6 +120,8 @@ The matching catalogue images are stored under `frontend/public/product-images`.
 
 Quotations are created from an opportunity and its product lines. Each version stores immutable SKU, product name, picture, unit-price, quantity, and line-total snapshots, so later catalog edits do not alter historical quotations. A Draft version can be edited and regenerated; marking it Sent locks the version. Further changes copy the previous snapshot into V2, V3, and later versions. Generated PDFs use the StarLink company header and the requested `Item Name / Picture / Unit Price / QTY / Total Price` table, followed by product total, door-to-door shipping, amount, validity, payment term, and delivery time. The PDF files are persisted in the Docker `quotation_pdfs` volume and downloaded through an authenticated API endpoint.
 
+Quotation PDF generation resolves URLs under `/product-images/` from the backend's local `PRODUCT_IMAGE_DIR` (default `/app/product-images`) before attempting public HTTP images. The backend Docker image copies the catalog image assets so product pictures remain available inside containers.
+
 When saving a draft, blank payment terms, delivery time, currency, or shipping cost values are normalized to the configured defaults; product prices and quantities remain strictly validated.
 Quotation draft updates keep nested product inputs as validated Pydantic objects through the service layer, preventing item updates from becoming unhandled 500 errors.
 

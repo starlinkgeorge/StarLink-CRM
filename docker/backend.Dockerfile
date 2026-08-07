@@ -9,6 +9,7 @@ COPY backend/app ./app
 COPY backend/alembic ./alembic
 COPY backend/alembic.ini ./alembic.ini
 COPY backend/scripts ./scripts
+COPY frontend/public/product-images ./product-images
 
 EXPOSE 8000
 
