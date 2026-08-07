@@ -61,6 +61,8 @@ cd backend
 alembic upgrade head
 ```
 
+Migration `0005_repair_v3_customer_columns` repairs databases whose Alembic revision advanced while the V3 customer columns were missing. It conditionally adds `customer_type`, `interested_product`, and `sales_stage`, backfills `sales_stage` from the legacy `status` value, and leaves already-correct schemas unchanged.
+
 See [docs/database-design.md](docs/database-design.md) for the CRM data model.
 
 ## Authentication and API access
