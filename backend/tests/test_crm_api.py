@@ -331,6 +331,97 @@ def test_viewer_cannot_create_or_convert_lead(client: TestClient) -> None:
     assert blocked_conversion.status_code == 403
 
 
+def test_alibaba_inquiry_creates_and_deduplicates_leads(client: TestClient) -> None:
+    admin_token = login(client, "admin@example.com", "AdminPass123!")
+    integration_status = client.get(
+        "/api/v1/integrations/alibaba/status", headers=admin_token
+    )
+    assert integration_status.status_code == 200
+    assert integration_status.json() == {
+        "provider": "Alibaba",
+        "connected": False,
+        "mode": "simulation",
+    }
+
+    payload = {
+        "company_name": "Bright Future Preschool",
+        "contact_name": "Maria Garcia",
+        "country": "Spain",
+        "email": "maria@brightfuture.example",
+        "phone": "+34 900 100 200",
+        "whatsapp": "+34 900 100 200",
+        "inquiry_content": "Need classroom furniture for September.",
+        "interested_product": "Preschool tables and chairs",
+        "source": "Website",
+    }
+    received = client.post(
+        "/api/v1/integrations/alibaba/inquiries",
+        json=payload,
+        headers=admin_token,
+    )
+    assert received.status_code == 200
+    first = received.json()
+    assert first["created"] is True
+    assert first["lead"]["source"] == "Alibaba"
+    assert first["lead"]["status"] == "New"
+
+    duplicate_email = client.post(
+        "/api/v1/integrations/alibaba/inquiries",
+        json={
+            **payload,
+            "company_name": "Different Company",
+            "contact_name": "Different Buyer",
+            "email": " MARIA@BRIGHTFUTURE.EXAMPLE ",
+        },
+        headers=admin_token,
+    )
+    assert duplicate_email.status_code == 200
+    assert duplicate_email.json()["created"] is False
+    assert duplicate_email.json()["lead_id"] == first["lead_id"]
+
+    duplicate_identity = client.post(
+        "/api/v1/integrations/alibaba/inquiries",
+        json={
+            **payload,
+            "company_name": " bright future preschool ",
+            "contact_name": "MARIA GARCIA",
+            "email": "another@example.com",
+        },
+        headers=admin_token,
+    )
+    assert duplicate_identity.status_code == 200
+    assert duplicate_identity.json()["created"] is False
+    assert duplicate_identity.json()["lead_id"] == first["lead_id"]
+
+    leads = client.get("/api/v1/leads", headers=admin_token)
+    assert leads.status_code == 200
+    assert leads.json()["total"] == 1
+
+
+def test_viewer_cannot_receive_alibaba_inquiry(client: TestClient) -> None:
+    admin_token = login(client, "admin@example.com", "AdminPass123!")
+    viewer = client.post(
+        "/api/v1/users",
+        json={
+            "name": "Integration Viewer",
+            "email": "integration-viewer@example.com",
+            "password": "ViewerPass123!",
+            "role": "Viewer",
+        },
+        headers=admin_token,
+    )
+    assert viewer.status_code == 201
+    viewer_token = login(
+        client, "integration-viewer@example.com", "ViewerPass123!"
+    )
+    blocked = client.post(
+        "/api/v1/integrations/alibaba/inquiries",
+        json={"company_name": "Blocked Lead", "contact_name": "Read Only"},
+        headers=viewer_token,
+    )
+    assert blocked.status_code == 403
+
+
 def test_customer_list_supports_v3_profile_filters(client: TestClient) -> None:
     admin_token = login(client, "admin@example.com", "AdminPass123!")
     records = [

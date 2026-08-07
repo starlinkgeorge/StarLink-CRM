@@ -20,6 +20,12 @@ export interface Opportunity {
 export interface LeadConversion {
   lead: Lead; customer: Customer; contact: Contact; opportunity: Opportunity;
 }
+export interface AlibabaIntegrationStatus {
+  provider: "Alibaba"; connected: boolean; mode: "simulation";
+}
+export interface AlibabaInquiryResult {
+  lead_id: number; lead_public_id: string; created: boolean; lead: Lead;
+}
 
 export interface User { id: number; name: string; email: string; role: UserRole; created_at: string; updated_at: string; }
 export interface Customer {

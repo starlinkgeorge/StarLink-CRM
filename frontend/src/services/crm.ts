@@ -1,5 +1,5 @@
 import api from "./api";
-import type { Customer, CustomerActivity, CustomerDetail, CustomerPage, DashboardStats, FollowUp, Lead, LeadConversion, LeadDetail, LeadPage, LeadStatus, Tag } from "../types";
+import type { AlibabaInquiryResult, AlibabaIntegrationStatus, Customer, CustomerActivity, CustomerDetail, CustomerPage, DashboardStats, FollowUp, Lead, LeadConversion, LeadDetail, LeadPage, LeadStatus, Tag } from "../types";
 
 export type CustomerCreatePayload = {
   company_name: string; contact_name?: string; country?: string; email?: string; phone?: string;
@@ -35,3 +35,10 @@ export const getLeads = async (params: LeadFilters) => (await api.get<LeadPage>(
 export const getLead = async (id: string) => (await api.get<LeadDetail>(`/leads/${id}`)).data;
 export const createLead = async (data: LeadCreatePayload) => (await api.post<Lead>("/leads", data)).data;
 export const convertLead = async (id: number) => (await api.post<LeadConversion>(`/leads/${id}/convert`)).data;
+
+export type AlibabaInquiryPayload = {
+  company_name: string; contact_name: string; country?: string; email?: string; phone?: string;
+  whatsapp?: string; inquiry_content?: string; interested_product?: string; source?: string;
+};
+export const getAlibabaIntegrationStatus = async () => (await api.get<AlibabaIntegrationStatus>("/integrations/alibaba/status")).data;
+export const receiveAlibabaInquiry = async (data: AlibabaInquiryPayload) => (await api.post<AlibabaInquiryResult>("/integrations/alibaba/inquiries", data)).data;
