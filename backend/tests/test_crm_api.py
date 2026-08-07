@@ -947,6 +947,7 @@ def test_quotation_versioning_pdf_and_immutable_sent_snapshot(client: TestClient
             "payment_term": "",
             "delivery_time": "",
             "shipping_cost": "",
+            "validity_days": 0,
             "items": [
                 {
                     "product_id": product.json()["id"],
@@ -965,6 +966,7 @@ def test_quotation_versioning_pdf_and_immutable_sent_snapshot(client: TestClient
         "30-45 days after deposit"
     )
     assert blank_optional_fields.json()["selected_version"]["shipping_cost"] == "0.00"
+    assert blank_optional_fields.json()["selected_version"]["validity_days"] == 30
 
     generated = client.post(
         f"/api/v1/quotations/{quotation_id}/pdf", headers=admin_token

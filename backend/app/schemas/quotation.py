@@ -39,6 +39,11 @@ class QuotationTerms(BaseModel):
     def normalize_shipping_cost(cls, value: Decimal | str) -> Decimal | str:
         return Decimal("0") if value is None or str(value).strip() == "" else value
 
+    @field_validator("validity_days", mode="before")
+    @classmethod
+    def normalize_validity_days(cls, value: int | str) -> int | str:
+        return 30 if value is None or str(value).strip() in {"", "0"} else value
+
 
 class QuotationCreate(QuotationTerms):
     opportunity_id: int = Field(gt=0)
@@ -72,6 +77,11 @@ class QuotationUpdate(BaseModel):
     @classmethod
     def normalize_optional_shipping_cost(cls, value: Decimal | str | None) -> Decimal | str | None:
         return Decimal("0") if value is not None and str(value).strip() == "" else value
+
+    @field_validator("validity_days", mode="before")
+    @classmethod
+    def normalize_optional_validity_days(cls, value: int | str | None) -> int | str | None:
+        return 30 if value is not None and str(value).strip() in {"", "0"} else value
 
 
 class QuotationItemRead(BaseModel):
