@@ -679,6 +679,160 @@ def test_viewer_cannot_modify_customer(client: TestClient) -> None:
     assert forbidden.status_code == 403
 
 
+def test_product_catalog_and_opportunity_product_lines(client: TestClient) -> None:
+    admin_token = login(client, "admin@example.com", "AdminPass123!")
+    category = client.post(
+        "/api/v1/product-categories",
+        json={"name": "Montessori Materials", "sort_order": 10},
+        headers=admin_token,
+    )
+    assert category.status_code == 201
+
+    created = client.post(
+        "/api/v1/products",
+        json={
+            "sku": " sl-pkl-001 ",
+            "name": "Pink Tower",
+            "category_id": category.json()["id"],
+            "material": "Beech wood",
+            "dimension_text": "10 graduated cubes",
+            "length_mm": "100.00",
+            "width_mm": "100.00",
+            "height_mm": "600.00",
+            "weight_kg": "4.500",
+            "unit": "set",
+            "moq": 5,
+            "reference_price": "48.50",
+            "currency_code": "usd",
+            "description": "Classic Montessori sensorial material.",
+            "images": [
+                {"image_url": "https://example.com/pink-tower-main.jpg", "is_primary": True},
+                {"image_url": "https://example.com/pink-tower-side.jpg"},
+            ],
+        },
+        headers=admin_token,
+    )
+    assert created.status_code == 201
+    product = created.json()
+    assert product["sku"] == "SL-PKL-001"
+    assert product["currency_code"] == "USD"
+    assert product["category_name"] == "Montessori Materials"
+    assert len(product["images"]) == 2
+    assert sum(image["is_primary"] for image in product["images"]) == 1
+
+    listing = client.get(
+        "/api/v1/products",
+        params={"q": "beech", "category_id": category.json()["id"], "is_active": True},
+        headers=admin_token,
+    )
+    assert listing.status_code == 200
+    assert listing.json()["total"] == 1
+
+    duplicate = client.post(
+        "/api/v1/products",
+        json={"sku": "SL-PKL-001", "name": "Duplicate"},
+        headers=admin_token,
+    )
+    assert duplicate.status_code == 409
+
+    customer = client.post(
+        "/api/v1/customers",
+        json={"company_name": "Sunrise Montessori School"},
+        headers=admin_token,
+    )
+    assert customer.status_code == 201
+    opportunity = client.post(
+        "/api/v1/opportunities",
+        json={"customer_id": customer.json()["id"], "name": "2026 Classroom Order"},
+        headers=admin_token,
+    )
+    assert opportunity.status_code == 201
+    linked = client.put(
+        f"/api/v1/opportunities/{opportunity.json()['id']}/products",
+        json={
+            "items": [
+                {"product_id": product["id"], "quantity": "20.00", "target_price": "45.00"}
+            ]
+        },
+        headers=admin_token,
+    )
+    assert linked.status_code == 200
+    assert linked.json()["products"][0]["sku"] == "SL-PKL-001"
+    assert linked.json()["products"][0]["quantity"] == "20.00"
+    assert linked.json()["products"][0]["target_price"] == "45.00"
+
+    disabled = client.put(
+        f"/api/v1/products/{product['id']}",
+        json={"is_active": False},
+        headers=admin_token,
+    )
+    assert disabled.status_code == 200
+    assert disabled.json()["is_active"] is False
+    assert client.get(
+        "/api/v1/products", params={"is_active": False}, headers=admin_token
+    ).json()["total"] == 1
+
+
+def test_viewer_has_read_only_product_access(client: TestClient) -> None:
+    admin_token = login(client, "admin@example.com", "AdminPass123!")
+    viewer = client.post(
+        "/api/v1/users",
+        json={
+            "name": "Product Viewer",
+            "email": "product-viewer@example.com",
+            "password": "ViewerPass123!",
+            "role": "Viewer",
+        },
+        headers=admin_token,
+    )
+    assert viewer.status_code == 201
+    product = client.post(
+        "/api/v1/products",
+        json={"sku": "VIEW-001", "name": "Visible Product"},
+        headers=admin_token,
+    )
+    assert product.status_code == 201
+    viewer_token = login(client, "product-viewer@example.com", "ViewerPass123!")
+    assert client.get("/api/v1/products", headers=viewer_token).status_code == 200
+    assert client.get(
+        f"/api/v1/products/{product.json()['id']}", headers=viewer_token
+    ).status_code == 200
+    assert client.post(
+        "/api/v1/products",
+        json={"sku": "BLOCKED", "name": "Blocked"},
+        headers=viewer_token,
+    ).status_code == 403
+    assert client.put(
+        f"/api/v1/products/{product.json()['id']}",
+        json={"name": "Blocked change"},
+        headers=viewer_token,
+    ).status_code == 403
+
+    sales = client.post(
+        "/api/v1/users",
+        json={
+            "name": "Product Sales",
+            "email": "product-sales@example.com",
+            "password": "SalesPass123!",
+            "role": "Sales",
+        },
+        headers=admin_token,
+    )
+    assert sales.status_code == 201
+    sales_token = login(client, "product-sales@example.com", "SalesPass123!")
+    sales_product = client.post(
+        "/api/v1/products",
+        json={"sku": "SALES-001", "name": "Sales-created Product"},
+        headers=sales_token,
+    )
+    assert sales_product.status_code == 201
+    assert client.put(
+        f"/api/v1/products/{sales_product.json()['id']}",
+        json={"material": "Beech wood"},
+        headers=sales_token,
+    ).status_code == 200
+
+
 def test_sales_cannot_access_another_users_customer(client: TestClient) -> None:
     admin_token = login(client, "admin@example.com", "AdminPass123!")
     sales = client.post(

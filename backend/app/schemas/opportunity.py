@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.models.lead import OpportunityStage
 from app.schemas.customer import CustomerRead
 from app.schemas.followup import FollowUpRead
+from app.schemas.product import OpportunityProductRead
 
 
 class OpportunityFields(BaseModel):
@@ -84,6 +85,7 @@ class OpportunityDetail(OpportunityListItem):
     customer: CustomerRead
     stage_history: list[OpportunityStageHistoryRead]
     followups: list[FollowUpRead]
+    products: list[OpportunityProductRead]
 
 
 class OpportunityPage(BaseModel):

@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.models.customer import Customer
 from app.models.lead import Opportunity, OpportunityStage, OpportunityStageHistory
+from app.models.product import OpportunityProduct, Product
 from app.models.user import User, UserRole
 from app.schemas.opportunity import (
     OpportunityCreate,
@@ -10,8 +11,9 @@ from app.schemas.opportunity import (
     OpportunityListItem,
     OpportunityUpdate,
 )
+from app.schemas.product import OpportunityProductRead, OpportunityProductReplace
 from app.services import access_service
-from app.services.errors import ForbiddenError, NotFoundError
+from app.services.errors import ConflictError, ForbiddenError, NotFoundError
 
 
 def _ensure_read_access(user: User, opportunity: Opportunity) -> None:
@@ -39,6 +41,20 @@ def _list_item(opportunity: Opportunity) -> OpportunityListItem:
         }
     )
     return item
+
+
+def _product_item(item: OpportunityProduct) -> OpportunityProductRead:
+    primary_image = next((image for image in item.product.images if image.is_primary), None)
+    return OpportunityProductRead(
+        product_id=item.product_id,
+        sku=item.product.sku,
+        name=item.product.name,
+        quantity=item.quantity,
+        target_price=item.target_price,
+        reference_price=item.product.reference_price,
+        currency_code=item.product.currency_code,
+        image_url=primary_image.image_url if primary_image else None,
+    )
 
 
 def list_opportunities(
@@ -93,6 +109,9 @@ def get_opportunity(session: Session, opportunity_id: int) -> Opportunity:
             joinedload(Opportunity.owner),
             joinedload(Opportunity.customer).selectinload(Customer.followups),
             selectinload(Opportunity.stage_history),
+            selectinload(Opportunity.product_items)
+            .joinedload(OpportunityProduct.product)
+            .selectinload(Product.images),
         )
     )
     opportunity = session.scalar(statement)
@@ -114,6 +133,7 @@ def get_opportunity_detail(
             "customer": opportunity.customer,
             "stage_history": opportunity.stage_history,
             "followups": opportunity.customer.followups,
+            "products": [_product_item(item) for item in opportunity.product_items],
         }
     )
 
@@ -178,5 +198,37 @@ def update_opportunity(
         )
     for field, value in changes.items():
         setattr(opportunity, field, value)
+    session.commit()
+    return get_opportunity_detail(session, opportunity.id, editor)
+
+
+def replace_opportunity_products(
+    session: Session,
+    opportunity_id: int,
+    payload: OpportunityProductReplace,
+    editor: User,
+) -> OpportunityDetail:
+    opportunity = get_opportunity(session, opportunity_id)
+    _ensure_manage_access(editor, opportunity)
+    product_ids = [item.product_id for item in payload.items]
+    if len(product_ids) != len(set(product_ids)):
+        raise ConflictError("Each product may only appear once in an opportunity.")
+    if product_ids:
+        existing_ids = set(
+            session.scalars(select(Product.id).where(Product.id.in_(product_ids)))
+        )
+        missing_ids = set(product_ids) - existing_ids
+        if missing_ids:
+            raise NotFoundError("One or more products were not found.")
+    opportunity.product_items.clear()
+    session.flush()
+    opportunity.product_items.extend(
+        OpportunityProduct(
+            product_id=item.product_id,
+            quantity=item.quantity,
+            target_price=item.target_price,
+        )
+        for item in payload.items
+    )
     session.commit()
     return get_opportunity_detail(session, opportunity.id, editor)

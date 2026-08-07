@@ -27,6 +27,7 @@ export interface OpportunityStageHistory {
 }
 export interface OpportunityDetail extends OpportunityListItem {
   customer: Customer; stage_history: OpportunityStageHistory[]; followups: FollowUp[];
+  products: OpportunityProduct[];
 }
 export interface OpportunityPage { items: OpportunityListItem[]; total: number; limit: number; offset: number; }
 export interface LeadConversion {
@@ -80,4 +81,26 @@ export interface DashboardStats {
 export interface FollowUpReminder {
   id: number; customer_id: number; customer_name: string; type: string; content: string;
   next_followup_date: string; reminder_status: "today" | "overdue";
+}
+
+export interface ProductCategory {
+  id: number; name: string; parent_id: number | null; sort_order: number;
+}
+export interface ProductImage {
+  id: number; product_id: number; image_url: string; is_primary: boolean;
+  sort_order: number; created_at: string;
+}
+export interface Product {
+  id: number; sku: string; name: string; category_id: number | null; category_name: string | null;
+  material: string | null; dimension_text: string | null; length_mm: string | null;
+  width_mm: string | null; height_mm: string | null; weight_kg: string | null;
+  unit: string; moq: number | null; reference_price: string | null; currency_code: string;
+  description: string | null; is_active: boolean; images: ProductImage[];
+  created_at: string; updated_at: string;
+}
+export interface ProductPage { items: Product[]; total: number; limit: number; offset: number; }
+export interface OpportunityProduct {
+  product_id: number; sku: string; name: string; quantity: string;
+  target_price: string | null; reference_price: string | null;
+  currency_code: string; image_url: string | null;
 }

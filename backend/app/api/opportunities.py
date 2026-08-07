@@ -12,8 +12,9 @@ from app.schemas.opportunity import (
     OpportunityPage,
     OpportunityUpdate,
 )
+from app.schemas.product import OpportunityProductReplace
 from app.services import opportunity_service
-from app.services.errors import ForbiddenError, NotFoundError
+from app.services.errors import ConflictError, ForbiddenError, NotFoundError
 
 router = APIRouter(prefix="/opportunities", tags=["opportunities"])
 
@@ -94,3 +95,22 @@ def update_opportunity(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
     except ForbiddenError as error:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(error)) from error
+
+
+@router.put("/{opportunity_id}/products", response_model=OpportunityDetail)
+def replace_opportunity_products(
+    opportunity_id: int,
+    payload: OpportunityProductReplace,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> OpportunityDetail:
+    try:
+        return opportunity_service.replace_opportunity_products(
+            session, opportunity_id, payload, current_user
+        )
+    except NotFoundError as error:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+    except ForbiddenError as error:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(error)) from error
+    except ConflictError as error:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error

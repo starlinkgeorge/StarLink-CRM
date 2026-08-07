@@ -1,5 +1,5 @@
 import api from "./api";
-import type { AlibabaInquiryResult, AlibabaIntegrationStatus, Customer, CustomerActivity, CustomerDetail, CustomerPage, DashboardStats, FollowUp, Lead, LeadConversion, LeadDetail, LeadPage, LeadStatus, OpportunityDetail, OpportunityListItem, OpportunityPage, OpportunityStage, Tag } from "../types";
+import type { AlibabaInquiryResult, AlibabaIntegrationStatus, Customer, CustomerActivity, CustomerDetail, CustomerPage, DashboardStats, FollowUp, Lead, LeadConversion, LeadDetail, LeadPage, LeadStatus, OpportunityDetail, OpportunityListItem, OpportunityPage, OpportunityStage, Product, ProductCategory, ProductPage, Tag } from "../types";
 
 export type CustomerCreatePayload = {
   company_name: string; contact_name?: string; country?: string; email?: string; phone?: string;
@@ -55,3 +55,19 @@ export const getOpportunities = async (params: OpportunityFilters) => (await api
 export const getOpportunity = async (id: string) => (await api.get<OpportunityDetail>(`/opportunities/${id}`)).data;
 export const createOpportunity = async (data: OpportunityPayload) => (await api.post<OpportunityListItem>("/opportunities", data)).data;
 export const updateOpportunity = async (id: number, data: Partial<Omit<OpportunityPayload, "customer_id">>) => (await api.put<OpportunityDetail>(`/opportunities/${id}`, data)).data;
+
+export type ProductImagePayload = { image_url: string; is_primary?: boolean; sort_order?: number };
+export type ProductPayload = {
+  sku: string; name: string; category_id?: number; material?: string; dimension_text?: string;
+  length_mm?: string; width_mm?: string; height_mm?: string; weight_kg?: string;
+  unit?: string; moq?: number; reference_price?: string; currency_code?: string;
+  description?: string; is_active?: boolean; images?: ProductImagePayload[];
+};
+export type ProductFilters = { limit: number; offset: number; q?: string; category_id?: number; is_active?: boolean };
+export const getProductCategories = async () => (await api.get<ProductCategory[]>("/product-categories")).data;
+export const createProductCategory = async (data: { name: string; parent_id?: number; sort_order?: number }) => (await api.post<ProductCategory>("/product-categories", data)).data;
+export const getProducts = async (params: ProductFilters) => (await api.get<ProductPage>("/products", { params })).data;
+export const getProduct = async (id: string) => (await api.get<Product>(`/products/${id}`)).data;
+export const createProduct = async (data: ProductPayload) => (await api.post<Product>("/products", data)).data;
+export const updateProduct = async (id: number, data: Partial<ProductPayload>) => (await api.put<Product>(`/products/${id}`, data)).data;
+export const replaceOpportunityProducts = async (id: number, items: { product_id: number; quantity: string; target_price?: string }[]) => (await api.put<OpportunityDetail>(`/opportunities/${id}/products`, { items })).data;

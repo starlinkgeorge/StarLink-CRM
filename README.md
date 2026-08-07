@@ -2,7 +2,7 @@
 
 StarLink-CRM is the foundation for a long-lived customer relationship management platform for **Dalian StarLink International Trade**, an exporter of Montessori educational products and wooden kindergarten furniture.
 
-## Current release: CRM V2.2
+## Current release: CRM V3
 
 The current release includes:
 
@@ -12,13 +12,15 @@ The current release includes:
 - Customer profiles capture customer type, acquisition source, interested products, and sales stage
 - Follow-up creation with optional next-follow-up dates
 - Dashboard statistics backed by PostgreSQL, including total follow-ups and upcoming work
+- Lead inquiry pool, Lead conversion, Alibaba inquiry simulation, and opportunity management
+- Product catalog with categories, specifications, prices, URL images, and opportunity product lines
 - React + TypeScript + Tailwind frontend
 - Python FastAPI + SQLAlchemy backend
 - PostgreSQL service configuration
 - Docker Compose and container build configuration
 - Environment, documentation, scripts, and test placeholders
 
-AI and third-party marketplace integrations are intentionally outside this release.
+AI features and live third-party marketplace credentials remain outside this release. The Alibaba endpoint is an integration contract and local simulation only.
 
 ## Prerequisites
 
@@ -91,7 +93,9 @@ Roles: `Admin` manages all records and users; `Sales` reads and manages only cus
 | Users | `GET /users`, `POST /users`, `GET /users/{id}` |
 | Customers | `GET /customers?limit=20&offset=0&q=keyword`, `POST /customers`, `GET /customers/{id}`, `GET /customers/{id}/timeline`, `PUT /customers/{id}`, `DELETE /customers/{id}` |
 | Leads | `GET /leads`, `POST /leads`, `GET /leads/{id}`, `POST /leads/{id}/convert` |
-| Opportunities | `GET /opportunities`, `POST /opportunities`, `GET /opportunities/{id}`, `PUT /opportunities/{id}` |
+| Opportunities | `GET /opportunities`, `POST /opportunities`, `GET /opportunities/{id}`, `PUT /opportunities/{id}`, `PUT /opportunities/{id}/products` |
+| Product categories | `GET /product-categories`, `POST /product-categories`, `PUT /product-categories/{id}` |
+| Products | `GET /products`, `POST /products`, `GET /products/{id}`, `PUT /products/{id}` |
 | Alibaba integration | `GET /integrations/alibaba/status`, `POST /integrations/alibaba/inquiries` |
 | Contacts | `POST /contacts`, `GET /contacts/{id}`, `PUT /contacts/{id}` |
 | Follow-ups | `POST /followups`, `GET /followups?customer_id={id}` |
@@ -106,6 +110,8 @@ The Lead inquiry pool accepts new inquiries, supports pagination and filtering, 
 
 Opportunities use an independent lifecycle: `Lead`, `Qualified`, `Proposal`, `Negotiation`, `Won`, and `Lost`. Lists support pagination, search, stage filtering, and customer filtering. Opportunity details combine customer information, product and inquiry requirements, amount/currency, expected close date, immutable stage history, and the customer's follow-up records. Lead conversion carries the company name, product need, and inquiry content into the opportunity. Admin users manage all opportunities; Sales users create and update only opportunities assigned to themselves; Viewer users are read-only. Dashboard opportunity counts respect the same scope, and amounts are grouped by currency instead of mixing incompatible totals.
 
+The product catalog stores hierarchical categories, SKU, dimensions, material, MOQ, reference price, currency, active state, and URL-based image lists with at most one primary image. Product lists accept `q`, `category_id`, and `is_active` filters; an empty `q` returns all products. Product images use `http` or `https` URLs in this phase. Opportunities link catalog products through `PUT /opportunities/{id}/products`, with per-line quantity and target price. The legacy free-text `interested_product` remains available, including on Lead conversion, to preserve existing inquiry data. Admin and Sales users may create and edit catalog records; Viewer users are read-only.
+
 The first-phase Alibaba integration accepts simulated inquiries through an authenticated endpoint. It always sets Lead `source` to `Alibaba` and `status` to `New`, regardless of submitted source data. Existing Leads are returned instead of duplicated when a case-insensitive email match or company-and-contact match is found. The Settings page exposes connection state and a simulation button. No database migration is required for this integration phase; see [docs/alibaba-integration.md](docs/alibaba-integration.md) for the future production-authentication boundary.
 
 Run API tests after installing backend development dependencies:
@@ -117,7 +123,7 @@ pytest
 
 ## Frontend CRM interface
 
-The React frontend includes login, dashboard, Lead inquiry list/detail/creation/conversion, opportunity list/detail/creation/update, data-source settings, customer list, customer detail, customer creation, and follow-up creation pages. The Dashboard separates today's reminders from overdue customers and includes scoped opportunity statistics. The customer detail page shows related opportunities, the current reminder state, and a newest-first activity timeline containing customer creation, follow-ups, and sales-stage changes. Set `VITE_API_BASE_URL` in `frontend/.env` if the backend is not running at the local default, then run `npm install` and `npm run dev` from `frontend/`.
+The React frontend includes login, dashboard, Lead inquiry list/detail/creation/conversion, opportunity list/detail/creation/update, product list/detail/creation/editing, data-source settings, customer list, customer detail, customer creation, and follow-up creation pages. The product library supports search, category and active-state filters, URL image management, and enable/disable actions. Opportunity details support product lines with quantity and target price. The Dashboard separates today's reminders from overdue customers and includes scoped opportunity statistics. The customer detail page shows related opportunities, the current reminder state, and a newest-first activity timeline containing customer creation, follow-ups, and sales-stage changes. Set `VITE_API_BASE_URL` in `frontend/.env` if the backend is not running at the local default, then run `npm install` and `npm run dev` from `frontend/`.
 
 ### Full local stack with Docker
 

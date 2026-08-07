@@ -104,6 +104,9 @@ class Opportunity(TimestampMixin, Base):
         passive_deletes=True,
         order_by="(OpportunityStageHistory.created_at.desc(), OpportunityStageHistory.id.desc())",
     )
+    product_items: Mapped[list["OpportunityProduct"]] = relationship(
+        back_populates="opportunity", cascade="all, delete-orphan", passive_deletes=True
+    )
 
 
 class OpportunityStageHistory(Base):

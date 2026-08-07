@@ -53,6 +53,22 @@ The V3 sales-opportunity record: `id`, UUID `public_id`, `customer_id`, nullable
 
 Immutable opportunity stage changes: `id`, `opportunity_id`, nullable `old_stage`, required `new_stage`, nullable `changed_by_id`, and `created_at`. Initial creation is represented by a row with `old_stage = NULL`; every later stage change appends another row.
 
+### `product_categories`
+
+Hierarchical product classifications: `id`, `name`, nullable self-referencing `parent_id`, and `sort_order`. Removing a parent leaves child categories in place and clears their `parent_id`.
+
+### `products`
+
+The export product catalog: `id`, unique `sku`, `name`, nullable `category_id`, `material`, `dimension_text`, metric dimensions (`length_mm`, `width_mm`, `height_mm`), `weight_kg`, `unit`, `moq`, `reference_price`, three-letter `currency_code`, `description`, `is_active`, `created_at`, and `updated_at`. Exact numeric columns avoid floating-point price and measurement errors. Inactive products remain available to historical opportunities.
+
+### `product_images`
+
+URL-based product images: `id`, `product_id`, `image_url`, `is_primary`, `sort_order`, and `created_at`. A partial unique index permits no more than one primary image per product. Images are deleted with their product.
+
+### `opportunity_products`
+
+Commercial line items joining opportunities and products: composite key (`opportunity_id`, `product_id`), `quantity`, and nullable `target_price`. The composite key prevents duplicate product lines; quantity and target price are opportunity-specific and do not alter the product reference price.
+
 ### `refresh_tokens`
 
 Revocable login-session records: `id`, `user_id`, unique `token_hash`, `expires_at`, `revoked_at`, and `created_at`. The raw JWT refresh token is never persisted. `users.last_login_at` records the most recent successful login.
@@ -71,6 +87,10 @@ customers 1 ──< opportunities (deleted with customer)
 users 1 ──< opportunities (owner_id; SET NULL on user deletion)
 opportunities 1 ──< opportunity_stage_history (deleted with opportunity)
 users 1 ──< opportunity_stage_history (changed_by_id; SET NULL on user deletion)
+product_categories 1 ──< products (category_id; SET NULL on category deletion)
+product_categories 1 ──< product_categories (parent_id; SET NULL on parent deletion)
+products 1 ──< product_images (deleted with product)
+opportunities >──< products (through opportunity_products)
 customers >──< tags (through customer_tags)
 users 1 ──< refresh_tokens (deleted with user)
 ```

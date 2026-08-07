@@ -1,14 +1,26 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import auth, contacts, customers, dashboard, followups, integrations, leads, opportunities, tags, users
+from app.api import (
+    auth,
+    contacts,
+    customers,
+    dashboard,
+    followups,
+    integrations,
+    leads,
+    opportunities,
+    products,
+    tags,
+    users,
+)
 from app.config import get_settings
 
 settings = get_settings()
 
 app = FastAPI(
     title="StarLink CRM API",
-    version="2.2.0",
+    version="3.0.0",
     openapi_url=f"{settings['api_prefix']}/openapi.json",
     docs_url=f"{settings['api_prefix']}/docs",
 )
@@ -31,6 +43,8 @@ app.include_router(followups.router, prefix=settings["api_prefix"])
 app.include_router(leads.router, prefix=settings["api_prefix"])
 app.include_router(integrations.router, prefix=settings["api_prefix"])
 app.include_router(opportunities.router, prefix=settings["api_prefix"])
+app.include_router(products.category_router, prefix=settings["api_prefix"])
+app.include_router(products.router, prefix=settings["api_prefix"])
 
 
 @app.get(f"{settings['api_prefix']}/health", tags=["system"])
