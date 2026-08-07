@@ -41,6 +41,14 @@ Sales activity records: `id`, `customer_id`, `user_id`, `type`, `content`, `next
 
 Immutable sales-stage audit records: `id`, `customer_id`, nullable `old_status`, required `new_status`, nullable `changed_by_id`, and `created_at`. A row is added only when `status`/`sales_stage` actually changes. Customer creation and follow-up activities remain in their source tables and are combined with these rows by the read-only timeline API.
 
+### `leads`
+
+Inbound trade inquiries before customer qualification: `id`, UUID `public_id`, `company_name`, `contact_name`, `country`, `email`, `phone`, `whatsapp`, `source`, `inquiry_content`, `interested_product`, `status`, `created_at`, and `updated_at`. Status values are `New`, `Contacted`, `Qualified`, `Converted`, and `Lost`.
+
+### `opportunities`
+
+The V3 base sales-opportunity record: `id`, UUID `public_id`, `customer_id`, nullable unique `source_lead_id`, nullable `owner_id`, `name`, `interested_product`, `stage`, `created_at`, and `updated_at`. `source_lead_id` provides conversion traceability and prevents the same Lead from creating duplicate opportunities. Opportunity stages currently reuse the compatible customer sales-stage values.
+
 ### `refresh_tokens`
 
 Revocable login-session records: `id`, `user_id`, unique `token_hash`, `expires_at`, `revoked_at`, and `created_at`. The raw JWT refresh token is never persisted. `users.last_login_at` records the most recent successful login.
@@ -54,6 +62,9 @@ users 1 ──< customer_status_history (changed_by_id; SET NULL on user deletio
 customers 1 ──< contacts (deleted with customer)
 customers 1 ──< followups (deleted with customer)
 customers 1 ──< customer_status_history (deleted with customer)
+leads 1 ── 0..1 opportunities (source_lead_id; SET NULL on Lead deletion)
+customers 1 ──< opportunities (deleted with customer)
+users 1 ──< opportunities (owner_id; SET NULL on user deletion)
 customers >──< tags (through customer_tags)
 users 1 ──< refresh_tokens (deleted with user)
 ```

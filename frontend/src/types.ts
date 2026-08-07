@@ -1,5 +1,26 @@
 export type UserRole = "Admin" | "Sales" | "Viewer";
 
+export type LeadStatus = "New" | "Contacted" | "Qualified" | "Converted" | "Lost";
+export interface Lead {
+  id: number; public_id: string; company_name: string; contact_name: string;
+  country: string | null; email: string | null; phone: string | null; whatsapp: string | null;
+  source: string | null; inquiry_content: string | null; interested_product: string | null;
+  status: LeadStatus; created_at: string; updated_at: string;
+}
+export interface LeadDetail extends Lead {
+  converted_customer_id: number | null;
+  converted_opportunity_id: number | null;
+}
+export interface LeadPage { items: Lead[]; total: number; limit: number; offset: number; }
+export interface Opportunity {
+  id: number; public_id: string; customer_id: number; source_lead_id: number | null;
+  owner_id: number | null; name: string; interested_product: string | null;
+  stage: CustomerStatus; created_at: string; updated_at: string;
+}
+export interface LeadConversion {
+  lead: Lead; customer: Customer; contact: Contact; opportunity: Opportunity;
+}
+
 export interface User { id: number; name: string; email: string; role: UserRole; created_at: string; updated_at: string; }
 export interface Customer {
   id: number; company_name: string; contact_name: string | null; country: string | null;

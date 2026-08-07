@@ -1,5 +1,5 @@
 import api from "./api";
-import type { Customer, CustomerActivity, CustomerDetail, CustomerPage, DashboardStats, FollowUp, Tag } from "../types";
+import type { Customer, CustomerActivity, CustomerDetail, CustomerPage, DashboardStats, FollowUp, Lead, LeadConversion, LeadDetail, LeadPage, LeadStatus, Tag } from "../types";
 
 export type CustomerCreatePayload = {
   company_name: string; contact_name?: string; country?: string; email?: string; phone?: string;
@@ -24,3 +24,14 @@ export const getTags = async () => (await api.get<Tag[]>("/tags")).data;
 export const createTag = async (name: string) => (await api.post<Tag>("/tags", { name })).data;
 export const assignTag = async (customerId: number, tagId: number) => (await api.post<CustomerDetail>(`/customers/${customerId}/tags/${tagId}`)).data;
 export const removeTag = async (customerId: number, tagId: number) => (await api.delete<CustomerDetail>(`/customers/${customerId}/tags/${tagId}`)).data;
+
+export type LeadCreatePayload = {
+  company_name: string; contact_name: string; country?: string; email?: string; phone?: string;
+  whatsapp?: string; source?: string; inquiry_content?: string; interested_product?: string;
+  status?: LeadStatus;
+};
+export type LeadFilters = { limit: number; offset: number; q?: string; status?: string; source?: string };
+export const getLeads = async (params: LeadFilters) => (await api.get<LeadPage>("/leads", { params })).data;
+export const getLead = async (id: string) => (await api.get<LeadDetail>(`/leads/${id}`)).data;
+export const createLead = async (data: LeadCreatePayload) => (await api.post<Lead>("/leads", data)).data;
+export const convertLead = async (id: number) => (await api.post<LeadConversion>(`/leads/${id}/convert`)).data;

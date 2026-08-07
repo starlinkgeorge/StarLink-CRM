@@ -230,6 +230,107 @@ def test_dashboard_separates_today_and_overdue_customer_reminders(
     assert payload["due_followups"] == 3
 
 
+def test_lead_lifecycle_and_transactional_conversion(client: TestClient) -> None:
+    admin_token = login(client, "admin@example.com", "AdminPass123!")
+    created = client.post(
+        "/api/v1/leads",
+        json={
+            "company_name": "Sunrise Montessori Academy",
+            "contact_name": "Anna Lee",
+            "country": "Singapore",
+            "email": "anna@example.com",
+            "phone": "+65 6000 1000",
+            "whatsapp": "+65 6000 1000",
+            "source": "Alibaba",
+            "inquiry_content": "Need a quotation for three classrooms.",
+            "interested_product": "Montessori shelves and preschool tables",
+        },
+        headers=admin_token,
+    )
+    assert created.status_code == 201
+    lead = created.json()
+    assert lead["status"] == "New"
+    assert lead["public_id"]
+
+    listing = client.get(
+        "/api/v1/leads",
+        params={"q": "three classrooms", "source": "alibaba", "status": "New"},
+        headers=admin_token,
+    )
+    assert listing.status_code == 200
+    assert listing.json()["total"] == 1
+
+    detail = client.get(f"/api/v1/leads/{lead['id']}", headers=admin_token)
+    assert detail.status_code == 200
+    assert detail.json()["converted_customer_id"] is None
+
+    conversion = client.post(
+        f"/api/v1/leads/{lead['id']}/convert", headers=admin_token
+    )
+    assert conversion.status_code == 201
+    converted = conversion.json()
+    assert converted["lead"]["status"] == "Converted"
+    assert converted["customer"]["company_name"] == "Sunrise Montessori Academy"
+    assert converted["customer"]["source"] == "Alibaba"
+    assert converted["customer"]["interested_product"] == (
+        "Montessori shelves and preschool tables"
+    )
+    assert converted["contact"]["name"] == "Anna Lee"
+    assert converted["opportunity"]["source_lead_id"] == lead["id"]
+    assert converted["opportunity"]["stage"] == "Lead"
+
+    customer_detail = client.get(
+        f"/api/v1/customers/{converted['customer']['id']}", headers=admin_token
+    )
+    assert customer_detail.status_code == 200
+    assert customer_detail.json()["contacts"][0]["email"] == "anna@example.com"
+
+    converted_detail = client.get(
+        f"/api/v1/leads/{lead['id']}", headers=admin_token
+    )
+    assert converted_detail.json()["converted_customer_id"] == converted["customer"]["id"]
+    assert converted_detail.json()["converted_opportunity_id"] == converted["opportunity"]["id"]
+
+    repeated = client.post(
+        f"/api/v1/leads/{lead['id']}/convert", headers=admin_token
+    )
+    assert repeated.status_code == 409
+
+
+def test_viewer_cannot_create_or_convert_lead(client: TestClient) -> None:
+    admin_token = login(client, "admin@example.com", "AdminPass123!")
+    viewer = client.post(
+        "/api/v1/users",
+        json={
+            "name": "Lead Viewer",
+            "email": "lead-viewer@example.com",
+            "password": "ViewerPass123!",
+            "role": "Viewer",
+        },
+        headers=admin_token,
+    )
+    assert viewer.status_code == 201
+    lead = client.post(
+        "/api/v1/leads",
+        json={"company_name": "Read Only Lead", "contact_name": "Buyer"},
+        headers=admin_token,
+    )
+    assert lead.status_code == 201
+    viewer_token = login(client, "lead-viewer@example.com", "ViewerPass123!")
+    listing = client.get("/api/v1/leads", headers=viewer_token)
+    assert listing.status_code == 200
+    blocked_create = client.post(
+        "/api/v1/leads",
+        json={"company_name": "Blocked", "contact_name": "Viewer"},
+        headers=viewer_token,
+    )
+    assert blocked_create.status_code == 403
+    blocked_conversion = client.post(
+        f"/api/v1/leads/{lead.json()['id']}/convert", headers=viewer_token
+    )
+    assert blocked_conversion.status_code == 403
+
+
 def test_customer_list_supports_v3_profile_filters(client: TestClient) -> None:
     admin_token = login(client, "admin@example.com", "AdminPass123!")
     records = [
