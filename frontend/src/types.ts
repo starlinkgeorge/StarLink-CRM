@@ -29,6 +29,13 @@ export interface CustomerPage { items: Customer[]; total: number; limit: number;
 export interface Tag { id: number; name: string; created_at: string; }
 export interface DashboardStats {
   customer_count: number; followup_count: number; new_customers_today: number; due_followups: number;
+  today_followup_count: number; overdue_followup_count: number;
   pipeline: { status: CustomerStatus; count: number }[];
   upcoming_followups: { id: number; customer_id: number; customer_name: string; type: string; content: string; next_followup_date: string }[];
+  today_followups: FollowUpReminder[];
+  overdue_followups: FollowUpReminder[];
+}
+export interface FollowUpReminder {
+  id: number; customer_id: number; customer_name: string; type: string; content: string;
+  next_followup_date: string; reminder_status: "today" | "overdue";
 }

@@ -93,7 +93,9 @@ Roles: `Admin` manages all records and users; `Sales` reads and manages only cus
 | Dashboard | `GET /dashboard/stats` |
 | Tags | `GET /tags`, `POST /tags`, `POST /customers/{id}/tags/{tag_id}`, `DELETE /customers/{id}/tags/{tag_id}` |
 
-The customer `q` parameter searches company name, primary contact name, country, and email. Empty or whitespace-only query and filter values are ignored, so the initial list request returns all visible customers. Customer creation accepts `customer_type`, `source`, `interested_product`, and `sales_stage`. The V3-facing `sales_stage` is synchronized with the legacy `status` field so existing V2.2 dashboard statistics remain compatible. Customer lists support `customer_type`, `interested_product`, `sales_stage`, `source`, `status`, `level`, `country`, and `tag_id` filters; the legacy `status` parameter remains available for existing clients. Customer details include related contacts, tags, and follow-ups. The customer timeline endpoint combines customer creation, follow-ups, and persisted sales-stage changes in newest-first order. Existing follow-up endpoints and Dashboard follow-up statistics remain unchanged and continue to read directly from `followups`. Interactive API documentation is available at `/api/v1/docs` while the backend is running.
+The customer `q` parameter searches company name, primary contact name, country, and email. Empty or whitespace-only query and filter values are ignored, so the initial list request returns all visible customers. Customer creation accepts `customer_type`, `source`, `interested_product`, and `sales_stage`. The V3-facing `sales_stage` is synchronized with the legacy `status` field so existing V2.2 dashboard statistics remain compatible. Customer lists support `customer_type`, `interested_product`, `sales_stage`, `source`, `status`, `level`, `country`, and `tag_id` filters; the legacy `status` parameter remains available for existing clients. Customer details include related contacts, tags, and follow-ups. The customer timeline endpoint combines customer creation, follow-ups, and persisted sales-stage changes in newest-first order. Existing follow-up endpoints continue to read and write `followups` without payload changes.
+
+Follow-up reminders reuse `next_followup_date`; no separate reminder record is required. The latest follow-up for each customer defines its current reminder, so an older planned date is superseded when a newer follow-up is recorded. Dashboard statistics expose `today_followup_count`, `overdue_followup_count`, `today_followups`, and `overdue_followups`, while retaining the existing response fields for compatibility. Reminder lists contain up to ten visible customers per category and respect the current user's customer scope. Interactive API documentation is available at `/api/v1/docs` while the backend is running.
 
 Run API tests after installing backend development dependencies:
 
@@ -104,7 +106,7 @@ pytest
 
 ## Frontend CRM interface
 
-The React frontend includes login, dashboard, customer list, customer detail, customer creation, and follow-up creation pages. The customer detail page shows a newest-first activity timeline containing customer creation, follow-ups, and sales-stage changes. Set `VITE_API_BASE_URL` in `frontend/.env` if the backend is not running at the local default, then run `npm install` and `npm run dev` from `frontend/`.
+The React frontend includes login, dashboard, customer list, customer detail, customer creation, and follow-up creation pages. The Dashboard separates today's reminders from overdue customers. The customer detail page shows the current reminder state plus a newest-first activity timeline containing customer creation, follow-ups, and sales-stage changes. Set `VITE_API_BASE_URL` in `frontend/.env` if the backend is not running at the local default, then run `npm install` and `npm run dev` from `frontend/`.
 
 ### Full local stack with Docker
 

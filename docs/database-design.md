@@ -35,7 +35,7 @@ Reusable customer labels. `tags` contains `id`, unique `name`, and `created_at`.
 
 ### `followups`
 
-Sales activity records: `id`, `customer_id`, `user_id`, `type`, `content`, `next_followup_date`, and `created_at`. Types are `Email`, `WhatsApp`, `Phone`, and `Meeting`.
+Sales activity records: `id`, `customer_id`, `user_id`, `type`, `content`, `next_followup_date`, and `created_at`. Types are `Email`, `WhatsApp`, `Phone`, and `Meeting`. The optional `next_followup_date` is also the reminder date. The latest follow-up row for a customer defines its active reminder; older dates remain immutable history and are not counted again after a newer follow-up is recorded.
 
 ### `customer_status_history`
 

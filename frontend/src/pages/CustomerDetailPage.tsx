@@ -26,6 +26,23 @@ const stageText: Record<CustomerStatus, string> = {
   Lost: "已流失",
 };
 
+function localDateString() {
+  const now = new Date();
+  const localTime = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
+  return localTime.toISOString().slice(0, 10);
+}
+
+function ReminderBadge({ followupDate }: { followupDate: string }) {
+  const today = localDateString();
+  if (followupDate < today) {
+    return <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-700">已逾期 · {followupDate}</span>;
+  }
+  if (followupDate === today) {
+    return <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">今日待跟进</span>;
+  }
+  return <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">计划跟进 · {followupDate}</span>;
+}
+
 function ActivityItem({ activity }: { activity: CustomerActivity }) {
   const isFollowup = activity.event_type === "followup";
   const isStatusChange = activity.event_type === "status_changed";
@@ -47,9 +64,7 @@ function ActivityItem({ activity }: { activity: CustomerActivity }) {
       <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm">
         <strong>{title}</strong>
         <time className="text-slate-500">{new Date(activity.occurred_at).toLocaleString()}</time>
-        {activity.next_followup_date && (
-          <span className="text-amber-700">下次跟进：{activity.next_followup_date}</span>
-        )}
+        {activity.next_followup_date && <ReminderBadge followupDate={activity.next_followup_date} />}
       </div>
       {isStatusChange && activity.new_status && (
         <p className="mt-1 text-sm text-slate-700">
@@ -99,6 +114,7 @@ export function CustomerDetailPage() {
   }, [load]);
 
   const editable = user?.role !== "Viewer";
+  const currentReminder = customer?.followups[0]?.next_followup_date;
 
   async function addFollowup(event: FormEvent) {
     event.preventDefault();
@@ -182,6 +198,16 @@ export function CustomerDetailPage() {
       </div>
 
       {error && <p className="mt-4 text-sm text-rose-600">{error}</p>}
+
+      <section className="mt-5 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold">当前跟进提醒</h3>
+            <p className="mt-1 text-sm text-slate-500">以客户最新一条跟进记录设置的日期为准</p>
+          </div>
+          {currentReminder ? <ReminderBadge followupDate={currentReminder} /> : <span className="text-sm text-slate-500">暂无待跟进提醒</span>}
+        </div>
+      </section>
 
       <section className="mt-7 grid gap-5 lg:grid-cols-2">
         <article className="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200">

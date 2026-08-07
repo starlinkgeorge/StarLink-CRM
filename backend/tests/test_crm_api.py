@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime, timedelta
 
 from fastapi.testclient import TestClient
 
@@ -174,6 +174,60 @@ def test_user_email_must_be_unique(client: TestClient) -> None:
         headers=admin_token,
     )
     assert duplicate.status_code == 409
+
+
+def test_dashboard_separates_today_and_overdue_customer_reminders(
+    client: TestClient,
+) -> None:
+    admin_token = login(client, "admin@example.com", "AdminPass123!")
+    users = client.get("/api/v1/users", headers=admin_token)
+    admin_id = users.json()[0]["id"]
+    today = date.today()
+
+    customers = {}
+    for company_name in ("Today Customer", "Overdue Customer", "Future Customer"):
+        response = client.post(
+            "/api/v1/customers",
+            json={"company_name": company_name},
+            headers=admin_token,
+        )
+        assert response.status_code == 201
+        customers[company_name] = response.json()["id"]
+
+    reminders = [
+        ("Today Customer", today - timedelta(days=3), "Older reminder"),
+        ("Today Customer", today, "Call today"),
+        ("Overdue Customer", today - timedelta(days=1), "Overdue call"),
+        ("Future Customer", today + timedelta(days=2), "Future call"),
+    ]
+    for company_name, reminder_date, content in reminders:
+        response = client.post(
+            "/api/v1/followups",
+            json={
+                "customer_id": customers[company_name],
+                "user_id": admin_id,
+                "type": "Phone",
+                "content": content,
+                "next_followup_date": reminder_date.isoformat(),
+            },
+            headers=admin_token,
+        )
+        assert response.status_code == 201
+
+    stats = client.get("/api/v1/dashboard/stats", headers=admin_token)
+    assert stats.status_code == 200
+    payload = stats.json()
+    assert payload["today_followup_count"] == 1
+    assert payload["overdue_followup_count"] == 1
+    assert [item["customer_name"] for item in payload["today_followups"]] == [
+        "Today Customer"
+    ]
+    assert [item["customer_name"] for item in payload["overdue_followups"]] == [
+        "Overdue Customer"
+    ]
+    assert payload["today_followups"][0]["reminder_status"] == "today"
+    assert payload["overdue_followups"][0]["reminder_status"] == "overdue"
+    assert payload["due_followups"] == 3
 
 
 def test_customer_list_supports_v3_profile_filters(client: TestClient) -> None:
