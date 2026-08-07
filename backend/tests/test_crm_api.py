@@ -67,7 +67,13 @@ def test_customer_lifecycle_with_contacts_and_followups(client: TestClient) -> N
     assert detail.json()["contacts"][0]["name"] == "Li Mei"
     assert detail.json()["followups"][0]["type"] == "Email"
 
-    listing = client.get("/api/v1/customers", params={"q": "Montessori", "limit": 10}, headers=sales_token)
+    tag = client.post("/api/v1/tags", json={"name": "Alibaba High Priority"}, headers=sales_token)
+    assert tag.status_code == 201
+    linked = client.post(f"/api/v1/customers/{customer['id']}/tags/{tag.json()['id']}", headers=sales_token)
+    assert linked.status_code == 200
+    assert linked.json()["tags"][0]["name"] == "Alibaba High Priority"
+
+    listing = client.get("/api/v1/customers", params={"q": "Montessori", "tag_id": tag.json()["id"], "limit": 10}, headers=sales_token)
     assert listing.status_code == 200
     assert listing.json()["total"] == 1
 

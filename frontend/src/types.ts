@@ -12,3 +12,9 @@ export interface Contact { id: number; customer_id: number; name: string; positi
 export interface FollowUp { id: number; customer_id: number; user_id: number; type: "Email" | "WhatsApp" | "Phone" | "Meeting"; content: string; next_followup_date: string | null; created_at: string; }
 export interface CustomerDetail extends Customer { contacts: Contact[]; tags: { id: number; name: string; created_at: string }[]; followups: FollowUp[]; }
 export interface CustomerPage { items: Customer[]; total: number; limit: number; offset: number; }
+export interface Tag { id: number; name: string; created_at: string; }
+export interface DashboardStats {
+  customer_count: number; followup_count: number; new_customers_today: number; due_followups: number;
+  pipeline: { status: CustomerStatus; count: number }[];
+  upcoming_followups: { id: number; customer_id: number; customer_name: string; type: string; content: string; next_followup_date: string }[];
+}

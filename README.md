@@ -2,17 +2,22 @@
 
 StarLink-CRM is the foundation for a long-lived customer relationship management platform for **Dalian StarLink International Trade**, an exporter of Montessori educational products and wooden kindergarten furniture.
 
-## Scope of this initial release
+## Current release: CRM V2.2
 
-This release establishes only the project foundation:
+The current release includes:
 
-- React + TypeScript frontend skeleton
-- Python FastAPI backend skeleton with a health endpoint
+- JWT login and role-based access control
+- Customer list with pagination, search, and CRM filters
+- Customer detail profiles with contacts, tags, sales stage, and follow-up timeline
+- Follow-up creation with optional next-follow-up dates
+- Dashboard statistics backed by PostgreSQL, including total follow-ups and upcoming work
+- React + TypeScript + Tailwind frontend
+- Python FastAPI + SQLAlchemy backend
 - PostgreSQL service configuration
 - Docker Compose and container build configuration
 - Environment, documentation, scripts, and test placeholders
 
-No customer-management, AI, authentication, or other business features are included yet.
+AI and third-party marketplace integrations are intentionally outside this release.
 
 ## Prerequisites
 
@@ -85,8 +90,9 @@ Roles: `Admin` manages all records and users; `Sales` reads and manages only cus
 | Contacts | `POST /contacts`, `GET /contacts/{id}`, `PUT /contacts/{id}` |
 | Follow-ups | `POST /followups`, `GET /followups?customer_id={id}` |
 | Dashboard | `GET /dashboard/stats` |
+| Tags | `GET /tags`, `POST /tags`, `POST /customers/{id}/tags/{tag_id}`, `DELETE /customers/{id}/tags/{tag_id}` |
 
-The customer `q` parameter searches company name, primary contact name, country, and email. Customer details include related contacts, tags, and follow-up records. Interactive API documentation is available at `/api/v1/docs` while the backend is running.
+The customer `q` parameter searches company name, primary contact name, country, and email. Customer lists also support `status`, `level`, `country`, `source`, and `tag_id` filters. Customer details include related contacts, tags, and a newest-first follow-up timeline. Dashboard follow-up totals are calculated directly from PostgreSQL and respect role-based customer visibility. Interactive API documentation is available at `/api/v1/docs` while the backend is running.
 
 Run API tests after installing backend development dependencies:
 

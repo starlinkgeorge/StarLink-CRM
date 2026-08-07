@@ -14,5 +14,4 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 def get_dashboard_stats(
     session: Session = Depends(get_db_session), current_user: User = Depends(get_current_user)
 ) -> DashboardStats:
-    customer_count, followup_count = dashboard_service.get_dashboard_stats(session, current_user)
-    return DashboardStats(customer_count=customer_count, followup_count=followup_count)
+    return DashboardStats(**dashboard_service.get_dashboard_stats(session, current_user))

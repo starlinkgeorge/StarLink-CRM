@@ -74,7 +74,10 @@ class Customer(TimestampMixin, Base):
     )
     tags: Mapped[list["Tag"]] = relationship(secondary=CustomerTag, back_populates="customers")
     followups: Mapped[list["FollowUp"]] = relationship(
-        back_populates="customer", cascade="all, delete-orphan", passive_deletes=True
+        back_populates="customer",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="(FollowUp.created_at.desc(), FollowUp.id.desc())",
     )
 
 

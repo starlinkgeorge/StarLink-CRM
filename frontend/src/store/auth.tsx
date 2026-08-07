@@ -18,4 +18,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
   return <AuthContext.Provider value={{ user, isAuthenticated: user !== null, login, logout }}>{children}</AuthContext.Provider>;
 }
+// This hook intentionally shares the authentication context with the provider.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() { const context = useContext(AuthContext); if (!context) throw new Error("useAuth must be used within AuthProvider"); return context; }
