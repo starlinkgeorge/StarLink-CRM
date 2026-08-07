@@ -307,7 +307,7 @@ export function CustomerDetailPage() {
             <label className="text-sm font-medium">
               跟进方式
               <select value={type} onChange={(event) => setType(event.target.value)} className="mt-1 w-full rounded border px-3 py-2">
-                <option>Email</option><option>WhatsApp</option><option>Phone</option><option>Meeting</option>
+                <option>Email</option><option>WhatsApp</option><option>Alibaba</option><option>Phone</option><option>Meeting</option>
               </select>
             </label>
             <label className="text-sm font-medium">

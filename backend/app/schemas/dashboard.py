@@ -35,6 +35,7 @@ class DashboardStats(BaseModel):
     due_followups: int
     today_followup_count: int
     overdue_followup_count: int
+    week_followup_count: int
     pipeline: list[PipelineItem]
     upcoming_followups: list[UpcomingFollowUp]
     today_followups: list[FollowUpReminder]

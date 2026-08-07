@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -34,6 +34,8 @@ def get_dashboard_stats(session: Session, user: User) -> dict:
         or 0
     )
     today = date.today()
+    week_start = today - timedelta(days=today.weekday())
+    week_end = week_start + timedelta(days=7)
     new_customers_today = session.scalar(
         select(func.count())
         .select_from(Customer)
@@ -42,6 +44,16 @@ def get_dashboard_stats(session: Session, user: User) -> dict:
     due_followups = session.scalar(
         select(func.count()).select_from(FollowUp).join(Customer).where(
             *filters, FollowUp.next_followup_date.is_not(None), FollowUp.next_followup_date <= today
+        )
+    ) or 0
+    week_followup_count = session.scalar(
+        select(func.count())
+        .select_from(FollowUp)
+        .join(Customer)
+        .where(
+            *filters,
+            func.date(FollowUp.created_at) >= week_start,
+            func.date(FollowUp.created_at) < week_end,
         )
     ) or 0
     pipeline_rows = session.execute(
@@ -109,6 +121,7 @@ def get_dashboard_stats(session: Session, user: User) -> dict:
         "due_followups": due_followups,
         "today_followup_count": len(today_reminders),
         "overdue_followup_count": len(overdue_reminders),
+        "week_followup_count": week_followup_count,
         "pipeline": [
             {"status": status.value, "count": counts[status.value]}
             for status in CustomerStatus

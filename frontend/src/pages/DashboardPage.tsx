@@ -47,6 +47,7 @@ export function DashboardPage() {
     ["今日新增", stats?.new_customers_today],
     ["今日待跟进", stats?.today_followup_count],
     ["逾期客户", stats?.overdue_followup_count],
+    ["本周跟进", stats?.week_followup_count],
     ["跟进记录", stats?.followup_count],
   ];
 
@@ -61,7 +62,7 @@ export function DashboardPage() {
       </div>
       {error && <p className="mt-4 text-sm text-rose-600">{error}</p>}
 
-      <section className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <section className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
         {cards.map(([title, value]) => (
           <article key={String(title)} className="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
             <p className="text-sm text-slate-500">{title}</p>
@@ -100,7 +101,7 @@ export function DashboardPage() {
           <div className="flex items-center justify-between">
             <h3 className="font-bold">跟进提醒</h3>
             <span className="text-sm text-slate-500">
-              今日 {stats?.today_followup_count ?? 0} · 逾期 {stats?.overdue_followup_count ?? 0}
+              今日 {stats?.today_followup_count ?? 0} · 逾期 {stats?.overdue_followup_count ?? 0} · 本周 {stats?.week_followup_count ?? 0}
             </span>
           </div>
           <h4 className="mt-4 text-sm font-semibold text-rose-700">逾期客户</h4>

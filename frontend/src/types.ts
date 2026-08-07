@@ -51,7 +51,8 @@ export interface Customer {
 }
 export type CustomerStatus = "Lead" | "Contacted" | "Quotation" | "Negotiation" | "Won" | "Lost";
 export interface Contact { id: number; customer_id: number; name: string; position: string | null; email: string | null; phone: string | null; whatsapp: string | null; created_at: string; }
-export interface FollowUp { id: number; customer_id: number; user_id: number; type: "Email" | "WhatsApp" | "Phone" | "Meeting"; content: string; next_followup_date: string | null; created_at: string; }
+export type FollowUpType = "Email" | "WhatsApp" | "Alibaba" | "Phone" | "Meeting";
+export interface FollowUp { id: number; customer_id: number; user_id: number; type: FollowUpType; content: string; next_followup_date: string | null; created_at: string; }
 export type CustomerActivityType = "customer_created" | "followup" | "status_changed";
 export interface CustomerActivity {
   event_id: string;
@@ -70,6 +71,7 @@ export interface Tag { id: number; name: string; created_at: string; }
 export interface DashboardStats {
   customer_count: number; followup_count: number; new_customers_today: number; due_followups: number;
   today_followup_count: number; overdue_followup_count: number;
+  week_followup_count: number;
   pipeline: { status: CustomerStatus; count: number }[];
   upcoming_followups: { id: number; customer_id: number; customer_name: string; type: string; content: string; next_followup_date: string }[];
   today_followups: FollowUpReminder[];

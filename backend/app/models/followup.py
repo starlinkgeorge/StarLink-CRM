@@ -11,6 +11,7 @@ from app.db.base import Base
 class FollowUpType(str, enum.Enum):
     EMAIL = "Email"
     WHATSAPP = "WhatsApp"
+    ALIBABA = "Alibaba"
     PHONE = "Phone"
     MEETING = "Meeting"
 

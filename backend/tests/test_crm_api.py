@@ -220,6 +220,7 @@ def test_dashboard_separates_today_and_overdue_customer_reminders(
     payload = stats.json()
     assert payload["today_followup_count"] == 1
     assert payload["overdue_followup_count"] == 1
+    assert payload["week_followup_count"] == 4
     assert [item["customer_name"] for item in payload["today_followups"]] == [
         "Today Customer"
     ]
@@ -229,6 +230,39 @@ def test_dashboard_separates_today_and_overdue_customer_reminders(
     assert payload["today_followups"][0]["reminder_status"] == "today"
     assert payload["overdue_followups"][0]["reminder_status"] == "overdue"
     assert payload["due_followups"] == 3
+
+
+def test_alibaba_followup_channel_is_supported_and_visible_in_timeline(client: TestClient) -> None:
+    admin_token = login(client, "admin@example.com", "AdminPass123!")
+    user = client.get("/api/v1/users", headers=admin_token).json()[0]
+    customer = client.post(
+        "/api/v1/customers",
+        json={"company_name": "Alibaba Follow-up Customer"},
+        headers=admin_token,
+    )
+    assert customer.status_code == 201
+    followup = client.post(
+        "/api/v1/followups",
+        json={
+            "customer_id": customer.json()["id"],
+            "user_id": user["id"],
+            "type": "Alibaba",
+            "content": "Alibaba inquiry follow-up",
+        },
+        headers=admin_token,
+    )
+    assert followup.status_code == 201
+    assert followup.json()["type"] == "Alibaba"
+
+    timeline = client.get(
+        f"/api/v1/customers/{customer.json()['id']}/timeline",
+        headers=admin_token,
+    )
+    assert timeline.status_code == 200
+    assert any(
+        item["event_type"] == "followup" and item["followup_type"] == "Alibaba"
+        for item in timeline.json()
+    )
 
 
 def test_lead_lifecycle_and_transactional_conversion(client: TestClient) -> None:
