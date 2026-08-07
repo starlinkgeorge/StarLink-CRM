@@ -253,8 +253,8 @@ def update_quotation(
     if quotation.status is not QuotationStatus.DRAFT:
         raise ConflictError("Sent quotation versions are immutable; create a new version.")
     current = _version(quotation)
-    changes = payload.model_dump(exclude_unset=True)
-    item_inputs = changes.pop("items", None)
+    item_inputs = payload.items
+    changes = payload.model_dump(exclude_unset=True, exclude={"items"})
     for field, value in changes.items():
         if value is None:
             raise ConflictError(f"{field} cannot be null.")
