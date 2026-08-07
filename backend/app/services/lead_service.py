@@ -3,7 +3,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.models.customer import Contact, Customer, CustomerStatus
-from app.models.lead import Lead, LeadStatus, Opportunity
+from app.models.lead import (
+    Lead,
+    LeadStatus,
+    Opportunity,
+    OpportunityStage,
+    OpportunityStageHistory,
+)
 from app.models.user import User, UserRole
 from app.schemas.lead import LeadCreate
 from app.services.errors import ConflictError, ForbiddenError, NotFoundError
@@ -109,10 +115,20 @@ def convert_lead(
             owner_id=converter.id,
             name=f"{lead.company_name} - {lead.interested_product or 'New Opportunity'}",
             interested_product=lead.interested_product,
-            stage=CustomerStatus.LEAD,
+            inquiry_content=lead.inquiry_content,
+            stage=OpportunityStage.LEAD,
         )
         lead.status = LeadStatus.CONVERTED
         session.add_all((contact, opportunity))
+        session.flush()
+        session.add(
+            OpportunityStageHistory(
+                opportunity_id=opportunity.id,
+                old_stage=None,
+                new_stage=OpportunityStage.LEAD,
+                changed_by_id=converter.id,
+            )
+        )
         session.commit()
     except IntegrityError as error:
         session.rollback()

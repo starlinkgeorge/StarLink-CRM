@@ -47,7 +47,11 @@ Inbound trade inquiries before customer qualification: `id`, UUID `public_id`, `
 
 ### `opportunities`
 
-The V3 base sales-opportunity record: `id`, UUID `public_id`, `customer_id`, nullable unique `source_lead_id`, nullable `owner_id`, `name`, `interested_product`, `stage`, `created_at`, and `updated_at`. `source_lead_id` provides conversion traceability and prevents the same Lead from creating duplicate opportunities. Opportunity stages currently reuse the compatible customer sales-stage values.
+The V3 sales-opportunity record: `id`, UUID `public_id`, `customer_id`, nullable unique `source_lead_id`, nullable `owner_id`, `name`, `interested_product`, `inquiry_content`, `amount`, three-letter `currency`, `expected_close_date`, `stage`, `created_at`, and `updated_at`. `source_lead_id` provides conversion traceability and prevents the same Lead from creating duplicate opportunities. Stages are independently defined as `Lead`, `Qualified`, `Proposal`, `Negotiation`, `Won`, and `Lost`. Monetary values use `NUMERIC(14,2)` and are aggregated by currency.
+
+### `opportunity_stage_history`
+
+Immutable opportunity stage changes: `id`, `opportunity_id`, nullable `old_stage`, required `new_stage`, nullable `changed_by_id`, and `created_at`. Initial creation is represented by a row with `old_stage = NULL`; every later stage change appends another row.
 
 ### `refresh_tokens`
 
@@ -65,6 +69,8 @@ customers 1 ──< customer_status_history (deleted with customer)
 leads 1 ── 0..1 opportunities (source_lead_id; SET NULL on Lead deletion)
 customers 1 ──< opportunities (deleted with customer)
 users 1 ──< opportunities (owner_id; SET NULL on user deletion)
+opportunities 1 ──< opportunity_stage_history (deleted with opportunity)
+users 1 ──< opportunity_stage_history (changed_by_id; SET NULL on user deletion)
 customers >──< tags (through customer_tags)
 users 1 ──< refresh_tokens (deleted with user)
 ```

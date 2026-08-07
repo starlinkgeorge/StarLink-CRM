@@ -4,10 +4,10 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.models.customer import CustomerStatus
 from app.models.lead import LeadStatus
 from app.schemas.contact import ContactRead
 from app.schemas.customer import CustomerRead
+from app.schemas.opportunity import OpportunityRead
 
 
 class LeadFields(BaseModel):
@@ -51,21 +51,6 @@ class LeadPage(BaseModel):
     total: int
     limit: int
     offset: int
-
-
-class OpportunityRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    public_id: UUID
-    customer_id: int
-    source_lead_id: int | None
-    owner_id: int | None
-    name: str
-    interested_product: str | None
-    stage: CustomerStatus
-    created_at: datetime
-    updated_at: datetime
 
 
 class LeadConversionRead(BaseModel):

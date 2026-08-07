@@ -91,6 +91,7 @@ Roles: `Admin` manages all records and users; `Sales` reads and manages only cus
 | Users | `GET /users`, `POST /users`, `GET /users/{id}` |
 | Customers | `GET /customers?limit=20&offset=0&q=keyword`, `POST /customers`, `GET /customers/{id}`, `GET /customers/{id}/timeline`, `PUT /customers/{id}`, `DELETE /customers/{id}` |
 | Leads | `GET /leads`, `POST /leads`, `GET /leads/{id}`, `POST /leads/{id}/convert` |
+| Opportunities | `GET /opportunities`, `POST /opportunities`, `GET /opportunities/{id}`, `PUT /opportunities/{id}` |
 | Alibaba integration | `GET /integrations/alibaba/status`, `POST /integrations/alibaba/inquiries` |
 | Contacts | `POST /contacts`, `GET /contacts/{id}`, `PUT /contacts/{id}` |
 | Follow-ups | `POST /followups`, `GET /followups?customer_id={id}` |
@@ -103,6 +104,8 @@ Follow-up reminders reuse `next_followup_date`; no separate reminder record is r
 
 The Lead inquiry pool accepts new inquiries, supports pagination and filtering, and exposes a detail view. `POST /leads/{id}/convert` atomically creates a customer, its primary contact, and a base opportunity, then marks the Lead as `Converted`. The unique opportunity-to-Lead link prevents duplicate conversion. Admin and Sales users may create and convert Leads; Viewer users retain read-only access.
 
+Opportunities use an independent lifecycle: `Lead`, `Qualified`, `Proposal`, `Negotiation`, `Won`, and `Lost`. Lists support pagination, search, stage filtering, and customer filtering. Opportunity details combine customer information, product and inquiry requirements, amount/currency, expected close date, immutable stage history, and the customer's follow-up records. Lead conversion carries the company name, product need, and inquiry content into the opportunity. Admin users manage all opportunities; Sales users create and update only opportunities assigned to themselves; Viewer users are read-only. Dashboard opportunity counts respect the same scope, and amounts are grouped by currency instead of mixing incompatible totals.
+
 The first-phase Alibaba integration accepts simulated inquiries through an authenticated endpoint. It always sets Lead `source` to `Alibaba` and `status` to `New`, regardless of submitted source data. Existing Leads are returned instead of duplicated when a case-insensitive email match or company-and-contact match is found. The Settings page exposes connection state and a simulation button. No database migration is required for this integration phase; see [docs/alibaba-integration.md](docs/alibaba-integration.md) for the future production-authentication boundary.
 
 Run API tests after installing backend development dependencies:
@@ -114,7 +117,7 @@ pytest
 
 ## Frontend CRM interface
 
-The React frontend includes login, dashboard, Lead inquiry list/detail/creation/conversion, data-source settings, customer list, customer detail, customer creation, and follow-up creation pages. The Dashboard separates today's reminders from overdue customers. The customer detail page shows the current reminder state plus a newest-first activity timeline containing customer creation, follow-ups, and sales-stage changes. Set `VITE_API_BASE_URL` in `frontend/.env` if the backend is not running at the local default, then run `npm install` and `npm run dev` from `frontend/`.
+The React frontend includes login, dashboard, Lead inquiry list/detail/creation/conversion, opportunity list/detail/creation/update, data-source settings, customer list, customer detail, customer creation, and follow-up creation pages. The Dashboard separates today's reminders from overdue customers and includes scoped opportunity statistics. The customer detail page shows related opportunities, the current reminder state, and a newest-first activity timeline containing customer creation, follow-ups, and sales-stage changes. Set `VITE_API_BASE_URL` in `frontend/.env` if the backend is not running at the local default, then run `npm install` and `npm run dev` from `frontend/`.
 
 ### Full local stack with Docker
 

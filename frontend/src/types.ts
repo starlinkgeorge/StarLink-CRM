@@ -1,6 +1,7 @@
 export type UserRole = "Admin" | "Sales" | "Viewer";
 
 export type LeadStatus = "New" | "Contacted" | "Qualified" | "Converted" | "Lost";
+export type OpportunityStage = "Lead" | "Qualified" | "Proposal" | "Negotiation" | "Won" | "Lost";
 export interface Lead {
   id: number; public_id: string; company_name: string; contact_name: string;
   country: string | null; email: string | null; phone: string | null; whatsapp: string | null;
@@ -15,8 +16,19 @@ export interface LeadPage { items: Lead[]; total: number; limit: number; offset:
 export interface Opportunity {
   id: number; public_id: string; customer_id: number; source_lead_id: number | null;
   owner_id: number | null; name: string; interested_product: string | null;
-  stage: CustomerStatus; created_at: string; updated_at: string;
+  inquiry_content: string | null; amount: string | null; currency: string;
+  expected_close_date: string | null; stage: OpportunityStage;
+  created_at: string; updated_at: string;
 }
+export interface OpportunityListItem extends Opportunity { customer_company: string; owner_name: string | null; }
+export interface OpportunityStageHistory {
+  id: number; opportunity_id: number; old_stage: OpportunityStage | null;
+  new_stage: OpportunityStage; changed_by_id: number | null; created_at: string;
+}
+export interface OpportunityDetail extends OpportunityListItem {
+  customer: Customer; stage_history: OpportunityStageHistory[]; followups: FollowUp[];
+}
+export interface OpportunityPage { items: OpportunityListItem[]; total: number; limit: number; offset: number; }
 export interface LeadConversion {
   lead: Lead; customer: Customer; contact: Contact; opportunity: Opportunity;
 }
@@ -61,6 +73,9 @@ export interface DashboardStats {
   upcoming_followups: { id: number; customer_id: number; customer_name: string; type: string; content: string; next_followup_date: string }[];
   today_followups: FollowUpReminder[];
   overdue_followups: FollowUpReminder[];
+  opportunity_count: number; active_opportunity_count: number;
+  won_opportunity_count: number; lost_opportunity_count: number;
+  opportunity_amounts: { currency: string; amount: string }[];
 }
 export interface FollowUpReminder {
   id: number; customer_id: number; customer_name: string; type: string; content: string;

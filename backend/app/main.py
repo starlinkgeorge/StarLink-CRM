@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import auth, contacts, customers, dashboard, followups, integrations, leads, tags, users
+from app.api import auth, contacts, customers, dashboard, followups, integrations, leads, opportunities, tags, users
 from app.config import get_settings
 
 settings = get_settings()
@@ -30,6 +30,7 @@ app.include_router(contacts.router, prefix=settings["api_prefix"])
 app.include_router(followups.router, prefix=settings["api_prefix"])
 app.include_router(leads.router, prefix=settings["api_prefix"])
 app.include_router(integrations.router, prefix=settings["api_prefix"])
+app.include_router(opportunities.router, prefix=settings["api_prefix"])
 
 
 @app.get(f"{settings['api_prefix']}/health", tags=["system"])

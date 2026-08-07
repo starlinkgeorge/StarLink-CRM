@@ -5,7 +5,8 @@ from sqlalchemy.orm import Session
 
 from app.models.customer import Customer, CustomerStatus
 from app.models.followup import FollowUp
-from app.models.user import User
+from app.models.lead import Opportunity, OpportunityStage
+from app.models.user import User, UserRole
 from app.services.access_service import customer_scope
 
 
@@ -34,7 +35,9 @@ def get_dashboard_stats(session: Session, user: User) -> dict:
     )
     today = date.today()
     new_customers_today = session.scalar(
-        select(func.count()).select_from(Customer).where(*filters, func.date(Customer.created_at) == today)
+        select(func.count())
+        .select_from(Customer)
+        .where(*filters, func.date(Customer.created_at) == today)
     ) or 0
     due_followups = session.scalar(
         select(func.count()).select_from(FollowUp).join(Customer).where(
@@ -81,6 +84,24 @@ def get_dashboard_stats(session: Session, user: User) -> dict:
         for followup, name in current_reminders
         if followup.next_followup_date < today
     ]
+    opportunity_filters = []
+    if user.role is UserRole.SALES:
+        opportunity_filters.append(Opportunity.owner_id == user.id)
+    opportunity_rows = session.execute(
+        select(Opportunity.stage, func.count(Opportunity.id))
+        .where(*opportunity_filters)
+        .group_by(Opportunity.stage)
+    ).all()
+    opportunity_counts = {stage: count for stage, count in opportunity_rows}
+    won_opportunities = opportunity_counts.get(OpportunityStage.WON, 0)
+    lost_opportunities = opportunity_counts.get(OpportunityStage.LOST, 0)
+    opportunity_count = sum(opportunity_counts.values())
+    amount_rows = session.execute(
+        select(Opportunity.currency, func.coalesce(func.sum(Opportunity.amount), 0))
+        .where(*opportunity_filters)
+        .group_by(Opportunity.currency)
+        .order_by(Opportunity.currency.asc())
+    ).all()
     return {
         "customer_count": customer_count,
         "followup_count": followup_count,
@@ -88,7 +109,10 @@ def get_dashboard_stats(session: Session, user: User) -> dict:
         "due_followups": due_followups,
         "today_followup_count": len(today_reminders),
         "overdue_followup_count": len(overdue_reminders),
-        "pipeline": [{"status": status.value, "count": counts[status.value]} for status in CustomerStatus],
+        "pipeline": [
+            {"status": status.value, "count": counts[status.value]}
+            for status in CustomerStatus
+        ],
         "upcoming_followups": [_serialize_followup(followup, name) for followup, name in upcoming],
         "today_followups": [
             {**_serialize_followup(followup, name), "reminder_status": "today"}
@@ -97,5 +121,12 @@ def get_dashboard_stats(session: Session, user: User) -> dict:
         "overdue_followups": [
             {**_serialize_followup(followup, name), "reminder_status": "overdue"}
             for followup, name in overdue_reminders[:10]
+        ],
+        "opportunity_count": opportunity_count,
+        "active_opportunity_count": opportunity_count - won_opportunities - lost_opportunities,
+        "won_opportunity_count": won_opportunities,
+        "lost_opportunity_count": lost_opportunities,
+        "opportunity_amounts": [
+            {"currency": currency, "amount": amount} for currency, amount in amount_rows
         ],
     }

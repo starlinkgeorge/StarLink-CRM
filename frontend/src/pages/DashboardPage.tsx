@@ -70,6 +70,17 @@ export function DashboardPage() {
         ))}
       </section>
 
+      <section className="mt-6 rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+        <div className="flex items-center justify-between"><h3 className="font-bold">商机统计</h3><Link to="/opportunities" className="text-sm text-blue-700">进入商机管理</Link></div>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="rounded-lg bg-slate-50 p-4"><p className="text-sm text-slate-500">商机总数</p><strong className="mt-1 block text-2xl">{stats?.opportunity_count ?? "—"}</strong></div>
+          <div className="rounded-lg bg-blue-50 p-4"><p className="text-sm text-blue-700">进行中</p><strong className="mt-1 block text-2xl">{stats?.active_opportunity_count ?? "—"}</strong></div>
+          <div className="rounded-lg bg-emerald-50 p-4"><p className="text-sm text-emerald-700">成交商机</p><strong className="mt-1 block text-2xl">{stats?.won_opportunity_count ?? "—"}</strong></div>
+          <div className="rounded-lg bg-slate-100 p-4"><p className="text-sm text-slate-600">丢失商机</p><strong className="mt-1 block text-2xl">{stats?.lost_opportunity_count ?? "—"}</strong></div>
+          <div className="rounded-lg bg-violet-50 p-4"><p className="text-sm text-violet-700">商机金额</p><div className="mt-1 space-y-1">{stats?.opportunity_amounts.length ? stats.opportunity_amounts.map((item) => <strong key={item.currency} className="block text-lg">{item.currency} {Number(item.amount).toLocaleString()}</strong>) : <strong className="block text-2xl">—</strong>}</div></div>
+        </div>
+      </section>
+
       <section className="mt-6 grid gap-5 lg:grid-cols-5">
         <article className="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200 lg:col-span-3">
           <h3 className="font-bold">销售漏斗</h3>

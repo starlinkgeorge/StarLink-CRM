@@ -9,12 +9,13 @@ import {
   createTag,
   getCustomer,
   getCustomerTimeline,
+  getOpportunities,
   getTags,
   removeTag,
   updateCustomer,
 } from "../services/crm";
 import { useAuth } from "../store/auth";
-import type { CustomerActivity, CustomerDetail, CustomerStatus, Tag } from "../types";
+import type { CustomerActivity, CustomerDetail, CustomerStatus, OpportunityListItem, OpportunityStage, Tag } from "../types";
 
 const stages: CustomerStatus[] = ["Lead", "Contacted", "Quotation", "Negotiation", "Won", "Lost"];
 const stageText: Record<CustomerStatus, string> = {
@@ -24,6 +25,10 @@ const stageText: Record<CustomerStatus, string> = {
   Negotiation: "谈判中",
   Won: "已成交",
   Lost: "已流失",
+};
+const opportunityStageText: Record<OpportunityStage, string> = {
+  Lead: "初始商机", Qualified: "已确认", Proposal: "方案/报价",
+  Negotiation: "谈判中", Won: "已成交", Lost: "已丢失",
 };
 
 function localDateString() {
@@ -84,6 +89,7 @@ export function CustomerDetailPage() {
   const { user } = useAuth();
   const [customer, setCustomer] = useState<CustomerDetail | null>(null);
   const [timeline, setTimeline] = useState<CustomerActivity[]>([]);
+  const [opportunities, setOpportunities] = useState<OpportunityListItem[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [error, setError] = useState("");
   const [content, setContent] = useState("");
@@ -96,12 +102,14 @@ export function CustomerDetailPage() {
   const load = useCallback(async () => {
     if (!id) return;
     try {
-      const [customerData, timelineData] = await Promise.all([
+      const [customerData, timelineData, opportunityData] = await Promise.all([
         getCustomer(id),
         getCustomerTimeline(id),
+        getOpportunities({ limit: 100, offset: 0, customer_id: Number(id) }),
       ]);
       setCustomer(customerData);
       setTimeline(timelineData);
+      setOpportunities(opportunityData.items);
       setError("");
     } catch {
       setError("无法加载客户详情。");
@@ -270,6 +278,23 @@ export function CustomerDetailPage() {
             )) : <p className="text-sm text-slate-500">暂无其他联系人。</p>}
           </div>
         </article>
+      </section>
+
+      <section className="mt-5 rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+        <div className="flex items-center justify-between">
+          <h3 className="font-bold">商机</h3>
+          <Link to="/opportunities" className="text-sm text-blue-700">查看全部商机</Link>
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {opportunities.map((opportunity) => (
+            <Link key={opportunity.id} to={`/opportunities/${opportunity.id}`} className="rounded-lg bg-slate-50 p-4 hover:bg-blue-50">
+              <div className="flex items-start justify-between gap-2"><strong>{opportunity.name}</strong><span className="whitespace-nowrap rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700">{opportunityStageText[opportunity.stage]}</span></div>
+              <p className="mt-2 truncate text-sm text-slate-600">{opportunity.interested_product ?? "未填写产品需求"}</p>
+              <p className="mt-2 text-sm font-medium">{opportunity.amount ? `${opportunity.currency} ${Number(opportunity.amount).toLocaleString()}` : "金额未填写"}</p>
+            </Link>
+          ))}
+          {!opportunities.length && <p className="text-sm text-slate-500">该客户暂无商机。</p>}
+        </div>
       </section>
 
       <section className="mt-5 rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200">

@@ -1,4 +1,5 @@
 from datetime import date, datetime, timedelta
+from decimal import Decimal
 
 from fastapi.testclient import TestClient
 
@@ -278,6 +279,9 @@ def test_lead_lifecycle_and_transactional_conversion(client: TestClient) -> None
     assert converted["contact"]["name"] == "Anna Lee"
     assert converted["opportunity"]["source_lead_id"] == lead["id"]
     assert converted["opportunity"]["stage"] == "Lead"
+    assert converted["opportunity"]["inquiry_content"] == (
+        "Need a quotation for three classrooms."
+    )
 
     customer_detail = client.get(
         f"/api/v1/customers/{converted['customer']['id']}", headers=admin_token
@@ -295,6 +299,163 @@ def test_lead_lifecycle_and_transactional_conversion(client: TestClient) -> None
         f"/api/v1/leads/{lead['id']}/convert", headers=admin_token
     )
     assert repeated.status_code == 409
+
+
+def test_opportunity_management_stage_history_and_dashboard(client: TestClient) -> None:
+    admin_token = login(client, "admin@example.com", "AdminPass123!")
+    admin_id = client.get("/api/v1/users", headers=admin_token).json()[0]["id"]
+    customer = client.post(
+        "/api/v1/customers",
+        json={"company_name": "Global Preschool Group", "contact_name": "Helen"},
+        headers=admin_token,
+    )
+    assert customer.status_code == 201
+    customer_id = customer.json()["id"]
+
+    created = client.post(
+        "/api/v1/opportunities",
+        json={
+            "customer_id": customer_id,
+            "name": "Campus Furniture Project",
+            "interested_product": "Preschool furniture package",
+            "inquiry_content": "Furniture for five classrooms.",
+            "amount": "25000.00",
+            "currency": "usd",
+            "expected_close_date": "2026-12-31",
+            "stage": "Qualified",
+        },
+        headers=admin_token,
+    )
+    assert created.status_code == 201
+    opportunity = created.json()
+    assert opportunity["currency"] == "USD"
+    assert Decimal(opportunity["amount"]) == Decimal("25000.00")
+    assert opportunity["customer_company"] == "Global Preschool Group"
+
+    listing = client.get(
+        "/api/v1/opportunities",
+        params={"q": "Furniture", "stage": "Qualified", "customer_id": customer_id},
+        headers=admin_token,
+    )
+    assert listing.status_code == 200
+    assert listing.json()["total"] == 1
+
+    followup = client.post(
+        "/api/v1/followups",
+        json={
+            "customer_id": customer_id,
+            "user_id": admin_id,
+            "type": "Meeting",
+            "content": "Reviewed the classroom layout.",
+        },
+        headers=admin_token,
+    )
+    assert followup.status_code == 201
+
+    proposal = client.put(
+        f"/api/v1/opportunities/{opportunity['id']}",
+        json={"stage": "Proposal"},
+        headers=admin_token,
+    )
+    assert proposal.status_code == 200
+    won = client.put(
+        f"/api/v1/opportunities/{opportunity['id']}",
+        json={"stage": "Won"},
+        headers=admin_token,
+    )
+    assert won.status_code == 200
+    detail = won.json()
+    assert detail["stage"] == "Won"
+    transitions = {
+        (item["old_stage"], item["new_stage"])
+        for item in detail["stage_history"]
+    }
+    assert transitions == {
+        (None, "Qualified"),
+        ("Qualified", "Proposal"),
+        ("Proposal", "Won"),
+    }
+    assert detail["followups"][0]["content"] == "Reviewed the classroom layout."
+
+    dashboard = client.get("/api/v1/dashboard/stats", headers=admin_token)
+    assert dashboard.status_code == 200
+    stats = dashboard.json()
+    assert stats["opportunity_count"] == 1
+    assert stats["active_opportunity_count"] == 0
+    assert stats["won_opportunity_count"] == 1
+    assert stats["lost_opportunity_count"] == 0
+    assert Decimal(stats["opportunity_amounts"][0]["amount"]) == Decimal("25000.00")
+
+
+def test_sales_opportunity_scope_and_viewer_read_only(client: TestClient) -> None:
+    admin_token = login(client, "admin@example.com", "AdminPass123!")
+    sales_users = []
+    for index in (1, 2):
+        response = client.post(
+            "/api/v1/users",
+            json={
+                "name": f"Opportunity Sales {index}",
+                "email": f"opportunity-sales-{index}@example.com",
+                "password": "SalesPass123!",
+                "role": "Sales",
+            },
+            headers=admin_token,
+        )
+        assert response.status_code == 201
+        sales_users.append(response.json())
+    sales_one_token = login(
+        client, "opportunity-sales-1@example.com", "SalesPass123!"
+    )
+    sales_two_token = login(
+        client, "opportunity-sales-2@example.com", "SalesPass123!"
+    )
+    customer = client.post(
+        "/api/v1/customers",
+        json={"company_name": "Owned Account", "owner_id": sales_users[0]["id"]},
+        headers=admin_token,
+    )
+    opportunity = client.post(
+        "/api/v1/opportunities",
+        json={"customer_id": customer.json()["id"], "name": "Owned Opportunity"},
+        headers=sales_one_token,
+    )
+    assert opportunity.status_code == 201
+    opportunity_id = opportunity.json()["id"]
+    blocked_detail = client.get(
+        f"/api/v1/opportunities/{opportunity_id}", headers=sales_two_token
+    )
+    assert blocked_detail.status_code == 403
+    blocked_update = client.put(
+        f"/api/v1/opportunities/{opportunity_id}",
+        json={"stage": "Lost"},
+        headers=sales_two_token,
+    )
+    assert blocked_update.status_code == 403
+    scoped_list = client.get("/api/v1/opportunities", headers=sales_two_token)
+    assert scoped_list.json()["total"] == 0
+
+    viewer = client.post(
+        "/api/v1/users",
+        json={
+            "name": "Opportunity Viewer",
+            "email": "opportunity-viewer@example.com",
+            "password": "ViewerPass123!",
+            "role": "Viewer",
+        },
+        headers=admin_token,
+    )
+    assert viewer.status_code == 201
+    viewer_token = login(
+        client, "opportunity-viewer@example.com", "ViewerPass123!"
+    )
+    assert client.get(
+        f"/api/v1/opportunities/{opportunity_id}", headers=viewer_token
+    ).status_code == 200
+    assert client.put(
+        f"/api/v1/opportunities/{opportunity_id}",
+        json={"stage": "Lost"},
+        headers=viewer_token,
+    ).status_code == 403
 
 
 def test_viewer_cannot_create_or_convert_lead(client: TestClient) -> None:

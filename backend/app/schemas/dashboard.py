@@ -1,4 +1,5 @@
 from datetime import date
+from decimal import Decimal
 from typing import Literal
 
 from pydantic import BaseModel
@@ -22,6 +23,11 @@ class FollowUpReminder(UpcomingFollowUp):
     reminder_status: Literal["today", "overdue"]
 
 
+class OpportunityAmountItem(BaseModel):
+    currency: str
+    amount: Decimal
+
+
 class DashboardStats(BaseModel):
     customer_count: int
     followup_count: int
@@ -33,3 +39,8 @@ class DashboardStats(BaseModel):
     upcoming_followups: list[UpcomingFollowUp]
     today_followups: list[FollowUpReminder]
     overdue_followups: list[FollowUpReminder]
+    opportunity_count: int
+    active_opportunity_count: int
+    won_opportunity_count: int
+    lost_opportunity_count: int
+    opportunity_amounts: list[OpportunityAmountItem]
