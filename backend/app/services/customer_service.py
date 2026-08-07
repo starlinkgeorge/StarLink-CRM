@@ -21,8 +21,9 @@ def list_customers(
     filters = []
     if owner_id is not None:
         filters.append(Customer.owner_id == owner_id)
-    if query:
-        term = f"%{query.strip()}%"
+    search_term = query.strip() if query else ""
+    if search_term:
+        term = f"%{search_term}%"
         filters.append(
             or_(
                 Customer.company_name.ilike(term),
@@ -35,10 +36,12 @@ def list_customers(
         filters.append(Customer.status == status)
     if level:
         filters.append(Customer.level == level)
-    if country:
-        filters.append(Customer.country.ilike(f"%{country.strip()}%"))
-    if source:
-        filters.append(Customer.source.ilike(f"%{source.strip()}%"))
+    country_term = country.strip() if country else ""
+    if country_term:
+        filters.append(Customer.country.ilike(f"%{country_term}%"))
+    source_term = source.strip() if source else ""
+    if source_term:
+        filters.append(Customer.source.ilike(f"%{source_term}%"))
     if tag_id:
         filters.append(Customer.tags.any(Tag.id == tag_id))
     statement = select(Customer).where(*filters).order_by(Customer.updated_at.desc(), Customer.id.desc())

@@ -77,6 +77,27 @@ def test_customer_lifecycle_with_contacts_and_followups(client: TestClient) -> N
     assert listing.status_code == 200
     assert listing.json()["total"] == 1
 
+    unfiltered = client.get(
+        "/api/v1/customers",
+        params={
+            "limit": 20,
+            "offset": 0,
+            "q": "",
+            "status": "",
+            "level": "",
+            "country": "",
+            "source": "",
+        },
+        headers=sales_token,
+    )
+    assert unfiltered.status_code == 200
+    assert unfiltered.json()["total"] == 1
+
+    invalid_filter = client.get(
+        "/api/v1/customers", params={"status": "NotAStatus"}, headers=sales_token
+    )
+    assert invalid_filter.status_code == 422
+
     update = client.put(f"/api/v1/customers/{customer['id']}", json={"status": "Contacted"}, headers=sales_token)
     assert update.status_code == 200
     assert update.json()["status"] == "Contacted"

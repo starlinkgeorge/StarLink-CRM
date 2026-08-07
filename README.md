@@ -92,7 +92,7 @@ Roles: `Admin` manages all records and users; `Sales` reads and manages only cus
 | Dashboard | `GET /dashboard/stats` |
 | Tags | `GET /tags`, `POST /tags`, `POST /customers/{id}/tags/{tag_id}`, `DELETE /customers/{id}/tags/{tag_id}` |
 
-The customer `q` parameter searches company name, primary contact name, country, and email. Customer lists also support `status`, `level`, `country`, `source`, and `tag_id` filters. Customer details include related contacts, tags, and a newest-first follow-up timeline. Dashboard follow-up totals are calculated directly from PostgreSQL and respect role-based customer visibility. Interactive API documentation is available at `/api/v1/docs` while the backend is running.
+The customer `q` parameter searches company name, primary contact name, country, and email. Empty or whitespace-only query and filter values are ignored, so the initial list request returns all visible customers. Customer lists also support `status`, `level`, `country`, `source`, and `tag_id` filters. Customer details include related contacts, tags, and a newest-first follow-up timeline. Dashboard follow-up totals are calculated directly from PostgreSQL and respect role-based customer visibility. Interactive API documentation is available at `/api/v1/docs` while the backend is running.
 
 Run API tests after installing backend development dependencies:
 

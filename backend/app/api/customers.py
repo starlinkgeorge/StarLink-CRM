@@ -12,13 +12,31 @@ from app.services.errors import ForbiddenError, NotFoundError
 router = APIRouter(prefix="/customers", tags=["customers"])
 
 
+def _parse_status_filter(value: str | None) -> CustomerStatus | None:
+    if value is None or not value.strip():
+        return None
+    try:
+        return CustomerStatus(value.strip())
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail="Invalid customer status filter.") from error
+
+
+def _parse_level_filter(value: str | None) -> CustomerLevel | None:
+    if value is None or not value.strip():
+        return None
+    try:
+        return CustomerLevel(value.strip())
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail="Invalid customer level filter.") from error
+
+
 @router.get("", response_model=CustomerPage)
 def list_customers(
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
-    q: str | None = Query(default=None, min_length=1, max_length=255),
-    status: CustomerStatus | None = None,
-    level: CustomerLevel | None = None,
+    q: str | None = Query(default=None, max_length=255),
+    status_filter: str | None = Query(default=None, alias="status", max_length=50),
+    level_filter: str | None = Query(default=None, alias="level", max_length=10),
     country: str | None = Query(default=None, max_length=100),
     source: str | None = Query(default=None, max_length=80),
     tag_id: int | None = Query(default=None, gt=0),
@@ -26,7 +44,18 @@ def list_customers(
     current_user: User = Depends(get_current_user),
 ) -> CustomerPage:
     owner_id = current_user.id if current_user.role is UserRole.SALES else None
-    items, total = customer_service.list_customers(session, limit, offset, q, owner_id, status, level, country, source, tag_id)
+    items, total = customer_service.list_customers(
+        session,
+        limit,
+        offset,
+        q,
+        owner_id,
+        _parse_status_filter(status_filter),
+        _parse_level_filter(level_filter),
+        country,
+        source,
+        tag_id,
+    )
     return CustomerPage(items=items, total=total, limit=limit, offset=offset)
 
 
