@@ -941,6 +941,31 @@ def test_quotation_versioning_pdf_and_immutable_sent_snapshot(client: TestClient
     assert changed.json()["selected_version"]["subtotal"] == "580.00"
     assert changed.json()["selected_version"]["total_amount"] == "780.00"
 
+    blank_optional_fields = client.put(
+        f"/api/v1/quotations/{quotation_id}",
+        json={
+            "payment_term": "",
+            "delivery_time": "",
+            "shipping_cost": "",
+            "items": [
+                {
+                    "product_id": product.json()["id"],
+                    "unit_price": "29.00",
+                    "quantity": "20.00",
+                }
+            ],
+        },
+        headers=admin_token,
+    )
+    assert blank_optional_fields.status_code == 200
+    assert blank_optional_fields.json()["selected_version"]["payment_term"] == (
+        "30% deposit, balance before shipment"
+    )
+    assert blank_optional_fields.json()["selected_version"]["delivery_time"] == (
+        "30-45 days after deposit"
+    )
+    assert blank_optional_fields.json()["selected_version"]["shipping_cost"] == "0.00"
+
     generated = client.post(
         f"/api/v1/quotations/{quotation_id}/pdf", headers=admin_token
     )

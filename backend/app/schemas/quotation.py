@@ -22,7 +22,22 @@ class QuotationTerms(BaseModel):
     @field_validator("currency", mode="before")
     @classmethod
     def normalize_currency(cls, value: str) -> str:
-        return value.strip().upper()
+        return value.strip().upper() or "USD"
+
+    @field_validator("payment_term", mode="before")
+    @classmethod
+    def normalize_payment_term(cls, value: str) -> str:
+        return value.strip() or "30% deposit, balance before shipment"
+
+    @field_validator("delivery_time", mode="before")
+    @classmethod
+    def normalize_delivery_time(cls, value: str) -> str:
+        return value.strip() or "30-45 days after deposit"
+
+    @field_validator("shipping_cost", mode="before")
+    @classmethod
+    def normalize_shipping_cost(cls, value: Decimal | str) -> Decimal | str:
+        return Decimal("0") if value is None or str(value).strip() == "" else value
 
 
 class QuotationCreate(QuotationTerms):
@@ -41,7 +56,22 @@ class QuotationUpdate(BaseModel):
     @field_validator("currency", mode="before")
     @classmethod
     def normalize_optional_currency(cls, value: str | None) -> str | None:
-        return value.strip().upper() if value is not None else None
+        return value.strip().upper() or "USD" if value is not None else None
+
+    @field_validator("payment_term", mode="before")
+    @classmethod
+    def normalize_optional_payment_term(cls, value: str | None) -> str | None:
+        return value.strip() or "30% deposit, balance before shipment" if value is not None else None
+
+    @field_validator("delivery_time", mode="before")
+    @classmethod
+    def normalize_optional_delivery_time(cls, value: str | None) -> str | None:
+        return value.strip() or "30-45 days after deposit" if value is not None else None
+
+    @field_validator("shipping_cost", mode="before")
+    @classmethod
+    def normalize_optional_shipping_cost(cls, value: Decimal | str | None) -> Decimal | str | None:
+        return Decimal("0") if value is not None and str(value).strip() == "" else value
 
 
 class QuotationItemRead(BaseModel):
