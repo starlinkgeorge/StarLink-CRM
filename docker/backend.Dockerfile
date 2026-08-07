@@ -13,4 +13,4 @@ COPY frontend/public/product-images ./product-images
 
 EXPOSE 8000
 
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+CMD ["sh", "-c", "python scripts/ensure_alembic_version.py && alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
