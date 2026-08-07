@@ -1,7 +1,12 @@
 from collections.abc import Generator
 import os
+from pathlib import Path
+import tempfile
 
 os.environ["JWT_SECRET_KEY"] = "test-secret-key-that-is-long-enough-for-local-tests"
+os.environ["QUOTATION_OUTPUT_DIR"] = str(
+    Path(tempfile.gettempdir()) / "starlink-crm-test-quotations"
+)
 
 import pytest
 from fastapi.testclient import TestClient

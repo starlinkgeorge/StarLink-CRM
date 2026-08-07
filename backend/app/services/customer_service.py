@@ -1,4 +1,5 @@
 from sqlalchemy import func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.models.customer import Customer, CustomerLevel, CustomerStatus, Tag
@@ -6,7 +7,7 @@ from app.models.customer_activity import CustomerStatusHistory
 from app.models.user import User
 from app.schemas.customer import CustomerCreate, CustomerUpdate
 from app.models.user import UserRole
-from app.services.errors import ForbiddenError, NotFoundError
+from app.services.errors import ConflictError, ForbiddenError, NotFoundError
 
 
 def _validate_owner(session: Session, owner_id: int | None) -> None:
@@ -127,7 +128,13 @@ def update_customer(session: Session, customer_id: int, payload: CustomerUpdate,
 def delete_customer(session: Session, customer_id: int) -> None:
     customer = get_customer(session, customer_id)
     session.delete(customer)
-    session.commit()
+    try:
+        session.commit()
+    except IntegrityError as error:
+        session.rollback()
+        raise ConflictError(
+            "Customers with commercial records such as quotations cannot be deleted."
+        ) from error
 
 
 def list_tags(session: Session) -> list[Tag]:

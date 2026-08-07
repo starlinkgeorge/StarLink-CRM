@@ -11,6 +11,7 @@ from app.api import (
     leads,
     opportunities,
     products,
+    quotations,
     tags,
     users,
 )
@@ -45,6 +46,7 @@ app.include_router(integrations.router, prefix=settings["api_prefix"])
 app.include_router(opportunities.router, prefix=settings["api_prefix"])
 app.include_router(products.category_router, prefix=settings["api_prefix"])
 app.include_router(products.router, prefix=settings["api_prefix"])
+app.include_router(quotations.router, prefix=settings["api_prefix"])
 
 
 @app.get(f"{settings['api_prefix']}/health", tags=["system"])

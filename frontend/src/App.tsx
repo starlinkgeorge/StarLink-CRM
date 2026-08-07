@@ -12,6 +12,8 @@ import { OpportunitiesPage } from "./pages/OpportunitiesPage";
 import { OpportunityDetailPage } from "./pages/OpportunityDetailPage";
 import { ProductDetailPage } from "./pages/ProductDetailPage";
 import { ProductsPage } from "./pages/ProductsPage";
+import { QuotationDetailPage } from "./pages/QuotationDetailPage";
+import { QuotationsPage } from "./pages/QuotationsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { AuthProvider } from "./store/auth";
 
@@ -24,6 +26,7 @@ export function App() {
       <Route path="/customers" element={<CustomersPage />} /><Route path="/customers/new" element={<NewCustomerPage />} /><Route path="/customers/:id" element={<CustomerDetailPage />} />
       <Route path="/opportunities" element={<OpportunitiesPage />} /><Route path="/opportunities/:id" element={<OpportunityDetailPage />} />
       <Route path="/products" element={<ProductsPage />} /><Route path="/products/:id" element={<ProductDetailPage />} />
+      <Route path="/quotations" element={<QuotationsPage />} /><Route path="/quotations/:id" element={<QuotationDetailPage />} />
       <Route path="/settings" element={<SettingsPage />} />
     </Route></Route>
     <Route path="*" element={<Navigate to="/" replace />} />

@@ -69,6 +69,18 @@ URL-based product images: `id`, `product_id`, `image_url`, `is_primary`, `sort_o
 
 Commercial line items joining opportunities and products: composite key (`opportunity_id`, `product_id`), `quantity`, and nullable `target_price`. The composite key prevents duplicate product lines; quantity and target price are opportunity-specific and do not alter the product reference price.
 
+### `quotations`
+
+The quotation master record: `id`, unique `quotation_number`, `customer_id`, nullable `opportunity_id`, `status`, `current_version`, `created_at`, and `updated_at`. Status values are `Draft`, `Sent`, `Accepted`, `Rejected`, and `Expired`. The master points to the editable/current version while preserving every prior version.
+
+### `quotation_versions`
+
+Immutable version headers: `id`, `quotation_id`, `version_no`, `currency`, `payment_term`, `delivery_time`, `validity_days`, `shipping_cost`, `subtotal`, `total_amount`, `pdf_url`, and `created_at`. (`quotation_id`, `version_no`) is unique. Only the current Draft may be edited; a sent version is copied into a new row for later revisions.
+
+### `quotation_items`
+
+Version-specific product snapshots: `id`, `quotation_version_id`, nullable `product_id`, `sku_snapshot`, `product_name_snapshot`, `picture_snapshot`, `unit_price`, `quantity`, and `line_total`. Catalog deletion clears only `product_id`; all snapshot fields remain unchanged for audit and PDF reproduction.
+
 ### `refresh_tokens`
 
 Revocable login-session records: `id`, `user_id`, unique `token_hash`, `expires_at`, `revoked_at`, and `created_at`. The raw JWT refresh token is never persisted. `users.last_login_at` records the most recent successful login.
@@ -91,6 +103,11 @@ product_categories 1 ──< products (category_id; SET NULL on category deletio
 product_categories 1 ──< product_categories (parent_id; SET NULL on parent deletion)
 products 1 ──< product_images (deleted with product)
 opportunities >──< products (through opportunity_products)
+customers 1 ──< quotations (deletion restricted to preserve commercial records)
+opportunities 1 ──< quotations (opportunity_id; SET NULL on opportunity deletion)
+quotations 1 ──< quotation_versions (deleted with quotation)
+quotation_versions 1 ──< quotation_items (deleted with version)
+products 1 ──< quotation_items (product_id; SET NULL on product deletion)
 customers >──< tags (through customer_tags)
 users 1 ──< refresh_tokens (deleted with user)
 ```

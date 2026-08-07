@@ -57,6 +57,7 @@ class Product(TimestampMixin, Base):
     opportunity_items: Mapped[list["OpportunityProduct"]] = relationship(
         back_populates="product"
     )
+    quotation_items: Mapped[list["QuotationItem"]] = relationship(back_populates="product")
 
 
 class ProductImage(CreatedAtMixin, Base):

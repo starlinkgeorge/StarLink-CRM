@@ -91,6 +91,7 @@ class Customer(TimestampMixin, Base):
         passive_deletes=True,
         order_by="(FollowUp.created_at.desc(), FollowUp.id.desc())",
     )
+    quotations: Mapped[list["Quotation"]] = relationship(back_populates="customer")
 
 
 class Contact(CreatedAtMixin, Base):

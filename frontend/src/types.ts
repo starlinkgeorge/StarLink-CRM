@@ -104,3 +104,28 @@ export interface OpportunityProduct {
   target_price: string | null; reference_price: string | null;
   currency_code: string; image_url: string | null;
 }
+
+export type QuotationStatus = "Draft" | "Sent" | "Accepted" | "Rejected" | "Expired";
+export interface QuotationItem {
+  id: number; product_id: number | null; sku_snapshot: string; product_name_snapshot: string;
+  picture_snapshot: string | null; unit_price: string; quantity: string; line_total: string;
+}
+export interface QuotationVersionSummary {
+  id: number; version_no: number; currency: string; total_amount: string;
+  pdf_url: string | null; created_at: string;
+}
+export interface QuotationVersion extends QuotationVersionSummary {
+  payment_term: string; delivery_time: string; validity_days: number;
+  shipping_cost: string; subtotal: string; items: QuotationItem[];
+}
+export interface QuotationListItem {
+  id: number; quotation_number: string; customer_id: number; customer_company: string;
+  opportunity_id: number | null; opportunity_name: string | null; status: QuotationStatus;
+  current_version: number; currency: string; total_amount: string;
+  created_at: string; updated_at: string;
+}
+export interface QuotationDetail extends QuotationListItem {
+  versions: QuotationVersionSummary[]; selected_version: QuotationVersion;
+  company_contact: { name: string; website: string; email: string; whatsapp: string };
+}
+export interface QuotationPage { items: QuotationListItem[]; total: number; limit: number; offset: number; }

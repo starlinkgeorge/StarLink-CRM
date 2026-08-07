@@ -107,6 +107,7 @@ class Opportunity(TimestampMixin, Base):
     product_items: Mapped[list["OpportunityProduct"]] = relationship(
         back_populates="opportunity", cascade="all, delete-orphan", passive_deletes=True
     )
+    quotations: Mapped[list["Quotation"]] = relationship(back_populates="opportunity")
 
 
 class OpportunityStageHistory(Base):

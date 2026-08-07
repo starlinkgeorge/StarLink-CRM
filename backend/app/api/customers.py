@@ -8,7 +8,7 @@ from app.models.customer import CustomerLevel, CustomerStatus, Tag
 from app.schemas.customer import CustomerCreate, CustomerDetail, CustomerPage, CustomerRead, CustomerUpdate
 from app.schemas.customer_activity import CustomerActivityRead
 from app.services import access_service, customer_activity_service, customer_service
-from app.services.errors import ForbiddenError, NotFoundError
+from app.services.errors import ConflictError, ForbiddenError, NotFoundError
 
 router = APIRouter(prefix="/customers", tags=["customers"])
 
@@ -144,6 +144,8 @@ def delete_customer(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
     except ForbiddenError as error:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(error)) from error
+    except ConflictError as error:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

@@ -852,3 +852,161 @@ def test_sales_cannot_access_another_users_customer(client: TestClient) -> None:
         f"/api/v1/customers/{customer.json()['id']}/timeline", headers=sales_token
     )
     assert blocked_timeline.status_code == 403
+
+
+def test_quotation_versioning_pdf_and_immutable_sent_snapshot(client: TestClient) -> None:
+    admin_token = login(client, "admin@example.com", "AdminPass123!")
+    product = client.post(
+        "/api/v1/products",
+        json={
+            "sku": "QUOTE-CHAIR-001",
+            "name": "Preschool Wooden Chair",
+            "reference_price": "32.50",
+            "currency_code": "USD",
+        },
+        headers=admin_token,
+    )
+    assert product.status_code == 201
+    customer = client.post(
+        "/api/v1/customers",
+        json={"company_name": "Happy Kids Preschool", "contact_name": "Maria"},
+        headers=admin_token,
+    )
+    assert customer.status_code == 201
+    opportunity = client.post(
+        "/api/v1/opportunities",
+        json={
+            "customer_id": customer.json()["id"],
+            "name": "Classroom Furniture Project",
+            "currency": "USD",
+        },
+        headers=admin_token,
+    )
+    assert opportunity.status_code == 201
+    linked = client.put(
+        f"/api/v1/opportunities/{opportunity.json()['id']}/products",
+        json={
+            "items": [
+                {
+                    "product_id": product.json()["id"],
+                    "quantity": "20.00",
+                    "target_price": "30.00",
+                }
+            ]
+        },
+        headers=admin_token,
+    )
+    assert linked.status_code == 200
+
+    created = client.post(
+        "/api/v1/quotations",
+        json={
+            "opportunity_id": opportunity.json()["id"],
+            "currency": "USD",
+            "payment_term": "30% deposit, balance before shipment",
+            "delivery_time": "35 days after deposit",
+            "validity_days": 30,
+            "shipping_cost": "150.00",
+        },
+        headers=admin_token,
+    )
+    assert created.status_code == 201
+    quotation = created.json()
+    quotation_id = quotation["id"]
+    assert quotation["quotation_number"].startswith("SLQ-")
+    assert quotation["current_version"] == 1
+    assert quotation["status"] == "Draft"
+    assert quotation["selected_version"]["subtotal"] == "600.00"
+    assert quotation["selected_version"]["total_amount"] == "750.00"
+    assert quotation["selected_version"]["items"][0]["product_name_snapshot"] == (
+        "Preschool Wooden Chair"
+    )
+
+    changed = client.put(
+        f"/api/v1/quotations/{quotation_id}",
+        json={
+            "shipping_cost": "200.00",
+            "validity_days": 21,
+            "items": [
+                {
+                    "product_id": product.json()["id"],
+                    "unit_price": "29.00",
+                    "quantity": "20.00",
+                }
+            ],
+        },
+        headers=admin_token,
+    )
+    assert changed.status_code == 200
+    assert changed.json()["selected_version"]["subtotal"] == "580.00"
+    assert changed.json()["selected_version"]["total_amount"] == "780.00"
+
+    generated = client.post(
+        f"/api/v1/quotations/{quotation_id}/pdf", headers=admin_token
+    )
+    assert generated.status_code == 200
+    assert generated.json()["selected_version"]["pdf_url"] is not None
+    downloaded = client.get(
+        f"/api/v1/quotations/{quotation_id}/pdf", headers=admin_token
+    )
+    assert downloaded.status_code == 200
+    assert downloaded.headers["content-type"] == "application/pdf"
+    assert downloaded.content.startswith(b"%PDF")
+
+    sent = client.post(
+        f"/api/v1/quotations/{quotation_id}/send", headers=admin_token
+    )
+    assert sent.status_code == 200
+    assert sent.json()["status"] == "Sent"
+    locked = client.put(
+        f"/api/v1/quotations/{quotation_id}",
+        json={"shipping_cost": "1.00"},
+        headers=admin_token,
+    )
+    assert locked.status_code == 409
+
+    revision = client.post(
+        f"/api/v1/quotations/{quotation_id}/versions", headers=admin_token
+    )
+    assert revision.status_code == 200
+    assert revision.json()["current_version"] == 2
+    assert revision.json()["status"] == "Draft"
+    assert len(revision.json()["versions"]) == 2
+    historical = client.get(
+        f"/api/v1/quotations/{quotation_id}",
+        params={"version_no": 1},
+        headers=admin_token,
+    )
+    assert historical.status_code == 200
+    assert historical.json()["selected_version"]["total_amount"] == "780.00"
+    assert historical.json()["selected_version"]["items"][0]["unit_price"] == "29.00"
+
+    listing = client.get("/api/v1/quotations", headers=admin_token)
+    assert listing.status_code == 200
+    assert listing.json()["total"] == 1
+    viewer = client.post(
+        "/api/v1/users",
+        json={
+            "name": "Quotation Viewer",
+            "email": "quotation-viewer@example.com",
+            "password": "ViewerPass123!",
+            "role": "Viewer",
+        },
+        headers=admin_token,
+    )
+    assert viewer.status_code == 201
+    viewer_token = login(client, "quotation-viewer@example.com", "ViewerPass123!")
+    assert client.get(
+        f"/api/v1/quotations/{quotation_id}", headers=viewer_token
+    ).status_code == 200
+    assert client.put(
+        f"/api/v1/quotations/{quotation_id}",
+        json={"shipping_cost": "10.00"},
+        headers=viewer_token,
+    ).status_code == 403
+    assert client.post(
+        f"/api/v1/quotations/{quotation_id}/pdf", headers=viewer_token
+    ).status_code == 403
+    assert client.delete(
+        f"/api/v1/customers/{customer.json()['id']}", headers=admin_token
+    ).status_code == 409

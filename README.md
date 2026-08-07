@@ -14,6 +14,7 @@ The current release includes:
 - Dashboard statistics backed by PostgreSQL, including total follow-ups and upcoming work
 - Lead inquiry pool, Lead conversion, Alibaba inquiry simulation, and opportunity management
 - Product catalog with categories, specifications, prices, URL images, and opportunity product lines
+- Versioned StarLink quotation workflow with product snapshots and PDF generation
 - React + TypeScript + Tailwind frontend
 - Python FastAPI + SQLAlchemy backend
 - PostgreSQL service configuration
@@ -96,6 +97,7 @@ Roles: `Admin` manages all records and users; `Sales` reads and manages only cus
 | Opportunities | `GET /opportunities`, `POST /opportunities`, `GET /opportunities/{id}`, `PUT /opportunities/{id}`, `PUT /opportunities/{id}/products` |
 | Product categories | `GET /product-categories`, `POST /product-categories`, `PUT /product-categories/{id}` |
 | Products | `GET /products`, `POST /products`, `GET /products/{id}`, `PUT /products/{id}` |
+| Quotations | `GET /quotations`, `POST /quotations`, `GET /quotations/{id}`, `PUT /quotations/{id}`, `POST /quotations/{id}/versions`, `POST /quotations/{id}/pdf`, `GET /quotations/{id}/pdf`, `POST /quotations/{id}/send` |
 | Alibaba integration | `GET /integrations/alibaba/status`, `POST /integrations/alibaba/inquiries` |
 | Contacts | `POST /contacts`, `GET /contacts/{id}`, `PUT /contacts/{id}` |
 | Follow-ups | `POST /followups`, `GET /followups?customer_id={id}` |
@@ -112,6 +114,8 @@ Opportunities use an independent lifecycle: `Lead`, `Qualified`, `Proposal`, `Ne
 
 The product catalog stores hierarchical categories, SKU, dimensions, material, MOQ, reference price, currency, active state, and URL-based image lists with at most one primary image. Product lists accept `q`, `category_id`, and `is_active` filters; an empty `q` returns all products. Product images use `http` or `https` URLs in this phase. Opportunities link catalog products through `PUT /opportunities/{id}/products`, with per-line quantity and target price. The legacy free-text `interested_product` remains available, including on Lead conversion, to preserve existing inquiry data. Admin and Sales users may create and edit catalog records; Viewer users are read-only.
 
+Quotations are created from an opportunity and its product lines. Each version stores immutable SKU, product name, picture, unit-price, quantity, and line-total snapshots, so later catalog edits do not alter historical quotations. A Draft version can be edited and regenerated; marking it Sent locks the version. Further changes copy the previous snapshot into V2, V3, and later versions. Generated PDFs use the StarLink company header and the requested `Item Name / Picture / Unit Price / QTY / Total Price` table, followed by product total, door-to-door shipping, amount, validity, payment term, and delivery time. The PDF files are persisted in the Docker `quotation_pdfs` volume and downloaded through an authenticated API endpoint.
+
 The first-phase Alibaba integration accepts simulated inquiries through an authenticated endpoint. It always sets Lead `source` to `Alibaba` and `status` to `New`, regardless of submitted source data. Existing Leads are returned instead of duplicated when a case-insensitive email match or company-and-contact match is found. The Settings page exposes connection state and a simulation button. No database migration is required for this integration phase; see [docs/alibaba-integration.md](docs/alibaba-integration.md) for the future production-authentication boundary.
 
 Run API tests after installing backend development dependencies:
@@ -123,7 +127,15 @@ pytest
 
 ## Frontend CRM interface
 
-The React frontend includes login, dashboard, Lead inquiry list/detail/creation/conversion, opportunity list/detail/creation/update, product list/detail/creation/editing, data-source settings, customer list, customer detail, customer creation, and follow-up creation pages. The product library supports search, category and active-state filters, URL image management, and enable/disable actions. Opportunity details support product lines with quantity and target price. The Dashboard separates today's reminders from overdue customers and includes scoped opportunity statistics. The customer detail page shows related opportunities, the current reminder state, and a newest-first activity timeline containing customer creation, follow-ups, and sales-stage changes. Set `VITE_API_BASE_URL` in `frontend/.env` if the backend is not running at the local default, then run `npm install` and `npm run dev` from `frontend/`.
+The React frontend includes login, dashboard, Lead inquiry list/detail/creation/conversion, opportunity list/detail/creation/update, product list/detail/creation/editing, quotation list/detail/version/PDF workflows, data-source settings, customer list, customer detail, customer creation, and follow-up creation pages. The product library supports search, category and active-state filters, URL image management, and enable/disable actions. Opportunity details support product lines with quantity and target price and provide the `Create Quotation` action. The Dashboard separates today's reminders from overdue customers and includes scoped opportunity statistics. Set `VITE_API_BASE_URL` in `frontend/.env` if the backend is not running at the local default, then run `npm install` and `npm run dev` from `frontend/`.
+
+Before generating customer-facing PDFs, set the real company contact values in `.env`:
+
+```text
+COMPANY_WEBSITE=https://your-real-website.example
+COMPANY_EMAIL=sales@your-real-domain.example
+COMPANY_WHATSAPP=+86-your-real-number
+```
 
 ### Full local stack with Docker
 

@@ -24,6 +24,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    volumes:
+      - quotation_pdfs:/app/output/pdf
 
   frontend:
     build:
@@ -38,3 +40,4 @@ services:
 
 volumes:
   postgres_data:
+  quotation_pdfs:

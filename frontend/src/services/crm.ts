@@ -1,5 +1,5 @@
 import api from "./api";
-import type { AlibabaInquiryResult, AlibabaIntegrationStatus, Customer, CustomerActivity, CustomerDetail, CustomerPage, DashboardStats, FollowUp, Lead, LeadConversion, LeadDetail, LeadPage, LeadStatus, OpportunityDetail, OpportunityListItem, OpportunityPage, OpportunityStage, Product, ProductCategory, ProductPage, Tag } from "../types";
+import type { AlibabaInquiryResult, AlibabaIntegrationStatus, Customer, CustomerActivity, CustomerDetail, CustomerPage, DashboardStats, FollowUp, Lead, LeadConversion, LeadDetail, LeadPage, LeadStatus, OpportunityDetail, OpportunityListItem, OpportunityPage, OpportunityStage, Product, ProductCategory, ProductPage, QuotationDetail, QuotationPage, QuotationStatus, Tag } from "../types";
 
 export type CustomerCreatePayload = {
   company_name: string; contact_name?: string; country?: string; email?: string; phone?: string;
@@ -71,3 +71,18 @@ export const getProduct = async (id: string) => (await api.get<Product>(`/produc
 export const createProduct = async (data: ProductPayload) => (await api.post<Product>("/products", data)).data;
 export const updateProduct = async (id: number, data: Partial<ProductPayload>) => (await api.put<Product>(`/products/${id}`, data)).data;
 export const replaceOpportunityProducts = async (id: number, items: { product_id: number; quantity: string; target_price?: string }[]) => (await api.put<OpportunityDetail>(`/opportunities/${id}/products`, { items })).data;
+
+export type QuotationItemPayload = { product_id: number; unit_price: string; quantity: string };
+export type QuotationCreatePayload = {
+  opportunity_id: number; currency?: string; payment_term?: string; delivery_time?: string;
+  validity_days?: number; shipping_cost?: string; items?: QuotationItemPayload[];
+};
+export type QuotationUpdatePayload = Omit<QuotationCreatePayload, "opportunity_id">;
+export const getQuotations = async (params: { limit: number; offset: number; q?: string; status?: QuotationStatus | "" }) => (await api.get<QuotationPage>("/quotations", { params })).data;
+export const createQuotation = async (data: QuotationCreatePayload) => (await api.post<QuotationDetail>("/quotations", data)).data;
+export const getQuotation = async (id: string | number, version_no?: number) => (await api.get<QuotationDetail>(`/quotations/${id}`, { params: { version_no } })).data;
+export const updateQuotation = async (id: number, data: QuotationUpdatePayload) => (await api.put<QuotationDetail>(`/quotations/${id}`, data)).data;
+export const createQuotationVersion = async (id: number) => (await api.post<QuotationDetail>(`/quotations/${id}/versions`)).data;
+export const generateQuotationPdf = async (id: number, version_no?: number) => (await api.post<QuotationDetail>(`/quotations/${id}/pdf`, undefined, { params: { version_no } })).data;
+export const markQuotationSent = async (id: number) => (await api.post<QuotationDetail>(`/quotations/${id}/send`)).data;
+export const downloadQuotationPdf = async (id: number, version_no?: number) => (await api.get<Blob>(`/quotations/${id}/pdf`, { params: { version_no }, responseType: "blob" })).data;
