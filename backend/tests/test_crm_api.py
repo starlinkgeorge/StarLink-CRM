@@ -32,14 +32,21 @@ def test_customer_lifecycle_with_contacts_and_followups(client: TestClient) -> N
             "company_name": "Dalian Montessori School",
             "country": "China",
             "email": "buyer@example.com",
+            "customer_type": "Kindergarten",
             "source": "Alibaba",
+            "interested_product": "Montessori shelves",
             "level": "A",
-            "status": "Lead",
+            "sales_stage": "Lead",
             "owner_id": user["id"],
         }, headers=sales_token,
     )
     assert create_customer.status_code == 201
     customer = create_customer.json()
+    assert customer["customer_type"] == "Kindergarten"
+    assert customer["source"] == "Alibaba"
+    assert customer["interested_product"] == "Montessori shelves"
+    assert customer["sales_stage"] == "Lead"
+    assert customer["status"] == "Lead"
     stats = client.get("/api/v1/dashboard/stats", headers=sales_token)
     assert stats.status_code == 200
     assert stats.json()["customer_count"] == 1
@@ -101,6 +108,16 @@ def test_customer_lifecycle_with_contacts_and_followups(client: TestClient) -> N
     update = client.put(f"/api/v1/customers/{customer['id']}", json={"status": "Contacted"}, headers=sales_token)
     assert update.status_code == 200
     assert update.json()["status"] == "Contacted"
+    assert update.json()["sales_stage"] == "Contacted"
+
+    stage_update = client.put(
+        f"/api/v1/customers/{customer['id']}",
+        json={"sales_stage": "Quotation"},
+        headers=sales_token,
+    )
+    assert stage_update.status_code == 200
+    assert stage_update.json()["sales_stage"] == "Quotation"
+    assert stage_update.json()["status"] == "Quotation"
 
     delete = client.delete(f"/api/v1/customers/{customer['id']}", headers=sales_token)
     assert delete.status_code == 204

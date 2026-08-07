@@ -4,7 +4,9 @@ export interface User { id: number; name: string; email: string; role: UserRole;
 export interface Customer {
   id: number; company_name: string; contact_name: string | null; country: string | null;
   email: string | null; phone: string | null; whatsapp: string | null; website: string | null;
-  source: string | null; level: "A" | "B" | "C"; status: CustomerStatus; owner_id: number | null;
+  customer_type: string | null; source: string | null; interested_product: string | null;
+  level: "A" | "B" | "C"; status: CustomerStatus; sales_stage: CustomerStatus;
+  owner_id: number | null;
   created_at: string; updated_at: string;
 }
 export type CustomerStatus = "Lead" | "Contacted" | "Quotation" | "Negotiation" | "Won" | "Lost";

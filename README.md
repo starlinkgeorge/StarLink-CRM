@@ -9,6 +9,7 @@ The current release includes:
 - JWT login and role-based access control
 - Customer list with pagination, search, and CRM filters
 - Customer detail profiles with contacts, tags, sales stage, and follow-up timeline
+- Customer profiles capture customer type, acquisition source, interested products, and sales stage
 - Follow-up creation with optional next-follow-up dates
 - Dashboard statistics backed by PostgreSQL, including total follow-ups and upcoming work
 - React + TypeScript + Tailwind frontend
@@ -53,7 +54,7 @@ The API health endpoint is available at `http://localhost:8000/api/v1/health`.
 
 ### Database migration
 
-Set `DATABASE_URL` to a PostgreSQL connection string, then run the initial schema migration:
+Set `DATABASE_URL` to a PostgreSQL connection string, then apply all pending schema migrations:
 
 ```bash
 cd backend
@@ -92,7 +93,7 @@ Roles: `Admin` manages all records and users; `Sales` reads and manages only cus
 | Dashboard | `GET /dashboard/stats` |
 | Tags | `GET /tags`, `POST /tags`, `POST /customers/{id}/tags/{tag_id}`, `DELETE /customers/{id}/tags/{tag_id}` |
 
-The customer `q` parameter searches company name, primary contact name, country, and email. Empty or whitespace-only query and filter values are ignored, so the initial list request returns all visible customers. Customer lists also support `status`, `level`, `country`, `source`, and `tag_id` filters. Customer details include related contacts, tags, and a newest-first follow-up timeline. Dashboard follow-up totals are calculated directly from PostgreSQL and respect role-based customer visibility. Interactive API documentation is available at `/api/v1/docs` while the backend is running.
+The customer `q` parameter searches company name, primary contact name, country, and email. Empty or whitespace-only query and filter values are ignored, so the initial list request returns all visible customers. Customer creation accepts `customer_type`, `source`, `interested_product`, and `sales_stage`. The V3-facing `sales_stage` is synchronized with the legacy `status` field so existing V2.2 dashboard statistics remain compatible. Customer lists also support `status`, `level`, `country`, `source`, and `tag_id` filters. Customer details include related contacts, tags, and a newest-first follow-up timeline. Dashboard follow-up totals are calculated directly from PostgreSQL and respect role-based customer visibility. Interactive API documentation is available at `/api/v1/docs` while the backend is running.
 
 Run API tests after installing backend development dependencies:
 

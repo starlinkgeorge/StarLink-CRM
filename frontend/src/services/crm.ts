@@ -3,7 +3,9 @@ import type { Customer, CustomerDetail, CustomerPage, DashboardStats, FollowUp, 
 
 export type CustomerCreatePayload = {
   company_name: string; contact_name?: string; country?: string; email?: string; phone?: string;
-  whatsapp?: string; website?: string; source?: string; level?: Customer["level"]; status?: Customer["status"];
+  whatsapp?: string; website?: string; customer_type?: string; source?: string;
+  interested_product?: string; level?: Customer["level"]; status?: Customer["status"];
+  sales_stage?: Customer["sales_stage"];
 };
 
 export const getDashboardStats = async () => (await api.get<DashboardStats>("/dashboard/stats")).data;

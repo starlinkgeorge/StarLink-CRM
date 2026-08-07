@@ -16,9 +16,12 @@ class CustomerFields(BaseModel):
     phone: Optional[str] = Field(default=None, max_length=50)
     whatsapp: Optional[str] = Field(default=None, max_length=50)
     website: Optional[str] = Field(default=None, max_length=255)
+    customer_type: Optional[str] = Field(default=None, max_length=80)
     source: Optional[str] = Field(default=None, max_length=80)
+    interested_product: Optional[str] = Field(default=None, max_length=500)
     level: CustomerLevel = CustomerLevel.C
     status: CustomerStatus = CustomerStatus.LEAD
+    sales_stage: CustomerStatus = CustomerStatus.LEAD
     owner_id: Optional[int] = Field(default=None, gt=0)
 
 
@@ -34,9 +37,12 @@ class CustomerUpdate(BaseModel):
     phone: Optional[str] = Field(default=None, max_length=50)
     whatsapp: Optional[str] = Field(default=None, max_length=50)
     website: Optional[str] = Field(default=None, max_length=255)
+    customer_type: Optional[str] = Field(default=None, max_length=80)
     source: Optional[str] = Field(default=None, max_length=80)
+    interested_product: Optional[str] = Field(default=None, max_length=500)
     level: Optional[CustomerLevel] = None
     status: Optional[CustomerStatus] = None
+    sales_stage: Optional[CustomerStatus] = None
     owner_id: Optional[int] = Field(default=None, gt=0)
 
 

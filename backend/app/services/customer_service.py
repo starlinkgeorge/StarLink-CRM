@@ -68,6 +68,10 @@ def create_customer(session: Session, payload: CustomerCreate, creator: User) ->
     if creator.role is UserRole.VIEWER:
         raise ForbiddenError("Viewer accounts have read-only access.")
     data = payload.model_dump()
+    if "sales_stage" in payload.model_fields_set:
+        data["status"] = data["sales_stage"]
+    else:
+        data["sales_stage"] = data["status"]
     if creator.role is UserRole.SALES:
         if data["owner_id"] not in (None, creator.id):
             raise ForbiddenError("Sales users may only create customers for themselves.")
@@ -83,6 +87,10 @@ def create_customer(session: Session, payload: CustomerCreate, creator: User) ->
 def update_customer(session: Session, customer_id: int, payload: CustomerUpdate, editor: User) -> Customer:
     customer = get_customer(session, customer_id)
     changes = payload.model_dump(exclude_unset=True)
+    if "sales_stage" in changes:
+        changes["status"] = changes["sales_stage"]
+    elif "status" in changes:
+        changes["sales_stage"] = changes["status"]
     if editor.role is UserRole.SALES and "owner_id" in changes and changes["owner_id"] != editor.id:
         raise ForbiddenError("Sales users may not reassign customers.")
     if "owner_id" in changes:

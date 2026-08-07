@@ -42,7 +42,9 @@ class Customer(TimestampMixin, Base):
     phone: Mapped[Optional[str]] = mapped_column(String(50))
     whatsapp: Mapped[Optional[str]] = mapped_column(String(50))
     website: Mapped[Optional[str]] = mapped_column(String(255))
+    customer_type: Mapped[Optional[str]] = mapped_column(String(80))
     source: Mapped[Optional[str]] = mapped_column(String(80), index=True)
+    interested_product: Mapped[Optional[str]] = mapped_column(String(500))
     level: Mapped[CustomerLevel] = mapped_column(
         Enum(
             CustomerLevel,
@@ -63,6 +65,16 @@ class Customer(TimestampMixin, Base):
         nullable=False,
         default=CustomerStatus.LEAD,
         index=True,
+    )
+    sales_stage: Mapped[CustomerStatus] = mapped_column(
+        Enum(
+            CustomerStatus,
+            name="customer_status",
+            native_enum=True,
+            values_callable=lambda enum_class: [member.value for member in enum_class],
+        ),
+        nullable=False,
+        default=CustomerStatus.LEAD,
     )
     owner_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), index=True

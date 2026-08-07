@@ -15,10 +15,14 @@ Application users who own customers and record follow-ups: `id`, `name`, unique 
 
 ### `customers`
 
-Companies managed by sales: `id`, `company_name`, `contact_name`, `country`, `email`, `phone`, `whatsapp`, `website`, `source`, `level`, `status`, `owner_id`, `created_at`, and `updated_at`.
+Companies managed by sales: `id`, `company_name`, `contact_name`, `country`, `email`, `phone`, `whatsapp`, `website`, `customer_type`, `source`, `interested_product`, `level`, `status`, `sales_stage`, `owner_id`, `created_at`, and `updated_at`.
 
+- `customer_type`: optional business classification such as Kindergarten, School, Distributor, or Retailer.
+- `source`: optional acquisition channel such as Alibaba, Website, Facebook, or LinkedIn.
+- `interested_product`: optional free-text summary of the products requested by the customer.
 - `level`: `A`, `B`, or `C` (default `C`).
 - `status`: `Lead`, `Contacted`, `Quotation`, `Negotiation`, `Won`, or `Lost` (default `Lead`).
+- `sales_stage`: the V3-facing sales stage. It uses the same values as `status`; the service keeps both fields synchronized so V2.2 dashboard queries remain compatible.
 - `owner_id` is optional and references `users.id`.
 
 ### `contacts`
