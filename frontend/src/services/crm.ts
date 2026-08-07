@@ -1,5 +1,5 @@
 import api from "./api";
-import type { Customer, CustomerDetail, CustomerPage, DashboardStats, FollowUp, Tag } from "../types";
+import type { Customer, CustomerActivity, CustomerDetail, CustomerPage, DashboardStats, FollowUp, Tag } from "../types";
 
 export type CustomerCreatePayload = {
   company_name: string; contact_name?: string; country?: string; email?: string; phone?: string;
@@ -16,6 +16,7 @@ export type CustomerFilters = {
 };
 export const getCustomers = async (params: CustomerFilters) => (await api.get<CustomerPage>("/customers", { params })).data;
 export const getCustomer = async (id: string) => (await api.get<CustomerDetail>(`/customers/${id}`)).data;
+export const getCustomerTimeline = async (id: string) => (await api.get<CustomerActivity[]>(`/customers/${id}/timeline`)).data;
 export const createCustomer = async (data: CustomerCreatePayload) => (await api.post<Customer>("/customers", data)).data;
 export const updateCustomer = async (id: number, data: Partial<CustomerCreatePayload>) => (await api.put<Customer>(`/customers/${id}`, data)).data;
 export const createFollowup = async (data: { customer_id: number; user_id: number; type: string; content: string; next_followup_date?: string }) => (await api.post<FollowUp>("/followups", data)).data;

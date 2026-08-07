@@ -2,6 +2,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.models.customer import Customer, CustomerLevel, CustomerStatus, Tag
+from app.models.customer_activity import CustomerStatusHistory
 from app.models.user import User
 from app.schemas.customer import CustomerCreate, CustomerUpdate
 from app.models.user import UserRole
@@ -96,6 +97,7 @@ def create_customer(session: Session, payload: CustomerCreate, creator: User) ->
 
 def update_customer(session: Session, customer_id: int, payload: CustomerUpdate, editor: User) -> Customer:
     customer = get_customer(session, customer_id)
+    previous_stage = customer.sales_stage
     changes = payload.model_dump(exclude_unset=True)
     if "sales_stage" in changes:
         changes["status"] = changes["sales_stage"]
@@ -105,6 +107,16 @@ def update_customer(session: Session, customer_id: int, payload: CustomerUpdate,
         raise ForbiddenError("Sales users may not reassign customers.")
     if "owner_id" in changes:
         _validate_owner(session, changes["owner_id"])
+    next_stage = changes.get("sales_stage", previous_stage)
+    if next_stage != previous_stage:
+        session.add(
+            CustomerStatusHistory(
+                customer_id=customer.id,
+                old_status=previous_stage,
+                new_status=next_stage,
+                changed_by_id=editor.id,
+            )
+        )
     for field, value in changes.items():
         setattr(customer, field, value)
     session.commit()

@@ -12,6 +12,18 @@ export interface Customer {
 export type CustomerStatus = "Lead" | "Contacted" | "Quotation" | "Negotiation" | "Won" | "Lost";
 export interface Contact { id: number; customer_id: number; name: string; position: string | null; email: string | null; phone: string | null; whatsapp: string | null; created_at: string; }
 export interface FollowUp { id: number; customer_id: number; user_id: number; type: "Email" | "WhatsApp" | "Phone" | "Meeting"; content: string; next_followup_date: string | null; created_at: string; }
+export type CustomerActivityType = "customer_created" | "followup" | "status_changed";
+export interface CustomerActivity {
+  event_id: string;
+  event_type: CustomerActivityType;
+  occurred_at: string;
+  user_id: number | null;
+  content: string | null;
+  followup_type: FollowUp["type"] | null;
+  next_followup_date: string | null;
+  old_status: CustomerStatus | null;
+  new_status: CustomerStatus | null;
+}
 export interface CustomerDetail extends Customer { contacts: Contact[]; tags: { id: number; name: string; created_at: string }[]; followups: FollowUp[]; }
 export interface CustomerPage { items: Customer[]; total: number; limit: number; offset: number; }
 export interface Tag { id: number; name: string; created_at: string; }

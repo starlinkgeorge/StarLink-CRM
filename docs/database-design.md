@@ -37,6 +37,10 @@ Reusable customer labels. `tags` contains `id`, unique `name`, and `created_at`.
 
 Sales activity records: `id`, `customer_id`, `user_id`, `type`, `content`, `next_followup_date`, and `created_at`. Types are `Email`, `WhatsApp`, `Phone`, and `Meeting`.
 
+### `customer_status_history`
+
+Immutable sales-stage audit records: `id`, `customer_id`, nullable `old_status`, required `new_status`, nullable `changed_by_id`, and `created_at`. A row is added only when `status`/`sales_stage` actually changes. Customer creation and follow-up activities remain in their source tables and are combined with these rows by the read-only timeline API.
+
 ### `refresh_tokens`
 
 Revocable login-session records: `id`, `user_id`, unique `token_hash`, `expires_at`, `revoked_at`, and `created_at`. The raw JWT refresh token is never persisted. `users.last_login_at` records the most recent successful login.
@@ -46,8 +50,10 @@ Revocable login-session records: `id`, `user_id`, unique `token_hash`, `expires_
 ```text
 users 1 ──< customers (owner_id; SET NULL on user deletion)
 users 1 ──< followups (user_id; deletion restricted to preserve history)
+users 1 ──< customer_status_history (changed_by_id; SET NULL on user deletion)
 customers 1 ──< contacts (deleted with customer)
 customers 1 ──< followups (deleted with customer)
+customers 1 ──< customer_status_history (deleted with customer)
 customers >──< tags (through customer_tags)
 users 1 ──< refresh_tokens (deleted with user)
 ```

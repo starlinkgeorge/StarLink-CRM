@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi.testclient import TestClient
 
 
@@ -118,6 +120,40 @@ def test_customer_lifecycle_with_contacts_and_followups(client: TestClient) -> N
     assert stage_update.status_code == 200
     assert stage_update.json()["sales_stage"] == "Quotation"
     assert stage_update.json()["status"] == "Quotation"
+
+    timeline = client.get(
+        f"/api/v1/customers/{customer['id']}/timeline", headers=sales_token
+    )
+    assert timeline.status_code == 200
+    activities = timeline.json()
+    assert {activity["event_type"] for activity in activities} == {
+        "customer_created",
+        "followup",
+        "status_changed",
+    }
+    assert sum(activity["event_type"] == "status_changed" for activity in activities) == 2
+    assert any(
+        activity["event_type"] == "followup"
+        and activity["followup_type"] == "Email"
+        and activity["content"] == "Sent the product catalogue."
+        for activity in activities
+    )
+    status_transitions = {
+        (activity["old_status"], activity["new_status"])
+        for activity in activities
+        if activity["event_type"] == "status_changed"
+    }
+    assert status_transitions == {("Lead", "Contacted"), ("Contacted", "Quotation")}
+    activity_times = [datetime.fromisoformat(activity["occurred_at"]) for activity in activities]
+    assert activity_times == sorted(activity_times, reverse=True)
+
+    existing_followups = client.get(
+        "/api/v1/followups",
+        params={"customer_id": customer["id"]},
+        headers=sales_token,
+    )
+    assert existing_followups.status_code == 200
+    assert len(existing_followups.json()) == 1
 
     delete = client.delete(f"/api/v1/customers/{customer['id']}", headers=sales_token)
     assert delete.status_code == 204
@@ -251,3 +287,7 @@ def test_sales_cannot_access_another_users_customer(client: TestClient) -> None:
     sales_token = login(client, "sales2@example.com", "SalesPass123!")
     blocked = client.get(f"/api/v1/customers/{customer.json()['id']}", headers=sales_token)
     assert blocked.status_code == 403
+    blocked_timeline = client.get(
+        f"/api/v1/customers/{customer.json()['id']}/timeline", headers=sales_token
+    )
+    assert blocked_timeline.status_code == 403
