@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AppLayout } from "./components/AppLayout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { CustomerDetailPage } from "./pages/CustomerDetailPage";
+import { CustomerClassificationPage } from "./pages/CustomerClassificationPage";
 import { CustomersPage } from "./pages/CustomersPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { LeadDetailPage } from "./pages/LeadDetailPage";
@@ -24,6 +25,7 @@ export function App() {
       <Route path="/" element={<DashboardPage />} />
       <Route path="/leads" element={<LeadsPage />} /><Route path="/leads/:id" element={<LeadDetailPage />} />
       <Route path="/customers" element={<CustomersPage />} /><Route path="/customers/new" element={<NewCustomerPage />} /><Route path="/customers/:id" element={<CustomerDetailPage />} />
+      <Route path="/customer-classification" element={<CustomerClassificationPage />} />
       <Route path="/opportunities" element={<OpportunitiesPage />} /><Route path="/opportunities/:id" element={<OpportunityDetailPage />} />
       <Route path="/products" element={<ProductsPage />} /><Route path="/products/:id" element={<ProductDetailPage />} />
       <Route path="/quotations" element={<QuotationsPage />} /><Route path="/quotations/:id" element={<QuotationDetailPage />} />

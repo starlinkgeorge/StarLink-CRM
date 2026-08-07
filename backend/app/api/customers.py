@@ -5,7 +5,15 @@ from app.db.session import get_db_session
 from app.api.dependencies import get_current_user
 from app.models.user import User, UserRole
 from app.models.customer import CustomerLevel, CustomerStatus, Tag
-from app.schemas.customer import CustomerCreate, CustomerDetail, CustomerPage, CustomerRead, CustomerUpdate
+from app.schemas.customer import (
+    CustomerCreate,
+    CustomerDetail,
+    CustomerPage,
+    CustomerRead,
+    CustomerScoreHistoryRead,
+    CustomerScoreUpdate,
+    CustomerUpdate,
+)
 from app.schemas.customer_activity import CustomerActivityRead
 from app.services import access_service, customer_activity_service, customer_service
 from app.services.errors import ConflictError, ForbiddenError, NotFoundError
@@ -53,6 +61,9 @@ def list_customers(
     interested_product: str | None = Query(default=None, max_length=500),
     sales_stage_filter: str | None = Query(default=None, alias="sales_stage", max_length=50),
     tag_id: int | None = Query(default=None, gt=0),
+    category_id: int | None = Query(default=None, gt=0),
+    score_min: int | None = Query(default=None, ge=0, le=100),
+    score_max: int | None = Query(default=None, ge=0, le=100),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ) -> CustomerPage:
@@ -71,6 +82,9 @@ def list_customers(
         customer_type=customer_type,
         interested_product=interested_product,
         sales_stage=_parse_sales_stage_filter(sales_stage_filter),
+        category_id=category_id,
+        score_min=score_min,
+        score_max=score_max,
     )
     return CustomerPage(items=items, total=total, limit=limit, offset=offset)
 
@@ -173,6 +187,41 @@ def remove_tag(customer_id: int, tag_id: int, session: Session = Depends(get_db_
         if tag is None: raise NotFoundError("Tag not found.")
         customer_service.remove_tag(session, customer, tag)
         return customer_service.get_customer(session, customer_id, include_relations=True)
+    except NotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ForbiddenError as error:
+        raise HTTPException(status_code=403, detail=str(error)) from error
+
+
+@router.put("/{customer_id}/score", response_model=CustomerRead)
+def update_customer_score(
+    customer_id: int,
+    payload: CustomerScoreUpdate,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> CustomerRead:
+    try:
+        customer = customer_service.get_customer(session, customer_id)
+        access_service.ensure_customer_manage_access(current_user, customer)
+        return customer_service.update_customer_score(
+            session, customer_id, payload.score, payload.reason, current_user
+        )
+    except NotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ForbiddenError as error:
+        raise HTTPException(status_code=403, detail=str(error)) from error
+
+
+@router.get("/{customer_id}/score-history", response_model=list[CustomerScoreHistoryRead])
+def get_customer_score_history(
+    customer_id: int,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> list[CustomerScoreHistoryRead]:
+    try:
+        customer = customer_service.get_customer(session, customer_id)
+        access_service.ensure_customer_read_access(current_user, customer)
+        return customer_service.list_score_history(session, customer_id)
     except NotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
     except ForbiddenError as error:

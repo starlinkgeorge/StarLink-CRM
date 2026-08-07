@@ -93,6 +93,7 @@ Roles: `Admin` manages all records and users; `Sales` reads and manages only cus
 | --- | --- |
 | Users | `GET /users`, `POST /users`, `GET /users/{id}` |
 | Customers | `GET /customers?limit=20&offset=0&q=keyword`, `POST /customers`, `GET /customers/{id}`, `GET /customers/{id}/timeline`, `PUT /customers/{id}`, `DELETE /customers/{id}` |
+| Customer classification | `GET /customer-categories`, `POST /customer-categories`, `PUT /customer-categories/{id}`, `GET /customers?category_id={id}&score_min=50&score_max=100` |
 | Leads | `GET /leads`, `POST /leads`, `GET /leads/{id}`, `POST /leads/{id}/convert` |
 | Opportunities | `GET /opportunities`, `POST /opportunities`, `GET /opportunities/{id}`, `PUT /opportunities/{id}`, `PUT /opportunities/{id}/products` |
 | Product categories | `GET /product-categories`, `POST /product-categories`, `PUT /product-categories/{id}` |
@@ -102,9 +103,11 @@ Roles: `Admin` manages all records and users; `Sales` reads and manages only cus
 | Contacts | `POST /contacts`, `GET /contacts/{id}`, `PUT /contacts/{id}` |
 | Follow-ups | `POST /followups`, `GET /followups?customer_id={id}` |
 | Dashboard | `GET /dashboard/stats` |
-| Tags | `GET /tags`, `POST /tags`, `POST /customers/{id}/tags/{tag_id}`, `DELETE /customers/{id}/tags/{tag_id}` |
+| Tags | `GET /tags`, `POST /tags`, `PUT /tags/{id}`, `DELETE /tags/{id}` (soft deactivate), `POST /customers/{id}/tags/{tag_id}`, `DELETE /customers/{id}/tags/{tag_id}` |
 
 The customer `q` parameter searches company name, primary contact name, country, and email. Empty or whitespace-only query and filter values are ignored, so the initial list request returns all visible customers. Customer creation accepts `customer_type`, `source`, `interested_product`, and `sales_stage`. The V3-facing `sales_stage` is synchronized with the legacy `status` field so existing V2.2 dashboard statistics remain compatible. Customer lists support `customer_type`, `interested_product`, `sales_stage`, `source`, `status`, `level`, `country`, and `tag_id` filters; the legacy `status` parameter remains available for existing clients. Customer details include related contacts, tags, and follow-ups. The customer timeline endpoint combines customer creation, follow-ups, and persisted sales-stage changes in newest-first order. Existing follow-up endpoints continue to read and write `followups` without payload changes.
+
+V4 adds configurable customer categories and score-based grading without removing the legacy `level` field. `customer_score` is an integer from 0 to 100; saving a score automatically maps 80-100 to A, 50-79 to B, and 0-49 to C. Score changes are retained in `customer_score_history` with an optional reason. Customer lists support `category_id`, `score_min`, and `score_max` filters. Admin and Sales users may manage categories/tags and score customers within their normal customer scope; Viewer users can read but cannot change taxonomy or scores. Tag deletion is a soft deactivation so existing customer relationships remain intact.
 
 Follow-up reminders reuse `next_followup_date`; no separate reminder record is required. The latest follow-up for each customer defines its current reminder, so an older planned date is superseded when a newer follow-up is recorded. Supported channels are `Email`, `WhatsApp`, `Alibaba`, `Phone`, and `Meeting`; the existing `content`, `next_followup_date`, and `created_at` fields remain backward compatible. Dashboard statistics expose `today_followup_count`, `overdue_followup_count`, `week_followup_count`, `today_followups`, and `overdue_followups`, while retaining the existing response fields for compatibility. Reminder lists contain up to ten visible customers per category and respect the current user's customer scope. Interactive API documentation is available at `/api/v1/docs` while the backend is running.
 

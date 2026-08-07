@@ -1,8 +1,9 @@
 import axios from "axios";
-import { useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { createCustomer, type CustomerCreatePayload } from "../services/crm";
+import { createCustomer, getCustomerCategories, type CustomerCreatePayload } from "../services/crm";
+import type { CustomerCategory } from "../types";
 
 const customerTypes = [
   "Kindergarten",
@@ -45,6 +46,11 @@ export function NewCustomerPage() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<CustomerCreatePayload>(initialForm);
+  const [categories, setCategories] = useState<CustomerCategory[]>([]);
+
+  useEffect(() => {
+    getCustomerCategories(true).then(setCategories).catch(() => undefined);
+  }, []);
 
   const field = (key: keyof CustomerCreatePayload) => ({
     value: form[key] ?? "",
@@ -93,6 +99,13 @@ export function NewCustomerPage() {
             </select>
           </label>
           <label className="text-sm font-medium">
+            客户分类
+            <select value={form.category_id ?? ""} onChange={(event) => setForm({ ...form, category_id: event.target.value ? Number(event.target.value) : undefined })} className="mt-1 w-full rounded border px-3 py-2">
+              <option value="">请选择分类</option>
+              {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+            </select>
+          </label>
+          <label className="text-sm font-medium">
             主联系人
             <input {...field("contact_name")} className="mt-1 w-full rounded border px-3 py-2" />
           </label>
@@ -136,6 +149,10 @@ export function NewCustomerPage() {
             <select {...field("level")} className="mt-1 w-full rounded border px-3 py-2">
               <option>A</option><option>B</option><option>C</option>
             </select>
+          </label>
+          <label className="text-sm font-medium">
+            客户评分（0-100）
+            <input type="number" min="0" max="100" value={form.customer_score ?? ""} onChange={(event) => setForm({ ...form, customer_score: event.target.value === "" ? undefined : Number(event.target.value) })} className="mt-1 w-full rounded border px-3 py-2" />
           </label>
           <label className="text-sm font-medium">
             销售阶段

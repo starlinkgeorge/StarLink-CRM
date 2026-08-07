@@ -1,7 +1,8 @@
 import enum
+from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import Column, Enum, ForeignKey, String, Table
+from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, String, Table
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -79,8 +80,20 @@ class Customer(TimestampMixin, Base):
     owner_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), index=True
     )
+    category_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("customer_categories.id", ondelete="SET NULL"), index=True
+    )
+    customer_score: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    score_updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
     owner: Mapped[Optional["User"]] = relationship(back_populates="owned_customers")
+    category: Mapped[Optional["CustomerCategory"]] = relationship(back_populates="customers")
+    score_history: Mapped[list["CustomerScoreHistory"]] = relationship(
+        back_populates="customer",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="(CustomerScoreHistory.created_at.desc(), CustomerScoreHistory.id.desc())",
+    )
     contacts: Mapped[list["Contact"]] = relationship(
         back_populates="customer", cascade="all, delete-orphan", passive_deletes=True
     )
@@ -115,5 +128,8 @@ class Tag(CreatedAtMixin, Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(80), nullable=False, unique=True)
+    description: Mapped[Optional[str]] = mapped_column(String(255))
+    color: Mapped[str] = mapped_column(String(20), nullable=False, server_default="#2563eb")
+    is_active: Mapped[bool] = mapped_column(nullable=False, server_default="true")
 
     customers: Mapped[list["Customer"]] = relationship(secondary=CustomerTag, back_populates="tags")

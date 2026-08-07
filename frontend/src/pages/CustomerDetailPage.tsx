@@ -8,14 +8,16 @@ import {
   createFollowup,
   createTag,
   getCustomer,
+  getCustomerScoreHistory,
   getCustomerTimeline,
   getOpportunities,
   getTags,
   removeTag,
+  updateCustomerScore,
   updateCustomer,
 } from "../services/crm";
 import { useAuth } from "../store/auth";
-import type { CustomerActivity, CustomerDetail, CustomerStatus, OpportunityListItem, OpportunityStage, Tag } from "../types";
+import type { CustomerActivity, CustomerDetail, CustomerScoreHistory, CustomerStatus, OpportunityListItem, OpportunityStage, Tag } from "../types";
 
 const stages: CustomerStatus[] = ["Lead", "Contacted", "Quotation", "Negotiation", "Won", "Lost"];
 const stageText: Record<CustomerStatus, string> = {
@@ -91,25 +93,31 @@ export function CustomerDetailPage() {
   const [timeline, setTimeline] = useState<CustomerActivity[]>([]);
   const [opportunities, setOpportunities] = useState<OpportunityListItem[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
+  const [scoreHistory, setScoreHistory] = useState<CustomerScoreHistory[]>([]);
   const [error, setError] = useState("");
   const [content, setContent] = useState("");
   const [type, setType] = useState("Email");
   const [nextDate, setNextDate] = useState("");
   const [tagId, setTagId] = useState("");
   const [newTag, setNewTag] = useState("");
+  const [scoreInput, setScoreInput] = useState("");
+  const [scoreReason, setScoreReason] = useState("");
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) return;
     try {
-      const [customerData, timelineData, opportunityData] = await Promise.all([
+      const [customerData, timelineData, opportunityData, scoreHistoryData] = await Promise.all([
         getCustomer(id),
         getCustomerTimeline(id),
         getOpportunities({ limit: 100, offset: 0, customer_id: Number(id) }),
+        getCustomerScoreHistory(Number(id)),
       ]);
       setCustomer(customerData);
       setTimeline(timelineData);
       setOpportunities(opportunityData.items);
+      setScoreHistory(scoreHistoryData);
+      setScoreInput(String(customerData.customer_score));
       setError("");
     } catch {
       setError("无法加载客户详情。");
@@ -157,6 +165,26 @@ export function CustomerDetailPage() {
       await load();
     } catch {
       setError("无法更新客户阶段。");
+    }
+  }
+
+  async function saveScore(event: FormEvent) {
+    event.preventDefault();
+    if (!customer || scoreInput === "") return;
+    const score = Number(scoreInput);
+    if (!Number.isInteger(score) || score < 0 || score > 100) {
+      setError("评分必须是 0 到 100 的整数。");
+      return;
+    }
+    setSaving(true);
+    try {
+      await updateCustomerScore(customer.id, { score, reason: scoreReason.trim() || undefined });
+      setScoreReason("");
+      await load();
+    } catch (err) {
+      setError(axios.isAxiosError(err) ? err.response?.data?.detail ?? "无法保存客户评分。" : "无法保存客户评分。");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -221,6 +249,8 @@ export function CustomerDetailPage() {
         <article className="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
           <h3 className="font-bold">客户档案</h3>
           <dl className="mt-4 grid grid-cols-2 gap-4 text-sm">
+            <div><dt className="text-slate-500">客户分类</dt><dd>{customer.category?.name ?? "—"}</dd></div>
+            <div><dt className="text-slate-500">客户评分</dt><dd className="font-semibold">{customer.customer_score} / 100（{customer.level}）</dd></div>
             <div><dt className="text-slate-500">等级</dt><dd>{customer.level}</dd></div>
             <div><dt className="text-slate-500">客户类型</dt><dd>{customer.customer_type ?? "—"}</dd></div>
             <div><dt className="text-slate-500">来源</dt><dd>{customer.source ?? "—"}</dd></div>
@@ -235,6 +265,22 @@ export function CustomerDetailPage() {
             <div><dt className="text-slate-500">创建时间</dt><dd>{new Date(customer.created_at).toLocaleString()}</dd></div>
             <div><dt className="text-slate-500">最近更新</dt><dd>{new Date(customer.updated_at).toLocaleString()}</dd></div>
           </dl>
+          {editable && (
+            <form onSubmit={saveScore} className="mt-5 rounded-lg bg-slate-50 p-3">
+              <p className="text-sm font-semibold">更新客户等级评分</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <input type="number" min="0" max="100" value={scoreInput} onChange={(event) => setScoreInput(event.target.value)} className="w-28 rounded border px-2 py-1 text-sm" />
+                <input value={scoreReason} onChange={(event) => setScoreReason(event.target.value)} maxLength={500} placeholder="评分原因（可选）" className="min-w-52 flex-1 rounded border px-2 py-1 text-sm" />
+                <button disabled={saving} className="rounded bg-blue-600 px-3 py-1 text-sm font-semibold text-white disabled:opacity-60">保存评分</button>
+              </div>
+              <p className="mt-1 text-xs text-slate-500">80-100 自动为 A，50-79 为 B，0-49 为 C。</p>
+            </form>
+          )}
+          {scoreHistory.length > 0 && (
+            <div className="mt-4 text-xs text-slate-500">
+              最近评分：{scoreHistory.slice(0, 3).map((item) => `${item.new_score}分（${new Date(item.created_at).toLocaleDateString()}）`).join(" · ")}
+            </div>
+          )}
 
           <h4 className="mt-6 text-sm font-semibold">客户标签</h4>
           <div className="mt-2 flex flex-wrap gap-2">

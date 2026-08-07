@@ -160,6 +160,76 @@ def test_customer_lifecycle_with_contacts_and_followups(client: TestClient) -> N
     assert delete.status_code == 204
 
 
+def test_customer_classification_scoring_and_permissions(client: TestClient) -> None:
+    admin_token = login(client, "admin@example.com", "AdminPass123!")
+    category = client.post(
+        "/api/v1/customer-categories",
+        json={"name": "Strategic School", "description": "High-value schools", "color": "#0f766e"},
+        headers=admin_token,
+    )
+    assert category.status_code == 201
+    category_id = category.json()["id"]
+    tag = client.post(
+        "/api/v1/tags",
+        json={"name": "High Intent", "description": "Ready for quotation", "color": "#dc2626"},
+        headers=admin_token,
+    )
+    assert tag.status_code == 201
+    assert tag.json()["color"] == "#dc2626"
+
+    customer = client.post(
+        "/api/v1/customers",
+        json={"company_name": "Scored School", "category_id": category_id, "customer_score": 85},
+        headers=admin_token,
+    )
+    assert customer.status_code == 201
+    customer_data = customer.json()
+    assert customer_data["customer_score"] == 85
+    assert customer_data["level"] == "A"
+    customer_id = customer_data["id"]
+
+    linked = client.post(
+        f"/api/v1/customers/{customer_id}/tags/{tag.json()['id']}", headers=admin_token
+    )
+    assert linked.status_code == 200
+    scored = client.put(
+        f"/api/v1/customers/{customer_id}/score",
+        json={"score": 70, "reason": "Strong product fit"},
+        headers=admin_token,
+    )
+    assert scored.status_code == 200
+    assert scored.json()["level"] == "B"
+    history = client.get(f"/api/v1/customers/{customer_id}/score-history", headers=admin_token)
+    assert history.status_code == 200
+    assert [item["new_score"] for item in history.json()] == [70, 85]
+
+    filtered = client.get(
+        "/api/v1/customers",
+        params={"category_id": category_id, "score_min": 60, "score_max": 80},
+        headers=admin_token,
+    )
+    assert filtered.status_code == 200
+    assert filtered.json()["total"] == 1
+
+    viewer = client.post(
+        "/api/v1/users",
+        json={"name": "Read Only", "email": "viewer@example.com", "password": "ViewerPass123!", "role": "Viewer"},
+        headers=admin_token,
+    )
+    assert viewer.status_code == 201
+    viewer_token = login(client, "viewer@example.com", "ViewerPass123!")
+    denied = client.put(
+        f"/api/v1/customers/{customer_id}/score",
+        json={"score": 90},
+        headers=viewer_token,
+    )
+    assert denied.status_code == 403
+    denied_category = client.post(
+        "/api/v1/customer-categories", json={"name": "Viewer Cannot Create"}, headers=viewer_token
+    )
+    assert denied_category.status_code == 403
+
+
 def test_user_email_must_be_unique(client: TestClient) -> None:
     user = create_user(client)
     admin_token = login(client, "admin@example.com", "AdminPass123!")

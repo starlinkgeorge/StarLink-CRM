@@ -45,11 +45,21 @@ export interface Customer {
   id: number; company_name: string; contact_name: string | null; country: string | null;
   email: string | null; phone: string | null; whatsapp: string | null; website: string | null;
   customer_type: string | null; source: string | null; interested_product: string | null;
+  category_id: number | null; category: CustomerCategory | null;
+  customer_score: number; score_updated_at: string | null;
   level: "A" | "B" | "C"; status: CustomerStatus; sales_stage: CustomerStatus;
   owner_id: number | null;
   created_at: string; updated_at: string;
 }
 export type CustomerStatus = "Lead" | "Contacted" | "Quotation" | "Negotiation" | "Won" | "Lost";
+export interface CustomerCategory {
+  id: number; name: string; description: string | null; color: string;
+  sort_order: number; is_active: boolean; created_at: string; updated_at: string;
+}
+export interface CustomerScoreHistory {
+  id: number; customer_id: number; old_score: number | null; new_score: number;
+  reason: string | null; changed_by_id: number | null; created_at: string;
+}
 export interface Contact { id: number; customer_id: number; name: string; position: string | null; email: string | null; phone: string | null; whatsapp: string | null; created_at: string; }
 export type FollowUpType = "Email" | "WhatsApp" | "Alibaba" | "Phone" | "Meeting";
 export interface FollowUp { id: number; customer_id: number; user_id: number; type: FollowUpType; content: string; next_followup_date: string | null; created_at: string; }
@@ -67,7 +77,10 @@ export interface CustomerActivity {
 }
 export interface CustomerDetail extends Customer { contacts: Contact[]; tags: { id: number; name: string; created_at: string }[]; followups: FollowUp[]; }
 export interface CustomerPage { items: Customer[]; total: number; limit: number; offset: number; }
-export interface Tag { id: number; name: string; created_at: string; }
+export interface Tag {
+  id: number; name: string; description: string | null; color: string;
+  is_active: boolean; created_at: string;
+}
 export interface DashboardStats {
   customer_count: number; followup_count: number; new_customers_today: number; due_followups: number;
   today_followup_count: number; overdue_followup_count: number;

@@ -3,7 +3,7 @@ import { useAuth } from "../store/auth";
 
 const navItems = [
   ["/", "仪表盘"], ["/leads", "询盘池"], ["/customers", "客户管理"],
-  ["/opportunities", "商机管理"], ["/products", "产品库"],
+  ["/opportunities", "商机管理"], ["/products", "产品库"], ["/customer-classification", "客户分类/标签"],
   ["/quotations", "报价管理"], ["/settings", "设置"],
 ] as const;
 

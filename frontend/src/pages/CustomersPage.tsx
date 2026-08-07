@@ -2,9 +2,9 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 
 import { StatusBadge } from "../components/StatusBadge";
-import { getCustomers, getTags, type CustomerFilters } from "../services/crm";
+import { getCustomerCategories, getCustomers, getTags, type CustomerFilters } from "../services/crm";
 import { useAuth } from "../store/auth";
-import type { CustomerPage, Tag } from "../types";
+import type { CustomerCategory, CustomerPage, Tag } from "../types";
 
 const PAGE_SIZE = 20;
 const salesStages = ["", "Lead", "Contacted", "Quotation", "Negotiation", "Won", "Lost"];
@@ -38,6 +38,9 @@ type FilterForm = {
   source: string;
   interested_product: string;
   tag_id: string;
+  category_id: string;
+  score_min: string;
+  score_max: string;
 };
 
 const emptyFilters: FilterForm = {
@@ -49,28 +52,37 @@ const emptyFilters: FilterForm = {
   source: "",
   interested_product: "",
   tag_id: "",
+  category_id: "",
+  score_min: "",
+  score_max: "",
 };
 
 export function CustomersPage() {
   const { user } = useAuth();
   const [data, setData] = useState<CustomerPage | null>(null);
   const [tags, setTags] = useState<Tag[]>([]);
+  const [categories, setCategories] = useState<CustomerCategory[]>([]);
   const [filters, setFilters] = useState<FilterForm>(emptyFilters);
   const [active, setActive] = useState<FilterForm>(emptyFilters);
   const [offset, setOffset] = useState(0);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    getTags().then(setTags).catch(() => undefined);
+    Promise.all([getTags(), getCustomerCategories(true)])
+      .then(([tagData, categoryData]) => { setTags(tagData); setCategories(categoryData); })
+      .catch(() => undefined);
   }, []);
 
   useEffect(() => {
-    const { tag_id: tagId, ...filterValues } = active;
+    const { tag_id: tagId, category_id: categoryId, score_min: scoreMin, score_max: scoreMax, ...filterValues } = active;
     const params: CustomerFilters = {
       limit: PAGE_SIZE,
       offset,
       ...filterValues,
       tag_id: tagId ? Number(tagId) : undefined,
+      category_id: categoryId ? Number(categoryId) : undefined,
+      score_min: scoreMin ? Number(scoreMin) : undefined,
+      score_max: scoreMax ? Number(scoreMax) : undefined,
     };
     setError("");
     getCustomers(params)
@@ -181,6 +193,16 @@ export function CustomersPage() {
             <option value="">全部标签</option>
             {tags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
           </select>
+          <select value={filters.category_id} onChange={(event) => setFilters({ ...filters, category_id: event.target.value })} className="rounded-lg border px-3 py-2">
+            <option value="">全部客户分类</option>
+            {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+          </select>
+          <select value={filters.score_min} onChange={(event) => setFilters({ ...filters, score_min: event.target.value })} className="rounded-lg border px-3 py-2">
+            <option value="">最低评分</option><option value="80">80+（A）</option><option value="50">50+（B）</option><option value="0">0+（C）</option>
+          </select>
+          <select value={filters.score_max} onChange={(event) => setFilters({ ...filters, score_max: event.target.value })} className="rounded-lg border px-3 py-2">
+            <option value="">最高评分</option><option value="49">0-49（C）</option><option value="79">50-79（B）</option><option value="100">80-100（A）</option>
+          </select>
         </div>
         <div className="mt-3 flex gap-2">
           <button className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white">
@@ -200,10 +222,12 @@ export function CustomersPage() {
               <th className="px-4 py-3">公司</th>
               <th className="px-4 py-3">联系人</th>
               <th className="px-4 py-3">客户类型</th>
+              <th className="px-4 py-3">客户分类</th>
               <th className="px-4 py-3">来源</th>
               <th className="px-4 py-3">感兴趣产品</th>
               <th className="px-4 py-3">国家</th>
               <th className="px-4 py-3">等级</th>
+              <th className="px-4 py-3">评分</th>
               <th className="px-4 py-3">阶段</th>
             </tr>
           </thead>
@@ -215,15 +239,17 @@ export function CustomersPage() {
                 </td>
                 <td className="px-4 py-3">{customer.contact_name ?? "—"}</td>
                 <td className="px-4 py-3">{customer.customer_type ?? "—"}</td>
+                <td className="px-4 py-3">{customer.category?.name ?? "—"}</td>
                 <td className="px-4 py-3">{customer.source ?? "—"}</td>
                 <td className="px-4 py-3">{customer.interested_product ?? "—"}</td>
                 <td className="px-4 py-3">{customer.country ?? "—"}</td>
                 <td className="px-4 py-3">{customer.level}</td>
+                <td className="px-4 py-3 font-semibold">{customer.customer_score}</td>
                 <td className="px-4 py-3"><StatusBadge status={customer.sales_stage} /></td>
               </tr>
             ))}
             {data?.items.length === 0 && (
-              <tr><td colSpan={8} className="px-4 py-10 text-center text-slate-500">没有匹配的客户。</td></tr>
+              <tr><td colSpan={10} className="px-4 py-10 text-center text-slate-500">没有匹配的客户。</td></tr>
             )}
           </tbody>
         </table>

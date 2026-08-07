@@ -1,18 +1,18 @@
 import api from "./api";
-import type { AlibabaInquiryResult, AlibabaIntegrationStatus, Customer, CustomerActivity, CustomerDetail, CustomerPage, DashboardStats, FollowUp, Lead, LeadConversion, LeadDetail, LeadPage, LeadStatus, OpportunityDetail, OpportunityListItem, OpportunityPage, OpportunityStage, Product, ProductCategory, ProductPage, QuotationDetail, QuotationPage, QuotationStatus, Tag } from "../types";
+import type { AlibabaInquiryResult, AlibabaIntegrationStatus, Customer, CustomerActivity, CustomerCategory, CustomerDetail, CustomerPage, CustomerScoreHistory, DashboardStats, FollowUp, Lead, LeadConversion, LeadDetail, LeadPage, LeadStatus, OpportunityDetail, OpportunityListItem, OpportunityPage, OpportunityStage, Product, ProductCategory, ProductPage, QuotationDetail, QuotationPage, QuotationStatus, Tag } from "../types";
 
 export type CustomerCreatePayload = {
   company_name: string; contact_name?: string; country?: string; email?: string; phone?: string;
   whatsapp?: string; website?: string; customer_type?: string; source?: string;
   interested_product?: string; level?: Customer["level"]; status?: Customer["status"];
-  sales_stage?: Customer["sales_stage"];
+  sales_stage?: Customer["sales_stage"]; category_id?: number; customer_score?: number;
 };
 
 export const getDashboardStats = async () => (await api.get<DashboardStats>("/dashboard/stats")).data;
 export type CustomerFilters = {
   limit: number; offset: number; q?: string; status?: string; level?: string; country?: string;
   customer_type?: string; source?: string; interested_product?: string; sales_stage?: string;
-  tag_id?: number;
+  tag_id?: number; category_id?: number; score_min?: number; score_max?: number;
 };
 export const getCustomers = async (params: CustomerFilters) => (await api.get<CustomerPage>("/customers", { params })).data;
 export const getCustomer = async (id: string) => (await api.get<CustomerDetail>(`/customers/${id}`)).data;
@@ -21,9 +21,15 @@ export const createCustomer = async (data: CustomerCreatePayload) => (await api.
 export const updateCustomer = async (id: number, data: Partial<CustomerCreatePayload>) => (await api.put<Customer>(`/customers/${id}`, data)).data;
 export const createFollowup = async (data: { customer_id: number; user_id: number; type: string; content: string; next_followup_date?: string }) => (await api.post<FollowUp>("/followups", data)).data;
 export const getTags = async () => (await api.get<Tag[]>("/tags")).data;
-export const createTag = async (name: string) => (await api.post<Tag>("/tags", { name })).data;
+export const createTag = async (name: string, options?: { description?: string; color?: string; is_active?: boolean }) => (await api.post<Tag>("/tags", { name, ...options })).data;
 export const assignTag = async (customerId: number, tagId: number) => (await api.post<CustomerDetail>(`/customers/${customerId}/tags/${tagId}`)).data;
 export const removeTag = async (customerId: number, tagId: number) => (await api.delete<CustomerDetail>(`/customers/${customerId}/tags/${tagId}`)).data;
+export const updateCustomerScore = async (customerId: number, data: { score: number; reason?: string }) => (await api.put<Customer>(`/customers/${customerId}/score`, data)).data;
+export const getCustomerScoreHistory = async (customerId: number) => (await api.get<CustomerScoreHistory[]>(`/customers/${customerId}/score-history`)).data;
+export const getCustomerCategories = async (activeOnly = false) => (await api.get<CustomerCategory[]>("/customer-categories", { params: { active_only: activeOnly } })).data;
+export const createCustomerCategory = async (data: { name: string; description?: string; color?: string; sort_order?: number; is_active?: boolean }) => (await api.post<CustomerCategory>("/customer-categories", data)).data;
+export const updateCustomerCategory = async (id: number, data: Partial<{ name: string; description: string; color: string; sort_order: number; is_active: boolean }>) => (await api.put<CustomerCategory>(`/customer-categories/${id}`, data)).data;
+export const updateTag = async (id: number, data: Partial<{ name: string; description: string; color: string; is_active: boolean }>) => (await api.put<Tag>(`/tags/${id}`, data)).data;
 
 export type LeadCreatePayload = {
   company_name: string; contact_name: string; country?: string; email?: string; phone?: string;
