@@ -140,6 +140,69 @@ def test_user_email_must_be_unique(client: TestClient) -> None:
     assert duplicate.status_code == 409
 
 
+def test_customer_list_supports_v3_profile_filters(client: TestClient) -> None:
+    admin_token = login(client, "admin@example.com", "AdminPass123!")
+    records = [
+        {
+            "company_name": "Berlin Montessori Campus",
+            "customer_type": "Kindergarten",
+            "source": "Alibaba",
+            "interested_product": "Montessori shelves and practical life materials",
+            "sales_stage": "Quotation",
+        },
+        {
+            "company_name": "Nordic Education Supply",
+            "customer_type": "Distributor",
+            "source": "Website",
+            "interested_product": "Preschool tables and chairs",
+            "sales_stage": "Contacted",
+        },
+    ]
+    for record in records:
+        response = client.post("/api/v1/customers", json=record, headers=admin_token)
+        assert response.status_code == 201
+
+    filters = [
+        ({"customer_type": "kindergarten"}, "Berlin Montessori Campus"),
+        ({"interested_product": "practical life"}, "Berlin Montessori Campus"),
+        ({"sales_stage": "Quotation"}, "Berlin Montessori Campus"),
+        ({"source": "alibaba"}, "Berlin Montessori Campus"),
+        (
+            {
+                "customer_type": "Distributor",
+                "interested_product": "tables",
+                "sales_stage": "Contacted",
+                "source": "Website",
+            },
+            "Nordic Education Supply",
+        ),
+        ({"status": "Contacted"}, "Nordic Education Supply"),
+    ]
+    for params, expected_company in filters:
+        response = client.get("/api/v1/customers", params=params, headers=admin_token)
+        assert response.status_code == 200
+        assert response.json()["total"] == 1
+        assert response.json()["items"][0]["company_name"] == expected_company
+
+    empty_filters = client.get(
+        "/api/v1/customers",
+        params={
+            "customer_type": "",
+            "interested_product": "",
+            "sales_stage": "",
+            "source": "",
+        },
+        headers=admin_token,
+    )
+    assert empty_filters.status_code == 200
+    assert empty_filters.json()["total"] == 2
+
+    invalid_stage = client.get(
+        "/api/v1/customers", params={"sales_stage": "Invalid"}, headers=admin_token
+    )
+    assert invalid_stage.status_code == 422
+
+
 def test_login_rejects_invalid_password_and_protects_api(client: TestClient) -> None:
     invalid_login = client.post(
         "/api/v1/auth/login", json={"email": "admin@example.com", "password": "incorrect"}

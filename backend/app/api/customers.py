@@ -30,6 +30,15 @@ def _parse_level_filter(value: str | None) -> CustomerLevel | None:
         raise HTTPException(status_code=422, detail="Invalid customer level filter.") from error
 
 
+def _parse_sales_stage_filter(value: str | None) -> CustomerStatus | None:
+    if value is None or not value.strip():
+        return None
+    try:
+        return CustomerStatus(value.strip())
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail="Invalid sales stage filter.") from error
+
+
 @router.get("", response_model=CustomerPage)
 def list_customers(
     limit: int = Query(default=20, ge=1, le=100),
@@ -38,23 +47,29 @@ def list_customers(
     status_filter: str | None = Query(default=None, alias="status", max_length=50),
     level_filter: str | None = Query(default=None, alias="level", max_length=10),
     country: str | None = Query(default=None, max_length=100),
+    customer_type: str | None = Query(default=None, max_length=80),
     source: str | None = Query(default=None, max_length=80),
+    interested_product: str | None = Query(default=None, max_length=500),
+    sales_stage_filter: str | None = Query(default=None, alias="sales_stage", max_length=50),
     tag_id: int | None = Query(default=None, gt=0),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ) -> CustomerPage:
     owner_id = current_user.id if current_user.role is UserRole.SALES else None
     items, total = customer_service.list_customers(
-        session,
-        limit,
-        offset,
-        q,
-        owner_id,
-        _parse_status_filter(status_filter),
-        _parse_level_filter(level_filter),
-        country,
-        source,
-        tag_id,
+        session=session,
+        limit=limit,
+        offset=offset,
+        query=q,
+        owner_id=owner_id,
+        status=_parse_status_filter(status_filter),
+        level=_parse_level_filter(level_filter),
+        country=country,
+        source=source,
+        tag_id=tag_id,
+        customer_type=customer_type,
+        interested_product=interested_product,
+        sales_stage=_parse_sales_stage_filter(sales_stage_filter),
     )
     return CustomerPage(items=items, total=total, limit=limit, offset=offset)
 

@@ -17,6 +17,8 @@ def list_customers(
     session: Session, limit: int, offset: int, query: str | None, owner_id: int | None = None,
     status: CustomerStatus | None = None, level: CustomerLevel | None = None,
     country: str | None = None, source: str | None = None, tag_id: int | None = None,
+    customer_type: str | None = None, interested_product: str | None = None,
+    sales_stage: CustomerStatus | None = None,
 ) -> tuple[list[Customer], int]:
     filters = []
     if owner_id is not None:
@@ -36,12 +38,20 @@ def list_customers(
         filters.append(Customer.status == status)
     if level:
         filters.append(Customer.level == level)
+    if sales_stage:
+        filters.append(Customer.sales_stage == sales_stage)
     country_term = country.strip() if country else ""
     if country_term:
         filters.append(Customer.country.ilike(f"%{country_term}%"))
     source_term = source.strip() if source else ""
     if source_term:
         filters.append(Customer.source.ilike(f"%{source_term}%"))
+    customer_type_term = customer_type.strip() if customer_type else ""
+    if customer_type_term:
+        filters.append(Customer.customer_type.ilike(f"%{customer_type_term}%"))
+    interested_product_term = interested_product.strip() if interested_product else ""
+    if interested_product_term:
+        filters.append(Customer.interested_product.ilike(f"%{interested_product_term}%"))
     if tag_id:
         filters.append(Customer.tags.any(Tag.id == tag_id))
     statement = select(Customer).where(*filters).order_by(Customer.updated_at.desc(), Customer.id.desc())

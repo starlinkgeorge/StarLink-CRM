@@ -9,7 +9,11 @@ export type CustomerCreatePayload = {
 };
 
 export const getDashboardStats = async () => (await api.get<DashboardStats>("/dashboard/stats")).data;
-export type CustomerFilters = { limit: number; offset: number; q?: string; status?: string; level?: string; country?: string; source?: string; tag_id?: number };
+export type CustomerFilters = {
+  limit: number; offset: number; q?: string; status?: string; level?: string; country?: string;
+  customer_type?: string; source?: string; interested_product?: string; sales_stage?: string;
+  tag_id?: number;
+};
 export const getCustomers = async (params: CustomerFilters) => (await api.get<CustomerPage>("/customers", { params })).data;
 export const getCustomer = async (id: string) => (await api.get<CustomerDetail>(`/customers/${id}`)).data;
 export const createCustomer = async (data: CustomerCreatePayload) => (await api.post<Customer>("/customers", data)).data;
