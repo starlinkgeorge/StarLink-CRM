@@ -62,7 +62,12 @@ export interface CustomerScoreHistory {
 }
 export interface Contact { id: number; customer_id: number; name: string; position: string | null; email: string | null; phone: string | null; whatsapp: string | null; created_at: string; }
 export type FollowUpType = "Email" | "WhatsApp" | "Alibaba" | "Phone" | "Meeting";
-export interface FollowUp { id: number; customer_id: number; user_id: number; type: FollowUpType; content: string; next_followup_date: string | null; created_at: string; }
+export interface FollowUpAttachment { id: number; file_name: string; content_type: string | null; size_bytes: number; created_at: string; }
+export interface FollowUp {
+  id: number; customer_id: number; opportunity_id: number | null; user_id: number;
+  type: FollowUpType; followup_date: string; content: string; next_followup_date: string | null;
+  created_at: string; updated_at: string; attachments: FollowUpAttachment[];
+}
 export type CustomerActivityType = "customer_created" | "followup" | "status_changed";
 export interface CustomerActivity {
   event_id: string;
@@ -71,7 +76,9 @@ export interface CustomerActivity {
   user_id: number | null;
   content: string | null;
   followup_type: FollowUp["type"] | null;
+  followup_date: string | null;
   next_followup_date: string | null;
+  opportunity_id: number | null;
   old_status: CustomerStatus | null;
   new_status: CustomerStatus | null;
 }

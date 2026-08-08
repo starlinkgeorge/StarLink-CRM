@@ -2,7 +2,7 @@
 
 StarLink-CRM is the foundation for a long-lived customer relationship management platform for **Dalian StarLink International Trade**, an exporter of Montessori educational products and wooden kindergarten furniture.
 
-## Current release: CRM V3
+## Current release: CRM V5
 
 The current release includes:
 
@@ -10,7 +10,7 @@ The current release includes:
 - Customer list with pagination, search, and CRM filters
 - Customer detail profiles with contacts, tags, sales stage, and follow-up timeline
 - Customer profiles capture customer type, acquisition source, interested products, and sales stage
-- Follow-up creation with optional next-follow-up dates
+- Full follow-up timeline with edit/delete, opportunity links, file attachments, activity date, and next-follow-up dates
 - Dashboard statistics backed by PostgreSQL, including total follow-ups and upcoming work
 - Lead inquiry pool, Lead conversion, Alibaba inquiry simulation, and opportunity management
 - Product catalog with categories, specifications, prices, URL images, and opportunity product lines
@@ -105,7 +105,7 @@ Roles: `Admin` manages all records and users; `Sales` reads and manages only cus
 | Quotations | `GET /quotations`, `POST /quotations`, `GET /quotations/{id}`, `PUT /quotations/{id}`, `POST /quotations/{id}/versions`, `POST /quotations/{id}/pdf`, `GET /quotations/{id}/pdf`, `POST /quotations/{id}/send` |
 | Alibaba integration | `GET /integrations/alibaba/status`, `POST /integrations/alibaba/inquiries` |
 | Contacts | `POST /contacts`, `GET /contacts/{id}`, `PUT /contacts/{id}` |
-| Follow-ups | `POST /followups`, `GET /followups?customer_id={id}` |
+| Follow-ups | `POST /followups`, `GET /followups?customer_id={id}`, `PUT /followups/{id}`, `DELETE /followups/{id}`, `POST /followups/{id}/attachments`, `GET /followups/{id}/attachments/{attachment_id}`, `DELETE /followups/{id}/attachments/{attachment_id}` |
 | Dashboard | `GET /dashboard/stats` |
 | Tags | `GET /tags`, `POST /tags`, `PUT /tags/{id}`, `DELETE /tags/{id}` (soft deactivate), `POST /customers/{id}/tags/{tag_id}`, `DELETE /customers/{id}/tags/{tag_id}` |
 
@@ -113,7 +113,9 @@ The customer `q` parameter searches company name, primary contact name, country,
 
 V4 adds configurable customer categories and score-based grading without removing the legacy `level` field. `customer_score` is an integer from 0 to 100; saving a score automatically maps 80-100 to A, 50-79 to B, and 0-49 to C. Score changes are retained in `customer_score_history` with an optional reason. Customer lists support `category_id`, `score_min`, and `score_max` filters. Admin and Sales users may manage categories/tags and score customers within their normal customer scope; Viewer users can read but cannot change taxonomy or scores. Tag deletion is a soft deactivation so existing customer relationships remain intact.
 
-Follow-up reminders reuse `next_followup_date`; no separate reminder record is required. The latest follow-up for each customer defines its current reminder, so an older planned date is superseded when a newer follow-up is recorded. Supported channels are `Email`, `WhatsApp`, `Alibaba`, `Phone`, and `Meeting`; the existing `content`, `next_followup_date`, and `created_at` fields remain backward compatible. Dashboard statistics expose `today_followup_count`, `overdue_followup_count`, `week_followup_count`, `today_followups`, and `overdue_followups`, while retaining the existing response fields for compatibility. Reminder lists contain up to ten visible customers per category and respect the current user's customer scope. Interactive API documentation is available at `/api/v1/docs` while the backend is running.
+V5 expands follow-ups without changing the legacy records or create payload. Each record can optionally link to an opportunity, records a business `followup_date`, supports edit/delete, and can store multiple attachments. Supported channels are `Email`, `WhatsApp`, `Alibaba`, `Phone`, and `Meeting`. `next_followup_date` still drives reminders: the latest follow-up for each customer defines its current reminder, so an older planned date is superseded when a newer follow-up is recorded. Dashboard statistics expose `today_followup_count`, `overdue_followup_count`, `week_followup_count`, `today_followups`, and `overdue_followups`, while retaining the existing response fields for compatibility. Reminder lists contain up to ten visible customers per category and respect the current user's customer scope. Attachments accept PDF, image, Office, and TXT files up to 10 MB and are stored outside the database in `FOLLOWUP_ATTACHMENT_DIR` (a persistent Docker volume by default). Interactive API documentation is available at `/api/v1/docs` while the backend is running.
+
+Apply migration `0013_v5_followup_management` with `alembic upgrade head`. It backfills `followup_date` from existing `created_at` values and adds only nullable opportunity links, timestamps, and the new attachment table; it does not remove or rewrite legacy follow-up content.
 
 The Lead inquiry pool accepts new inquiries, supports pagination and filtering, and exposes a detail view. `POST /leads/{id}/convert` atomically creates a customer, its primary contact, and a base opportunity, then marks the Lead as `Converted`. The unique opportunity-to-Lead link prevents duplicate conversion. Admin and Sales users may create and convert Leads; Viewer users retain read-only access.
 

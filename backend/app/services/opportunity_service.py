@@ -2,6 +2,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.models.customer import Customer
+from app.models.followup import FollowUp
 from app.models.lead import Opportunity, OpportunityStage, OpportunityStageHistory
 from app.models.product import OpportunityProduct, Product
 from app.models.user import User, UserRole
@@ -107,7 +108,9 @@ def get_opportunity(session: Session, opportunity_id: int) -> Opportunity:
         .where(Opportunity.id == opportunity_id)
         .options(
             joinedload(Opportunity.owner),
-            joinedload(Opportunity.customer).selectinload(Customer.followups),
+            joinedload(Opportunity.customer)
+            .selectinload(Customer.followups)
+            .selectinload(FollowUp.attachments),
             selectinload(Opportunity.stage_history),
             selectinload(Opportunity.product_items)
             .joinedload(OpportunityProduct.product)
@@ -132,7 +135,11 @@ def get_opportunity_detail(
             "owner_name": opportunity.owner.name if opportunity.owner else None,
             "customer": opportunity.customer,
             "stage_history": opportunity.stage_history,
-            "followups": opportunity.customer.followups,
+            "followups": [
+                followup
+                for followup in opportunity.customer.followups
+                if followup.opportunity_id in (None, opportunity.id)
+            ],
             "products": [_product_item(item) for item in opportunity.product_items],
         }
     )

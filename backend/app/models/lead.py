@@ -98,6 +98,7 @@ class Opportunity(TimestampMixin, Base):
     source_lead: Mapped[Optional[Lead]] = relationship(back_populates="opportunity")
     customer: Mapped["Customer"] = relationship()
     owner: Mapped[Optional["User"]] = relationship()
+    followups: Mapped[list["FollowUp"]] = relationship(back_populates="opportunity")
     stage_history: Mapped[list["OpportunityStageHistory"]] = relationship(
         back_populates="opportunity",
         cascade="all, delete-orphan",

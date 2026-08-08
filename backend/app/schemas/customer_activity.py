@@ -14,6 +14,8 @@ class CustomerActivityRead(BaseModel):
     user_id: int | None = None
     content: str | None = None
     followup_type: FollowUpType | None = None
+    followup_date: date | None = None
     next_followup_date: date | None = None
+    opportunity_id: int | None = None
     old_status: CustomerStatus | None = None
     new_status: CustomerStatus | None = None

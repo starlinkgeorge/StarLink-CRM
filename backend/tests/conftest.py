@@ -7,6 +7,9 @@ os.environ["JWT_SECRET_KEY"] = "test-secret-key-that-is-long-enough-for-local-te
 os.environ["QUOTATION_OUTPUT_DIR"] = str(
     Path(tempfile.gettempdir()) / "starlink-crm-test-quotations"
 )
+os.environ["FOLLOWUP_ATTACHMENT_DIR"] = str(
+    Path(tempfile.gettempdir()) / "starlink-crm-test-followup-attachments"
+)
 
 import pytest
 from fastapi.testclient import TestClient

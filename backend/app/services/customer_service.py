@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.models.customer import Customer, CustomerLevel, CustomerStatus, Tag
 from app.models.customer_classification import CustomerCategory, CustomerScoreHistory
 from app.models.customer_activity import CustomerStatusHistory
+from app.models.followup import FollowUp
 from app.models.user import User
 from app.schemas.customer import CustomerCreate, CustomerUpdate
 from app.models.user import UserRole
@@ -83,7 +84,7 @@ def get_customer(session: Session, customer_id: int, include_relations: bool = F
         statement = statement.options(
             selectinload(Customer.contacts),
             selectinload(Customer.tags),
-            selectinload(Customer.followups),
+            selectinload(Customer.followups).selectinload(FollowUp.attachments),
             selectinload(Customer.category),
             selectinload(Customer.score_history),
         )

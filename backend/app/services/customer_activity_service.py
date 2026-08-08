@@ -41,7 +41,9 @@ def list_customer_timeline(
                     user_id=followup.user_id,
                     content=followup.content,
                     followup_type=followup.type,
+                    followup_date=followup.followup_date,
                     next_followup_date=followup.next_followup_date,
+                    opportunity_id=followup.opportunity_id,
                 ),
             )
         )

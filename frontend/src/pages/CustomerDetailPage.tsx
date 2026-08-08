@@ -7,17 +7,22 @@ import {
   assignTag,
   createFollowup,
   createTag,
+  deleteFollowup,
+  deleteFollowupAttachment,
+  downloadFollowupAttachment,
   getCustomer,
   getCustomerScoreHistory,
   getCustomerTimeline,
   getOpportunities,
   getTags,
   removeTag,
+  updateFollowup,
   updateCustomerScore,
   updateCustomer,
+  uploadFollowupAttachment,
 } from "../services/crm";
 import { useAuth } from "../store/auth";
-import type { CustomerActivity, CustomerDetail, CustomerScoreHistory, CustomerStatus, OpportunityListItem, OpportunityStage, Tag } from "../types";
+import type { CustomerActivity, CustomerDetail, CustomerScoreHistory, CustomerStatus, FollowUp, FollowUpType, OpportunityListItem, OpportunityStage, Tag } from "../types";
 
 const stages: CustomerStatus[] = ["Lead", "Contacted", "Quotation", "Negotiation", "Won", "Lost"];
 const stageText: Record<CustomerStatus, string> = {
@@ -71,7 +76,9 @@ function ActivityItem({ activity }: { activity: CustomerActivity }) {
       <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm">
         <strong>{title}</strong>
         <time className="text-slate-500">{new Date(activity.occurred_at).toLocaleString()}</time>
+        {activity.followup_date && <span className="text-slate-500">{activity.followup_date}</span>}
         {activity.next_followup_date && <ReminderBadge followupDate={activity.next_followup_date} />}
+        {activity.opportunity_id && <Link to={`/opportunities/${activity.opportunity_id}`} className="text-blue-700">关联商机</Link>}
       </div>
       {isStatusChange && activity.new_status && (
         <p className="mt-1 text-sm text-slate-700">
@@ -96,8 +103,13 @@ export function CustomerDetailPage() {
   const [scoreHistory, setScoreHistory] = useState<CustomerScoreHistory[]>([]);
   const [error, setError] = useState("");
   const [content, setContent] = useState("");
-  const [type, setType] = useState("Email");
+  const [type, setType] = useState<FollowUpType>("Email");
+  const [followupDate, setFollowupDate] = useState(localDateString());
   const [nextDate, setNextDate] = useState("");
+  const [opportunityId, setOpportunityId] = useState("");
+  const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
+  const [attachmentInputKey, setAttachmentInputKey] = useState(0);
+  const [editingFollowupId, setEditingFollowupId] = useState<number | null>(null);
   const [tagId, setTagId] = useState("");
   const [newTag, setNewTag] = useState("");
   const [scoreInput, setScoreInput] = useState("");
@@ -137,15 +149,26 @@ export function CustomerDetailPage() {
     if (!customer || !user) return;
     setSaving(true);
     try {
-      await createFollowup({
-        customer_id: customer.id,
-        user_id: user.id,
+      const payload = {
+        opportunity_id: opportunityId ? Number(opportunityId) : null,
         type,
+        followup_date: followupDate,
         content,
-        next_followup_date: nextDate || undefined,
-      });
+        next_followup_date: nextDate || (editingFollowupId ? null : undefined),
+      };
+      const followup = editingFollowupId
+        ? await updateFollowup(editingFollowupId, payload)
+        : await createFollowup({ customer_id: customer.id, user_id: user.id, ...payload });
+      await Promise.all(
+        attachmentFiles.map((file) => uploadFollowupAttachment(followup.id, file)),
+      );
       setContent("");
+      setFollowupDate(localDateString());
       setNextDate("");
+      setOpportunityId("");
+      setAttachmentFiles([]);
+      setAttachmentInputKey((value) => value + 1);
+      setEditingFollowupId(null);
       await load();
     } catch (err) {
       setError(
@@ -155,6 +178,59 @@ export function CustomerDetailPage() {
       );
     } finally {
       setSaving(false);
+    }
+  }
+
+  function editFollowup(followup: FollowUp) {
+    setEditingFollowupId(followup.id);
+    setType(followup.type);
+    setFollowupDate(followup.followup_date);
+    setContent(followup.content);
+    setNextDate(followup.next_followup_date ?? "");
+    setOpportunityId(followup.opportunity_id ? String(followup.opportunity_id) : "");
+    setAttachmentFiles([]);
+    setAttachmentInputKey((value) => value + 1);
+  }
+
+  function cancelFollowupEdit() {
+    setEditingFollowupId(null);
+    setType("Email");
+    setFollowupDate(localDateString());
+    setContent("");
+    setNextDate("");
+    setOpportunityId("");
+    setAttachmentFiles([]);
+    setAttachmentInputKey((value) => value + 1);
+  }
+
+  async function removeFollowupRecord(followup: FollowUp) {
+    if (!window.confirm("确认删除这条跟进记录及其附件吗？")) return;
+    try {
+      await deleteFollowup(followup.id);
+      if (editingFollowupId === followup.id) cancelFollowupEdit();
+      await load();
+    } catch {
+      setError("无法删除跟进记录。");
+    }
+  }
+
+  async function removeFollowupFile(followupId: number, attachmentId: number) {
+    try {
+      await deleteFollowupAttachment(followupId, attachmentId);
+      await load();
+    } catch {
+      setError("无法删除附件。");
+    }
+  }
+
+  async function openFollowupFile(followupId: number, attachmentId: number) {
+    try {
+      const blob = await downloadFollowupAttachment(followupId, attachmentId);
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank", "noopener,noreferrer");
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch {
+      setError("无法下载附件。");
     }
   }
 
@@ -352,23 +428,63 @@ export function CustomerDetailPage() {
           <form onSubmit={addFollowup} className="mt-4 grid gap-3 md:grid-cols-2">
             <label className="text-sm font-medium">
               跟进方式
-              <select value={type} onChange={(event) => setType(event.target.value)} className="mt-1 w-full rounded border px-3 py-2">
+              <select value={type} onChange={(event) => setType(event.target.value as FollowUpType)} className="mt-1 w-full rounded border px-3 py-2">
                 <option>Email</option><option>WhatsApp</option><option>Alibaba</option><option>Phone</option><option>Meeting</option>
               </select>
+            </label>
+            <label className="text-sm font-medium">
+              跟进日期
+              <input required type="date" value={followupDate} onChange={(event) => setFollowupDate(event.target.value)} className="mt-1 w-full rounded border px-3 py-2" />
             </label>
             <label className="text-sm font-medium">
               下次跟进日期
               <input type="date" value={nextDate} onChange={(event) => setNextDate(event.target.value)} className="mt-1 w-full rounded border px-3 py-2" />
             </label>
             <label className="text-sm font-medium md:col-span-2">
+              关联商机
+              <select value={opportunityId} onChange={(event) => setOpportunityId(event.target.value)} className="mt-1 w-full rounded border px-3 py-2">
+                <option value="">仅关联客户</option>
+                {opportunities.map((opportunity) => <option key={opportunity.id} value={opportunity.id}>{opportunity.name}</option>)}
+              </select>
+            </label>
+            <label className="text-sm font-medium md:col-span-2">
               跟进内容
               <textarea required maxLength={5000} value={content} onChange={(event) => setContent(event.target.value)} placeholder="记录本次沟通内容、客户需求或下一步动作" className="mt-1 min-h-24 w-full rounded border px-3 py-2" />
             </label>
-            <button disabled={saving} className="w-fit rounded bg-blue-600 px-4 py-2 font-semibold text-white disabled:opacity-60">
-              {saving ? "保存中…" : "添加跟进"}
-            </button>
+            <label className="text-sm font-medium md:col-span-2">
+              附件（PDF、图片、Office 或 TXT，单个不超过 10 MB）
+              <input key={attachmentInputKey} type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx,.txt" onChange={(event) => setAttachmentFiles(Array.from(event.target.files ?? []))} className="mt-1 block w-full text-sm" />
+              {attachmentFiles.length > 0 && <p className="mt-1 text-xs text-slate-500">待上传：{attachmentFiles.map((file) => file.name).join("、")}</p>}
+            </label>
+            <div className="flex flex-wrap gap-2">
+              <button disabled={saving} className="w-fit rounded bg-blue-600 px-4 py-2 font-semibold text-white disabled:opacity-60">
+                {saving ? "保存中…" : editingFollowupId ? "保存修改" : "添加跟进"}
+              </button>
+              {editingFollowupId && <button type="button" onClick={cancelFollowupEdit} className="rounded border px-4 py-2 font-semibold">取消编辑</button>}
+            </div>
           </form>
         )}
+        <div className="mt-6 border-t pt-5">
+          <h4 className="font-semibold">跟进记录</h4>
+          <div className="mt-3 space-y-3">
+            {customer.followups.map((followup) => (
+              <article key={followup.id} className="rounded-lg bg-slate-50 p-4 text-sm">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <strong>{followup.type}</strong>
+                    <span className="ml-2 text-slate-500">{followup.followup_date}</span>
+                    {followup.opportunity_id && <Link to={`/opportunities/${followup.opportunity_id}`} className="ml-2 text-blue-700">关联商机</Link>}
+                  </div>
+                  {editable && <div className="flex gap-3"><button type="button" onClick={() => editFollowup(followup)} className="text-blue-700">编辑</button><button type="button" onClick={() => void removeFollowupRecord(followup)} className="text-rose-600">删除</button></div>}
+                </div>
+                <p className="mt-2 whitespace-pre-wrap">{followup.content}</p>
+                {followup.next_followup_date && <div className="mt-2"><ReminderBadge followupDate={followup.next_followup_date} /></div>}
+                {followup.attachments.length > 0 && <div className="mt-3 flex flex-wrap gap-2">{followup.attachments.map((attachment) => <span key={attachment.id} className="rounded border bg-white px-2 py-1 text-xs"><button type="button" onClick={() => void openFollowupFile(followup.id, attachment.id)} className="text-blue-700">{attachment.file_name}</button>{editable && <button type="button" onClick={() => void removeFollowupFile(followup.id, attachment.id)} className="ml-2 text-rose-600">×</button>}</span>)}</div>}
+              </article>
+            ))}
+            {!customer.followups.length && <p className="text-sm text-slate-500">暂无跟进记录。</p>}
+          </div>
+        </div>
         <div className="mt-5 space-y-4">
           {timeline.map((activity) => <ActivityItem key={activity.event_id} activity={activity} />)}
           {!timeline.length && <p className="text-sm text-slate-500">暂无客户活动。</p>}

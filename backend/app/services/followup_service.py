@@ -1,23 +1,87 @@
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from pathlib import Path
+import re
+from uuid import uuid4
 
+from sqlalchemy import select
+from sqlalchemy.orm import Session, selectinload
+
+from app.config import get_settings
 from app.models.customer import Customer
-from app.models.followup import FollowUp
+from app.models.followup import FollowUp, FollowUpAttachment
+from app.models.lead import Opportunity
 from app.models.user import User
-from app.schemas.followup import FollowUpCreate
-from app.services.errors import NotFoundError
+from app.schemas.followup import FollowUpCreate, FollowUpUpdate
+from app.services.errors import ConflictError, NotFoundError
+
+
+MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
+ALLOWED_ATTACHMENT_EXTENSIONS = {
+    ".pdf",
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".webp",
+    ".doc",
+    ".docx",
+    ".xls",
+    ".xlsx",
+    ".txt",
+}
+
+
+def _attachment_directory() -> Path:
+    directory = Path(get_settings()["followup_attachment_dir"]).resolve()
+    directory.mkdir(parents=True, exist_ok=True)
+    return directory
+
+
+def _validate_opportunity(
+    session: Session, customer_id: int, opportunity_id: int | None
+) -> None:
+    if opportunity_id is None:
+        return
+    opportunity = session.get(Opportunity, opportunity_id)
+    if opportunity is None:
+        raise NotFoundError("Opportunity not found.")
+    if opportunity.customer_id != customer_id:
+        raise ConflictError("The opportunity does not belong to this customer.")
+
+
+def get_followup(session: Session, followup_id: int) -> FollowUp:
+    followup = session.scalar(
+        select(FollowUp)
+        .where(FollowUp.id == followup_id)
+        .options(selectinload(FollowUp.attachments))
+    )
+    if followup is None:
+        raise NotFoundError("Follow-up record not found.")
+    return followup
 
 
 def create_followup(session: Session, payload: FollowUpCreate) -> FollowUp:
     if session.get(Customer, payload.customer_id) is None:
         raise NotFoundError("Customer not found.")
-    if session.get(User, payload.user_id) is None:
-        raise NotFoundError("User not found.")
+    if payload.user_id is None or session.get(User, payload.user_id) is None:
+        raise NotFoundError("Follow-up user not found.")
+    _validate_opportunity(session, payload.customer_id, payload.opportunity_id)
     followup = FollowUp(**payload.model_dump())
     session.add(followup)
     session.commit()
-    session.refresh(followup)
-    return followup
+    return get_followup(session, followup.id)
+
+
+def update_followup(session: Session, followup_id: int, payload: FollowUpUpdate) -> FollowUp:
+    followup = get_followup(session, followup_id)
+    changes = payload.model_dump(exclude_unset=True)
+    for required_field in ("type", "followup_date", "content"):
+        if required_field in changes and changes[required_field] is None:
+            raise ConflictError(f"{required_field} cannot be null.")
+    if "opportunity_id" in changes:
+        _validate_opportunity(session, followup.customer_id, changes["opportunity_id"])
+    for field, value in changes.items():
+        setattr(followup, field, value)
+    session.commit()
+    return get_followup(session, followup.id)
 
 
 def list_customer_followups(session: Session, customer_id: int) -> list[FollowUp]:
@@ -26,6 +90,82 @@ def list_customer_followups(session: Session, customer_id: int) -> list[FollowUp
     statement = (
         select(FollowUp)
         .where(FollowUp.customer_id == customer_id)
-        .order_by(FollowUp.created_at.desc(), FollowUp.id.desc())
+        .options(selectinload(FollowUp.attachments))
+        .order_by(FollowUp.followup_date.desc(), FollowUp.created_at.desc(), FollowUp.id.desc())
     )
     return list(session.scalars(statement))
+
+
+def create_attachment(
+    session: Session,
+    followup: FollowUp,
+    file_name: str,
+    content_type: str | None,
+    content: bytes,
+) -> FollowUpAttachment:
+    safe_name = Path(file_name.replace("\\", "/")).name.strip()
+    extension = Path(safe_name).suffix.lower()
+    if not safe_name or extension not in ALLOWED_ATTACHMENT_EXTENSIONS:
+        raise ConflictError("Unsupported attachment type.")
+    if not content or len(content) > MAX_ATTACHMENT_BYTES:
+        raise ConflictError("Attachment must be between 1 byte and 10 MB.")
+
+    stored_name = f"{uuid4().hex}{extension}"
+    path = _attachment_directory() / stored_name
+    try:
+        path.write_bytes(content)
+        attachment = FollowUpAttachment(
+            followup_id=followup.id,
+            file_name=safe_name[:255],
+            stored_name=stored_name,
+            content_type=(content_type or None)[:100],
+            size_bytes=len(content),
+        )
+        session.add(attachment)
+        session.commit()
+        session.refresh(attachment)
+        return attachment
+    except Exception:
+        path.unlink(missing_ok=True)
+        session.rollback()
+        raise
+
+
+def get_attachment(session: Session, followup_id: int, attachment_id: int) -> FollowUpAttachment:
+    attachment = session.scalar(
+        select(FollowUpAttachment).where(
+            FollowUpAttachment.id == attachment_id,
+            FollowUpAttachment.followup_id == followup_id,
+        )
+    )
+    if attachment is None:
+        raise NotFoundError("Follow-up attachment not found.")
+    return attachment
+
+
+def attachment_path(attachment: FollowUpAttachment) -> Path:
+    if not re.fullmatch(r"[0-9a-f]{32}\.[a-z0-9]+", attachment.stored_name):
+        raise NotFoundError("Follow-up attachment file is unavailable.")
+    directory = _attachment_directory()
+    path = (directory / attachment.stored_name).resolve()
+    if path.parent != directory or not path.is_file():
+        raise NotFoundError("Follow-up attachment file is unavailable.")
+    return path
+
+
+def delete_attachment(session: Session, attachment: FollowUpAttachment) -> None:
+    path = _attachment_directory() / attachment.stored_name
+    session.delete(attachment)
+    session.commit()
+    path.unlink(missing_ok=True)
+
+
+def delete_followup(session: Session, followup: FollowUp) -> None:
+    attachment_paths = [
+        _attachment_directory() / attachment.stored_name
+        for attachment in followup.attachments
+    ]
+    session.delete(followup)
+    session.commit()
+    for path in attachment_paths:
+        path.unlink(missing_ok=True)

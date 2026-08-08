@@ -22,6 +22,9 @@ def get_settings() -> dict[str, str]:
         "jwt_refresh_token_days": getenv("JWT_REFRESH_TOKEN_DAYS", "14"),
         "cors_origins": getenv("CORS_ORIGINS", "http://localhost:5173"),
         "quotation_output_dir": getenv("QUOTATION_OUTPUT_DIR", "output/pdf"),
+        "followup_attachment_dir": getenv(
+            "FOLLOWUP_ATTACHMENT_DIR", "output/followup-attachments"
+        ),
         "company_alibaba_store": alibaba_store,
         "company_website": company_website,
         "company_email": getenv("COMPANY_EMAIL", ""),

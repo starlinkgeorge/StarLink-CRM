@@ -335,6 +335,90 @@ def test_alibaba_followup_channel_is_supported_and_visible_in_timeline(client: T
     )
 
 
+def test_followup_can_link_opportunity_and_manage_attachments(client: TestClient) -> None:
+    """V5 follow-up fields must work without changing the legacy create payload."""
+    admin_token = login(client, "admin@example.com", "AdminPass123!")
+    admin_id = client.get("/api/v1/users", headers=admin_token).json()[0]["id"]
+    customer = client.post(
+        "/api/v1/customers",
+        json={"company_name": "V5 Follow-up Customer"},
+        headers=admin_token,
+    )
+    assert customer.status_code == 201
+    customer_id = customer.json()["id"]
+    opportunity = client.post(
+        "/api/v1/opportunities",
+        json={"customer_id": customer_id, "name": "V5 Linked Opportunity"},
+        headers=admin_token,
+    )
+    assert opportunity.status_code == 201
+
+    created = client.post(
+        "/api/v1/followups",
+        json={
+            "customer_id": customer_id,
+            "user_id": admin_id,
+            "opportunity_id": opportunity.json()["id"],
+            "type": "WhatsApp",
+            "followup_date": date.today().isoformat(),
+            "content": "Sent product photos and confirmed the preferred finish.",
+            "next_followup_date": (date.today() + timedelta(days=2)).isoformat(),
+        },
+        headers=admin_token,
+    )
+    assert created.status_code == 201
+    followup = created.json()
+    assert followup["opportunity_id"] == opportunity.json()["id"]
+    assert followup["followup_date"] == date.today().isoformat()
+    assert followup["attachments"] == []
+
+    updated = client.put(
+        f"/api/v1/followups/{followup['id']}",
+        json={"content": "Buyer confirmed the preferred finish.", "next_followup_date": None},
+        headers=admin_token,
+    )
+    assert updated.status_code == 200
+    assert updated.json()["content"] == "Buyer confirmed the preferred finish."
+    assert updated.json()["next_followup_date"] is None
+
+    uploaded = client.post(
+        f"/api/v1/followups/{followup['id']}/attachments",
+        files={"file": ("buyer-notes.txt", b"Approved by buyer", "text/plain")},
+        headers=admin_token,
+    )
+    assert uploaded.status_code == 201
+    attachment = uploaded.json()
+    assert attachment["file_name"] == "buyer-notes.txt"
+    downloaded = client.get(
+        f"/api/v1/followups/{followup['id']}/attachments/{attachment['id']}",
+        headers=admin_token,
+    )
+    assert downloaded.status_code == 200
+    assert downloaded.content == b"Approved by buyer"
+
+    opportunity_detail = client.get(
+        f"/api/v1/opportunities/{opportunity.json()['id']}", headers=admin_token
+    )
+    assert opportunity_detail.status_code == 200
+    assert opportunity_detail.json()["followups"][0]["id"] == followup["id"]
+    assert opportunity_detail.json()["followups"][0]["attachments"][0]["id"] == attachment["id"]
+
+    deleted_attachment = client.delete(
+        f"/api/v1/followups/{followup['id']}/attachments/{attachment['id']}",
+        headers=admin_token,
+    )
+    assert deleted_attachment.status_code == 204
+    deleted_followup = client.delete(
+        f"/api/v1/followups/{followup['id']}", headers=admin_token
+    )
+    assert deleted_followup.status_code == 204
+    listing = client.get(
+        "/api/v1/followups", params={"customer_id": customer_id}, headers=admin_token
+    )
+    assert listing.status_code == 200
+    assert listing.json() == []
+
+
 def test_lead_lifecycle_and_transactional_conversion(client: TestClient) -> None:
     admin_token = login(client, "admin@example.com", "AdminPass123!")
     created = client.post(

@@ -26,6 +26,7 @@ services:
         condition: service_healthy
     volumes:
       - quotation_pdfs:/app/output/pdf
+      - followup_attachments:/app/output/followup-attachments
 
   frontend:
     build:
@@ -41,3 +42,4 @@ services:
 volumes:
   postgres_data:
   quotation_pdfs:
+  followup_attachments:

@@ -1,5 +1,5 @@
 import api from "./api";
-import type { AlibabaInquiryResult, AlibabaIntegrationStatus, Customer, CustomerActivity, CustomerCategory, CustomerDetail, CustomerPage, CustomerScoreHistory, DashboardStats, FollowUp, Lead, LeadConversion, LeadDetail, LeadPage, LeadStatus, OpportunityDetail, OpportunityListItem, OpportunityPage, OpportunityStage, Product, ProductCategory, ProductPage, QuotationDetail, QuotationPage, QuotationStatus, Tag } from "../types";
+import type { AlibabaInquiryResult, AlibabaIntegrationStatus, Customer, CustomerActivity, CustomerCategory, CustomerDetail, CustomerPage, CustomerScoreHistory, DashboardStats, FollowUp, FollowUpAttachment, Lead, LeadConversion, LeadDetail, LeadPage, LeadStatus, OpportunityDetail, OpportunityListItem, OpportunityPage, OpportunityStage, Product, ProductCategory, ProductPage, QuotationDetail, QuotationPage, QuotationStatus, Tag } from "../types";
 
 export type CustomerCreatePayload = {
   company_name: string; contact_name?: string; country?: string; email?: string; phone?: string;
@@ -19,7 +19,23 @@ export const getCustomer = async (id: string) => (await api.get<CustomerDetail>(
 export const getCustomerTimeline = async (id: string) => (await api.get<CustomerActivity[]>(`/customers/${id}/timeline`)).data;
 export const createCustomer = async (data: CustomerCreatePayload) => (await api.post<Customer>("/customers", data)).data;
 export const updateCustomer = async (id: number, data: Partial<CustomerCreatePayload>) => (await api.put<Customer>(`/customers/${id}`, data)).data;
-export const createFollowup = async (data: { customer_id: number; user_id: number; type: string; content: string; next_followup_date?: string }) => (await api.post<FollowUp>("/followups", data)).data;
+export type FollowUpPayload = {
+  customer_id: number; user_id?: number; opportunity_id?: number | null; type: FollowUp["type"];
+  followup_date?: string; content: string; next_followup_date?: string | null;
+};
+export type FollowUpUpdatePayload = {
+  opportunity_id?: number | null; type?: FollowUp["type"]; followup_date?: string;
+  content?: string; next_followup_date?: string | null;
+};
+export const createFollowup = async (data: FollowUpPayload) => (await api.post<FollowUp>("/followups", data)).data;
+export const updateFollowup = async (id: number, data: FollowUpUpdatePayload) => (await api.put<FollowUp>(`/followups/${id}`, data)).data;
+export const deleteFollowup = async (id: number) => { await api.delete(`/followups/${id}`); };
+export const uploadFollowupAttachment = async (followupId: number, file: File) => {
+  const form = new FormData(); form.append("file", file);
+  return (await api.post<FollowUpAttachment>(`/followups/${followupId}/attachments`, form)).data;
+};
+export const deleteFollowupAttachment = async (followupId: number, attachmentId: number) => { await api.delete(`/followups/${followupId}/attachments/${attachmentId}`); };
+export const downloadFollowupAttachment = async (followupId: number, attachmentId: number) => (await api.get<Blob>(`/followups/${followupId}/attachments/${attachmentId}`, { responseType: "blob" })).data;
 export const getTags = async () => (await api.get<Tag[]>("/tags")).data;
 export const createTag = async (name: string, options?: { description?: string; color?: string; is_active?: boolean }) => (await api.post<Tag>("/tags", { name, ...options })).data;
 export const assignTag = async (customerId: number, tagId: number) => (await api.post<CustomerDetail>(`/customers/${customerId}/tags/${tagId}`)).data;
