@@ -10,7 +10,7 @@ from xml.sax.saxutils import escape
 
 from reportlab.graphics.shapes import Drawing, Rect, String
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
@@ -99,27 +99,30 @@ def _read_catalog_image(url: str) -> bytes | None:
 
 
 def _picture(url: str | None):
+    picture_size = 18 * mm
     data = _fetch_public_image(url)
     if data:
         try:
-            return Image(BytesIO(data), width=24 * mm, height=24 * mm, kind="proportional")
+            image = Image(BytesIO(data), width=picture_size, height=picture_size, kind="proportional")
+            image.hAlign = "CENTER"
+            return image
         except Exception:  # ReportLab supports several image types; invalid content uses placeholder.
             pass
-    drawing = Drawing(24 * mm, 24 * mm)
+    drawing = Drawing(picture_size, picture_size)
     drawing.add(
         Rect(
             0,
             0,
-            24 * mm,
-            24 * mm,
+            picture_size,
+            picture_size,
             fillColor=colors.HexColor("#F1F5F9"),
             strokeColor=colors.HexColor("#CBD5E1"),
         )
     )
     drawing.add(
         String(
-            12 * mm,
-            11 * mm,
+            picture_size / 2,
+            picture_size / 2 - 1,
             "No image",
             textAnchor="middle",
             fontSize=7,
@@ -175,6 +178,7 @@ def generate_quotation_pdf(
         textColor=colors.HexColor("#1F2937"),
     )
     small = ParagraphStyle("StarLinkSmall", parent=body, fontSize=7.5, leading=9)
+    left = ParagraphStyle("StarLinkLeft", parent=body, alignment=TA_LEFT)
     right = ParagraphStyle("StarLinkRight", parent=body, alignment=TA_RIGHT)
     title = ParagraphStyle(
         "StarLinkTitle",
@@ -194,11 +198,28 @@ def generate_quotation_pdf(
         textColor=BRAND_BLUE,
     )
     center_small = ParagraphStyle("StarLinkCenter", parent=small, alignment=TA_CENTER)
+    item_name = ParagraphStyle(
+        "StarLinkItemName",
+        parent=body,
+        fontName="Helvetica-Bold",
+        leading=10,
+        alignment=TA_LEFT,
+    )
     header_small = ParagraphStyle(
         "StarLinkTableHeader",
         parent=center_small,
         fontName="Helvetica-Bold",
         textColor=colors.white,
+    )
+    header_left = ParagraphStyle(
+        "StarLinkTableHeaderLeft",
+        parent=header_small,
+        alignment=TA_LEFT,
+    )
+    header_right = ParagraphStyle(
+        "StarLinkTableHeaderRight",
+        parent=header_small,
+        alignment=TA_RIGHT,
     )
 
     document = SimpleDocTemplate(
@@ -211,12 +232,15 @@ def generate_quotation_pdf(
         title=f"Quotation {quotation.quotation_number} V{version.version_no}",
         author="Dalian StarLink International Trade Co., Ltd.",
     )
-    website = settings["company_website"] or "Not configured"
+    alibaba_store = settings["company_alibaba_store"] or "Not configured"
+    company_website = settings["company_website"] or "Not configured"
     email = settings["company_email"] or "Not configured"
     whatsapp = settings["company_whatsapp"] or "Not configured"
     story = []
     contact_text = (
-        f"Website: {_safe_text(website)}<br/>Email: {_safe_text(email)}"
+        f"Alibaba Store: {_safe_text(alibaba_store)}<br/>"
+        f"Company Website: {_safe_text(company_website)}<br/>"
+        f"Email: {_safe_text(email)}"
         f"<br/>WhatsApp: {_safe_text(whatsapp)}"
     )
     reference_text = (
@@ -268,16 +292,16 @@ def generate_quotation_pdf(
     story.append(Spacer(1, 6 * mm))
 
     item_rows = [[
-        Paragraph("Item Name", header_small), Paragraph("Picture", header_small),
-        Paragraph("Unit Price", header_small), Paragraph("QTY", header_small),
-        Paragraph("Total Price", header_small),
+        Paragraph("Item Name", header_left), Paragraph("Picture", header_small),
+        Paragraph("Unit Price", header_right), Paragraph("QTY", header_small),
+        Paragraph("Total Price", header_right),
     ]]
     for item in version.items:
         item_rows.append([
             Paragraph(
-                f"<b>{_safe_text(item.product_name_snapshot)}</b>"
-                f"<br/><font color='#64748B'>{_safe_text(item.sku_snapshot)}</font>",
-                body,
+                f"{_safe_text(item.product_name_snapshot)}<br/>"
+                f"<font color='#64748B' size='7'>{_safe_text(item.sku_snapshot)}</font>",
+                item_name,
             ),
             _picture(item.picture_snapshot),
             Paragraph(f"{version.currency} {_money(item.unit_price)}", right),
@@ -286,7 +310,7 @@ def generate_quotation_pdf(
         ])
     item_table = Table(
         item_rows,
-        colWidths=[60 * mm, 30 * mm, 26 * mm, 15 * mm, 28 * mm],
+        colWidths=[57 * mm, 24 * mm, 29 * mm, 15 * mm, 34 * mm],
         repeatRows=1,
     )
     item_table.setStyle(
@@ -296,7 +320,11 @@ def generate_quotation_pdf(
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
                 ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
                 ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("ALIGN", (0, 0), (0, -1), "LEFT"),
                 ("ALIGN", (1, 1), (1, -1), "CENTER"),
+                ("ALIGN", (2, 1), (2, -1), "RIGHT"),
+                ("ALIGN", (3, 1), (3, -1), "CENTER"),
+                ("ALIGN", (4, 1), (4, -1), "RIGHT"),
                 ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#C9D4DF")),
                 (
                     "ROWBACKGROUNDS",
@@ -304,8 +332,10 @@ def generate_quotation_pdf(
                     (-1, -1),
                     [colors.white, colors.HexColor("#F8FAFC")],
                 ),
-                ("TOPPADDING", (0, 0), (-1, -1), 6),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                ("TOPPADDING", (0, 0), (-1, 0), 5),
+                ("BOTTOMPADDING", (0, 0), (-1, 0), 5),
+                ("TOPPADDING", (0, 1), (-1, -1), 3),
+                ("BOTTOMPADDING", (0, 1), (-1, -1), 3),
             ]
         )
     )
@@ -319,11 +349,11 @@ def generate_quotation_pdf(
         Table(
             [
                 [
-                    Paragraph("Total cost", body),
+                    Paragraph("Total cost", left),
                     Paragraph(f"{version.currency} {_money(version.subtotal)}", right),
                 ],
                 [
-                    Paragraph("Door to door shipping cost", body),
+                    Paragraph("Door to door shipping cost", left),
                     Paragraph(f"{version.currency} {_money(version.shipping_cost)}", right),
                 ],
                 [
@@ -353,12 +383,18 @@ def generate_quotation_pdf(
         fontSize=10,
         textColor=BRAND_BLUE,
     )
-    story.append(Paragraph("TERMS", terms_heading))
+    story.append(Paragraph("TERMS AND CONDITIONS", terms_heading))
     story.append(Spacer(1, 2 * mm))
     story.append(Table([
-        [Paragraph("Validity", small), Paragraph(f"{version.validity_days} days", body)],
-        [Paragraph("Payment Term", small), Paragraph(_safe_text(version.payment_term), body)],
-        [Paragraph("Delivery Time", small), Paragraph(_safe_text(version.delivery_time), body)],
+        [Paragraph("Validity", small), Paragraph(
+            f"This quotation is valid for {version.validity_days} calendar days from the date of issue.", body
+        )],
+        [Paragraph("Payment Terms", small), Paragraph(
+            f"Payment shall be made as follows: {_safe_text(version.payment_term)}.", body
+        )],
+        [Paragraph("Delivery Time", small), Paragraph(
+            f"Estimated delivery time: {_safe_text(version.delivery_time)}, subject to final order confirmation and receipt of the required deposit.", body
+        )],
     ], colWidths=[35 * mm, 124 * mm], style=TableStyle([
         ("BACKGROUND", (0, 0), (0, -1), LIGHT_BLUE),
         ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#C9D4DF")),

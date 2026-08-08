@@ -146,10 +146,14 @@ The React frontend includes login, dashboard, Lead inquiry list/detail/creation/
 Before generating customer-facing PDFs, set the real company contact values in `.env`:
 
 ```text
+COMPANY_ALIBABA_STORE=https://www.alibaba.com/store/your-store
 COMPANY_WEBSITE=https://your-real-website.example
 COMPANY_EMAIL=sales@your-real-domain.example
 COMPANY_WHATSAPP=+86-your-real-number
 ```
+
+Quotation PDFs show the Alibaba Store and Company Website on separate lines. Product rows use fixed-size, vertically centered pictures, with the product name/SKU hierarchy and numeric columns aligned for business quotation readability; the totals and formal terms section follow the same template.
+Older `.env` files that stored the two website links as `Alibaba URL&Company URL` are split automatically for backward compatibility; new deployments should use the two explicit variables above.
 
 ### Full local stack with Docker
 
