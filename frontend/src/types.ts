@@ -4,6 +4,7 @@ export type LeadStatus = "New" | "Contacted" | "Qualified" | "Converted" | "Lost
 export type InquiryStatus = "New" | "Processing" | "Converted" | "Closed";
 export type OpportunityStage = "Lead" | "Qualified" | "Proposal" | "Negotiation" | "Won" | "Lost";
 export type OpportunitySalesStage = "New Lead" | "Contacted" | "Requirement Confirmed" | "Quotation Sent" | "Negotiation" | "Won" | "Lost";
+export type OpportunityDealStage = "New Inquiry" | "Contacted" | "Quoted" | "Negotiating" | "Won" | "Lost";
 export interface Lead {
   id: number; public_id: string; company_name: string; contact_name: string;
   country: string | null; email: string | null; phone: string | null; whatsapp: string | null;
@@ -30,6 +31,7 @@ export interface Opportunity {
   inquiry_content: string | null; amount: string | null; currency: string;
   expected_close_date: string | null; stage: OpportunityStage;
   sales_stage: OpportunitySalesStage; probability: number; next_action: string | null;
+  deal_stage: OpportunityDealStage;
   created_at: string; updated_at: string;
 }
 export interface OpportunityListItem extends Opportunity { customer_company: string; owner_name: string | null; }
@@ -41,15 +43,25 @@ export interface OpportunitySalesStageHistory {
   id: number; opportunity_id: number; old_sales_stage: OpportunitySalesStage | null;
   new_sales_stage: OpportunitySalesStage; changed_by_id: number | null; created_at: string;
 }
+export interface OpportunityDealStageHistory {
+  id: number; opportunity_id: number; old_deal_stage: OpportunityDealStage | null;
+  new_deal_stage: OpportunityDealStage; changed_by_id: number | null; created_at: string;
+}
 export interface OpportunityDetail extends OpportunityListItem {
   customer: Customer; stage_history: OpportunityStageHistory[]; followups: FollowUp[];
-  sales_stage_history: OpportunitySalesStageHistory[]; products: OpportunityProduct[];
+  contacts: Contact[]; sales_stage_history: OpportunitySalesStageHistory[];
+  deal_stage_history: OpportunityDealStageHistory[]; products: OpportunityProduct[];
+  quotations: QuotationListItem[];
 }
 export interface OpportunityPage { items: OpportunityListItem[]; total: number; limit: number; offset: number; }
 export interface OpportunityPipelineColumn {
   sales_stage: OpportunitySalesStage; count: number; opportunities: OpportunityListItem[];
 }
 export interface OpportunityPipeline { columns: OpportunityPipelineColumn[]; }
+export interface OpportunityDealPipelineColumn {
+  deal_stage: OpportunityDealStage; count: number; opportunities: OpportunityListItem[];
+}
+export interface OpportunityDealPipeline { columns: OpportunityDealPipelineColumn[]; }
 export interface LeadConversion {
   lead: Lead; customer: Customer; contact: Contact; opportunity: Opportunity;
 }

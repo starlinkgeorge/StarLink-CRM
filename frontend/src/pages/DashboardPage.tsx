@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { getDashboardStats } from "../services/crm";
 import { useAuth } from "../store/auth";
 import type { DashboardStats, FollowUpReminder, OpportunitySalesStage } from "../types";
-import { salesStageLabels } from "./OpportunitiesPage";
+import { salesStageLabels } from "../constants/opportunitySalesStages";
 
 const customerLabels: Record<string, string> = {
   Lead: "新线索", Contacted: "已联系", Quotation: "报价中", Negotiation: "谈判中", Won: "已成交", Lost: "已流失",

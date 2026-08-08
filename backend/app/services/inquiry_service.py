@@ -6,6 +6,8 @@ from app.models.customer import Contact, Customer, CustomerStatus
 from app.models.inquiry import Inquiry, InquiryStatus
 from app.models.lead import (
     Opportunity,
+    OpportunityDealStage,
+    OpportunityDealStageHistory,
     OpportunitySalesStage,
     OpportunitySalesStageHistory,
     OpportunityStage,
@@ -156,6 +158,7 @@ def convert_inquiry(
             inquiry_content=inquiry.inquiry_content,
             stage=OpportunityStage.LEAD,
             sales_stage=OpportunitySalesStage.NEW_LEAD.value,
+            deal_stage=OpportunityDealStage.NEW_INQUIRY.value,
             probability=10,
         )
         inquiry.customer_id = customer.id
@@ -175,6 +178,12 @@ def convert_inquiry(
                     opportunity_id=opportunity.id,
                     old_sales_stage=None,
                     new_sales_stage=OpportunitySalesStage.NEW_LEAD.value,
+                    changed_by_id=converter.id,
+                ),
+                OpportunityDealStageHistory(
+                    opportunity_id=opportunity.id,
+                    old_deal_stage=None,
+                    new_deal_stage=OpportunityDealStage.NEW_INQUIRY.value,
                     changed_by_id=converter.id,
                 ),
             )

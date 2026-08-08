@@ -2,7 +2,7 @@
 
 StarLink-CRM is the foundation for a long-lived customer relationship management platform for **Dalian StarLink International Trade**, an exporter of Montessori educational products and wooden kindergarten furniture.
 
-## Current release: CRM V8
+## Current release: CRM V9
 
 The current release includes:
 
@@ -14,6 +14,7 @@ The current release includes:
 - Customer Center that unifies the profile, contacts, opportunities, quotations, follow-ups, attachments, and customer activity in one view
 - V7 sales pipeline with seven Kanban stages, probability, next action, estimated amount, expected close date, and immutable sales-stage history
 - V8 Alibaba inquiry management with manual entry, search/filtering, source analytics, and atomic Inquiry → Customer + Contact + Opportunity conversion
+- V9 foreign-trade opportunity workflow with six business stages, deal-stage audit history, amount, probability, expected-close-date management, and a customer/contact/product/quotation/follow-up sales workspace
 - Dashboard statistics backed by PostgreSQL, including total follow-ups and upcoming work
 - Lead inquiry pool, Lead conversion, Alibaba inquiry simulation, and opportunity management
 - Product catalog with categories, specifications, prices, URL images, and opportunity product lines
@@ -103,7 +104,7 @@ Roles: `Admin` manages all records and users; `Sales` reads and manages only cus
 | Customer classification | `GET /customer-categories`, `POST /customer-categories`, `PUT /customer-categories/{id}`, `GET /customers?category_id={id}&score_min=50&score_max=100` |
 | Leads | `GET /leads`, `POST /leads`, `GET /leads/{id}`, `POST /leads/{id}/convert` |
 | Inquiries | `GET /inquiries`, `POST /inquiries`, `GET /inquiries/{id}`, `PUT /inquiries/{id}`, `POST /inquiries/{id}/convert` |
-| Opportunities | `GET /opportunities?sales_stage={stage}`, `GET /opportunities/pipeline`, `POST /opportunities`, `GET /opportunities/{id}`, `PUT /opportunities/{id}`, `PUT /opportunities/{id}/products` |
+| Opportunities | `GET /opportunities?deal_stage={stage}`, `GET /opportunities/pipeline` (V7 compatibility), `GET /opportunities/deal-pipeline` (V9), `POST /opportunities`, `GET /opportunities/{id}`, `PUT /opportunities/{id}`, `PUT /opportunities/{id}/products` |
 | Product categories | `GET /product-categories`, `POST /product-categories`, `PUT /product-categories/{id}` |
 | Products | `GET /products`, `POST /products`, `GET /products/{id}`, `PUT /products/{id}` |
 | Quotations | `GET /quotations?customer_id={id}`, `POST /quotations`, `GET /quotations/{id}`, `PUT /quotations/{id}`, `POST /quotations/{id}/versions`, `POST /quotations/{id}/pdf`, `GET /quotations/{id}/pdf`, `POST /quotations/{id}/send` |
@@ -130,6 +131,10 @@ Apply migration `0014_v7_sales_pipeline` with `alembic upgrade head`. It adds fi
 V8 adds an independent `inquiries` table for external marketplace inquiries and leaves the older `leads` table and its Alibaba simulation endpoint unchanged. Each Inquiry records the acquisition channel, source platform, contact information, product need, original content, and a processing status (`New`, `Processing`, `Converted`, or `Closed`). `POST /inquiries/{id}/convert` is transactional: it creates a customer, primary contact, V7 `New Lead` opportunity, and both opportunity-history records before marking the Inquiry as `Converted`. The new customer retains `source`, `source_platform`, and `original_inquiry`, while all fields are nullable on existing customers for safe migration. Dashboard stats now include `today_inquiry_count`, `pending_inquiry_count`, and `inquiry_source_stats`. Admin and Sales can create, update, and convert inquiries; Viewer users remain read-only.
 
 Apply migration `0015_v8_alibaba_inquiry_management` with `alembic upgrade head`. It only adds the nullable customer source-context columns, backfills `source_platform` from the existing `source` where possible, and creates the new `inquiries` table with indexes and a status check constraint. No existing Lead, Customer, Opportunity, Follow-up, or Quotation field is removed or changed.
+
+V9 adds the user-facing opportunity stages `New Inquiry`, `Contacted`, `Quoted`, `Negotiating`, `Won`, and `Lost`. `deal_stage` is the canonical V9 field shown in the opportunity list, detail workspace, and six-column sales board. Existing V3 `stage` and V7 `sales_stage` fields remain available and are mapped automatically on create and update, so existing inquiry conversion, dashboard, quotation, and API clients keep working. Opportunity details now aggregate the customer, contacts, catalog products, related quotations, and relevant follow-up records alongside amount, probability, estimated close date, and next action.
+
+Apply migration `0016_v9_opportunity_deal_management` with `alembic upgrade head`. It backfills `deal_stage` from the existing V7 sales stage, creates the indexed immutable `opportunity_deal_stage_history` table, and does not remove or rewrite any existing opportunity column or history table. The migration takes a PostgreSQL transaction advisory lock so two concurrent startup/manual Alembic upgrades cannot both apply it.
 
 The Lead inquiry pool accepts new inquiries, supports pagination and filtering, and exposes a detail view. `POST /leads/{id}/convert` atomically creates a customer, its primary contact, and a base opportunity, then marks the Lead as `Converted`. The unique opportunity-to-Lead link prevents duplicate conversion. Admin and Sales users may create and convert Leads; Viewer users retain read-only access.
 

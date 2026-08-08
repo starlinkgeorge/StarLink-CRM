@@ -1,5 +1,5 @@
 import api from "./api";
-import type { AlibabaInquiryResult, AlibabaIntegrationStatus, Customer, CustomerActivity, CustomerCategory, CustomerCenter, CustomerDetail, CustomerPage, CustomerScoreHistory, DashboardStats, FollowUp, FollowUpAttachment, Inquiry, InquiryConversion, InquiryPage, InquiryStatus, Lead, LeadConversion, LeadDetail, LeadPage, LeadStatus, OpportunityDetail, OpportunityListItem, OpportunityPage, OpportunityPipeline, OpportunitySalesStage, OpportunityStage, Product, ProductCategory, ProductPage, QuotationDetail, QuotationPage, QuotationStatus, Tag } from "../types";
+import type { AlibabaInquiryResult, AlibabaIntegrationStatus, Customer, CustomerActivity, CustomerCategory, CustomerCenter, CustomerDetail, CustomerPage, CustomerScoreHistory, DashboardStats, FollowUp, FollowUpAttachment, Inquiry, InquiryConversion, InquiryPage, InquiryStatus, Lead, LeadConversion, LeadDetail, LeadPage, LeadStatus, OpportunityDealPipeline, OpportunityDealStage, OpportunityDetail, OpportunityListItem, OpportunityPage, OpportunityPipeline, OpportunitySalesStage, OpportunityStage, Product, ProductCategory, ProductPage, QuotationDetail, QuotationPage, QuotationStatus, Tag } from "../types";
 
 export type CustomerCreatePayload = {
   company_name: string; contact_name?: string; country?: string; email?: string; phone?: string;
@@ -82,15 +82,18 @@ export const receiveAlibabaInquiry = async (data: AlibabaInquiryPayload) => (awa
 export type OpportunityPayload = {
   customer_id: number; name: string; interested_product?: string; inquiry_content?: string;
   amount?: string; currency?: string; expected_close_date?: string; stage?: OpportunityStage;
-  sales_stage?: OpportunitySalesStage; probability?: number; next_action?: string | null;
+  sales_stage?: OpportunitySalesStage; deal_stage?: OpportunityDealStage;
+  probability?: number; next_action?: string | null;
   owner_id?: number;
 };
 export type OpportunityFilters = {
-  limit: number; offset: number; q?: string; stage?: string; sales_stage?: string; customer_id?: number;
+  limit: number; offset: number; q?: string; stage?: string; sales_stage?: string;
+  deal_stage?: string; customer_id?: number;
 };
 export const getOpportunities = async (params: OpportunityFilters) => (await api.get<OpportunityPage>("/opportunities", { params })).data;
 export const getOpportunity = async (id: string) => (await api.get<OpportunityDetail>(`/opportunities/${id}`)).data;
 export const getOpportunityPipeline = async () => (await api.get<OpportunityPipeline>("/opportunities/pipeline")).data;
+export const getOpportunityDealPipeline = async () => (await api.get<OpportunityDealPipeline>("/opportunities/deal-pipeline")).data;
 export const createOpportunity = async (data: OpportunityPayload) => (await api.post<OpportunityListItem>("/opportunities", data)).data;
 export const updateOpportunity = async (id: number, data: Partial<Omit<OpportunityPayload, "customer_id">>) => (await api.put<OpportunityDetail>(`/opportunities/${id}`, data)).data;
 

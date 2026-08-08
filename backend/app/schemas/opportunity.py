@@ -4,10 +4,12 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.models.lead import OpportunitySalesStage, OpportunityStage
+from app.models.lead import OpportunityDealStage, OpportunitySalesStage, OpportunityStage
+from app.schemas.contact import ContactRead
 from app.schemas.customer import CustomerRead
 from app.schemas.followup import FollowUpRead
 from app.schemas.product import OpportunityProductRead
+from app.schemas.quotation import QuotationListItem
 
 
 class OpportunityFields(BaseModel):
@@ -20,6 +22,7 @@ class OpportunityFields(BaseModel):
     # stage remains accepted for V3 API compatibility. sales_stage is the V7 pipeline.
     stage: OpportunityStage | None = None
     sales_stage: OpportunitySalesStage | None = None
+    deal_stage: OpportunityDealStage | None = None
     probability: int | None = Field(default=None, ge=0, le=100)
     next_action: str | None = Field(default=None, max_length=500)
 
@@ -43,6 +46,7 @@ class OpportunityUpdate(BaseModel):
     expected_close_date: date | None = None
     stage: OpportunityStage | None = None
     sales_stage: OpportunitySalesStage | None = None
+    deal_stage: OpportunityDealStage | None = None
     probability: int | None = Field(default=None, ge=0, le=100)
     next_action: str | None = Field(default=None, max_length=500)
     owner_id: int | None = Field(default=None, gt=0)
@@ -69,6 +73,7 @@ class OpportunityRead(BaseModel):
     expected_close_date: date | None
     stage: OpportunityStage
     sales_stage: OpportunitySalesStage
+    deal_stage: OpportunityDealStage
     probability: int
     next_action: str | None
     created_at: datetime
@@ -102,12 +107,26 @@ class OpportunitySalesStageHistoryRead(BaseModel):
     created_at: datetime
 
 
+class OpportunityDealStageHistoryRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    opportunity_id: int
+    old_deal_stage: OpportunityDealStage | None
+    new_deal_stage: OpportunityDealStage
+    changed_by_id: int | None
+    created_at: datetime
+
+
 class OpportunityDetail(OpportunityListItem):
     customer: CustomerRead
+    contacts: list[ContactRead]
     stage_history: list[OpportunityStageHistoryRead]
     sales_stage_history: list[OpportunitySalesStageHistoryRead]
+    deal_stage_history: list[OpportunityDealStageHistoryRead]
     followups: list[FollowUpRead]
     products: list[OpportunityProductRead]
+    quotations: list[QuotationListItem]
 
 
 class OpportunityPage(BaseModel):
@@ -125,3 +144,13 @@ class OpportunityPipelineColumn(BaseModel):
 
 class OpportunityPipeline(BaseModel):
     columns: list[OpportunityPipelineColumn]
+
+
+class OpportunityDealPipelineColumn(BaseModel):
+    deal_stage: OpportunityDealStage
+    count: int
+    opportunities: list[OpportunityListItem]
+
+
+class OpportunityDealPipeline(BaseModel):
+    columns: list[OpportunityDealPipelineColumn]

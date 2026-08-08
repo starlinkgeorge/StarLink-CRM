@@ -3,11 +3,12 @@ from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user
 from app.db.session import get_db_session
-from app.models.lead import OpportunitySalesStage, OpportunityStage
+from app.models.lead import OpportunityDealStage, OpportunitySalesStage, OpportunityStage
 from app.models.user import User
 from app.schemas.opportunity import (
     OpportunityCreate,
     OpportunityDetail,
+    OpportunityDealPipeline,
     OpportunityListItem,
     OpportunityPage,
     OpportunityPipeline,
@@ -38,6 +39,15 @@ def _parse_sales_stage(value: str | None) -> OpportunitySalesStage | None:
         raise HTTPException(status_code=422, detail="Invalid opportunity sales stage.") from error
 
 
+def _parse_deal_stage(value: str | None) -> OpportunityDealStage | None:
+    if value is None or not value.strip():
+        return None
+    try:
+        return OpportunityDealStage(value.strip())
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail="Invalid opportunity deal stage.") from error
+
+
 @router.get("", response_model=OpportunityPage)
 def list_opportunities(
     limit: int = Query(default=20, ge=1, le=100),
@@ -47,6 +57,7 @@ def list_opportunities(
     sales_stage_filter: str | None = Query(
         default=None, alias="sales_stage", max_length=50
     ),
+    deal_stage_filter: str | None = Query(default=None, alias="deal_stage", max_length=50),
     customer_id: int | None = Query(default=None, gt=0),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
@@ -59,6 +70,7 @@ def list_opportunities(
         query=q,
         stage=_parse_stage(stage_filter),
         sales_stage=_parse_sales_stage(sales_stage_filter),
+        deal_stage=_parse_deal_stage(deal_stage_filter),
         customer_id=customer_id,
     )
     return OpportunityPage(items=items, total=total, limit=limit, offset=offset)
@@ -85,6 +97,15 @@ def get_sales_pipeline(
 ) -> OpportunityPipeline:
     """Return the seven V7 sales stages as Kanban columns."""
     return opportunity_service.get_sales_pipeline(session, current_user)
+
+
+@router.get("/deal-pipeline", response_model=OpportunityDealPipeline)
+def get_deal_pipeline(
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> OpportunityDealPipeline:
+    """Return V9's six user-facing stages for the sales-process board."""
+    return opportunity_service.get_deal_pipeline(session, current_user)
 
 
 @router.get("/{opportunity_id}", response_model=OpportunityDetail)

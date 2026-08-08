@@ -1435,3 +1435,148 @@ def test_v8_inquiry_lifecycle_conversion_and_dashboard(client: TestClient) -> No
         },
         headers=viewer_token,
     ).status_code == 403
+
+
+def test_v9_opportunity_deal_stage_workspace_and_legacy_compatibility(
+    client: TestClient,
+) -> None:
+    admin_token = login(client, "admin@example.com", "AdminPass123!")
+    admin_id = client.get("/api/v1/users", headers=admin_token).json()[0]["id"]
+    customer = client.post(
+        "/api/v1/customers",
+        json={
+            "company_name": "V9 International Preschool",
+            "contact_name": "Primary Buyer",
+            "country": "Canada",
+            "email": "buyer@v9-preschool.example",
+        },
+        headers=admin_token,
+    )
+    assert customer.status_code == 201
+    customer_id = customer.json()["id"]
+    contact = client.post(
+        "/api/v1/contacts",
+        json={
+            "customer_id": customer_id,
+            "name": "V9 Purchase Manager",
+            "position": "Purchasing Manager",
+            "email": "purchasing@v9-preschool.example",
+        },
+        headers=admin_token,
+    )
+    assert contact.status_code == 201
+
+    created = client.post(
+        "/api/v1/opportunities",
+        json={
+            "customer_id": customer_id,
+            "name": "V9 Classroom Furniture Order",
+            "interested_product": "Solid wood classroom tables",
+            "amount": "6200.00",
+            "currency": "USD",
+            "deal_stage": "Quoted",
+            "probability": 60,
+            "expected_close_date": "2026-12-31",
+            "next_action": "Confirm delivery port with buyer",
+        },
+        headers=admin_token,
+    )
+    assert created.status_code == 201
+    opportunity = created.json()
+    assert opportunity["deal_stage"] == "Quoted"
+    assert opportunity["sales_stage"] == "Quotation Sent"
+    assert opportunity["stage"] == "Proposal"
+    assert opportunity["amount"] == "6200.00"
+    assert opportunity["probability"] == 60
+    assert opportunity["expected_close_date"] == "2026-12-31"
+
+    product = client.post(
+        "/api/v1/products",
+        json={
+            "sku": "V9-TABLE-001",
+            "name": "V9 Solid Wood Table",
+            "reference_price": "120.00",
+            "currency_code": "USD",
+        },
+        headers=admin_token,
+    )
+    assert product.status_code == 201
+    linked = client.put(
+        f"/api/v1/opportunities/{opportunity['id']}/products",
+        json={
+            "items": [
+                {
+                    "product_id": product.json()["id"],
+                    "quantity": "10.00",
+                    "target_price": "115.00",
+                }
+            ]
+        },
+        headers=admin_token,
+    )
+    assert linked.status_code == 200
+
+    quotation = client.post(
+        "/api/v1/quotations",
+        json={"opportunity_id": opportunity["id"], "currency": "USD"},
+        headers=admin_token,
+    )
+    assert quotation.status_code == 201
+    followup = client.post(
+        "/api/v1/followups",
+        json={
+            "customer_id": customer_id,
+            "user_id": admin_id,
+            "opportunity_id": opportunity["id"],
+            "type": "Alibaba",
+            "content": "Buyer reviewed the first quotation.",
+        },
+        headers=admin_token,
+    )
+    assert followup.status_code == 201
+
+    detail_response = client.get(
+        f"/api/v1/opportunities/{opportunity['id']}", headers=admin_token
+    )
+    assert detail_response.status_code == 200
+    detail = detail_response.json()
+    assert detail["customer"]["id"] == customer_id
+    assert [item["name"] for item in detail["contacts"]] == ["V9 Purchase Manager"]
+    assert detail["products"][0]["sku"] == "V9-TABLE-001"
+    assert detail["quotations"][0]["id"] == quotation.json()["id"]
+    assert detail["followups"][0]["id"] == followup.json()["id"]
+    assert [(item["old_deal_stage"], item["new_deal_stage"]) for item in detail["deal_stage_history"]] == [
+        (None, "Quoted")
+    ]
+
+    updated = client.put(
+        f"/api/v1/opportunities/{opportunity['id']}",
+        json={"deal_stage": "Negotiating", "probability": 80},
+        headers=admin_token,
+    )
+    assert updated.status_code == 200
+    assert updated.json()["deal_stage"] == "Negotiating"
+    assert updated.json()["sales_stage"] == "Negotiation"
+    assert updated.json()["stage"] == "Negotiation"
+    transitions = {
+        (item["old_deal_stage"], item["new_deal_stage"])
+        for item in updated.json()["deal_stage_history"]
+    }
+    assert transitions == {(None, "Quoted"), ("Quoted", "Negotiating")}
+
+    listing = client.get(
+        "/api/v1/opportunities",
+        params={"deal_stage": "Negotiating"},
+        headers=admin_token,
+    )
+    assert listing.status_code == 200
+    assert listing.json()["total"] == 1
+    pipeline = client.get("/api/v1/opportunities/deal-pipeline", headers=admin_token)
+    assert pipeline.status_code == 200
+    negotiating = next(
+        column
+        for column in pipeline.json()["columns"]
+        if column["deal_stage"] == "Negotiating"
+    )
+    assert negotiating["count"] == 1
+    assert negotiating["opportunities"][0]["id"] == opportunity["id"]
