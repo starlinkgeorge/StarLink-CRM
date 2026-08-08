@@ -47,11 +47,21 @@ Inbound trade inquiries before customer qualification: `id`, UUID `public_id`, `
 
 ### `opportunities`
 
-The V3 sales-opportunity record: `id`, UUID `public_id`, `customer_id`, nullable unique `source_lead_id`, nullable `owner_id`, `name`, `interested_product`, `inquiry_content`, `amount`, three-letter `currency`, `expected_close_date`, `stage`, `created_at`, and `updated_at`. `source_lead_id` provides conversion traceability and prevents the same Lead from creating duplicate opportunities. Stages are independently defined as `Lead`, `Qualified`, `Proposal`, `Negotiation`, `Won`, and `Lost`. Monetary values use `NUMERIC(14,2)` and are aggregated by currency.
+The sales-opportunity record: `id`, UUID `public_id`, `customer_id`, nullable unique `source_lead_id`, nullable `owner_id`, `name`, `interested_product`, `inquiry_content`, `amount`, three-letter `currency`, `expected_close_date`, legacy `stage`, V7 `sales_stage`, `probability`, `next_action`, `created_at`, and `updated_at`. `source_lead_id` provides conversion traceability and prevents the same Lead from creating duplicate opportunities. Monetary values use `NUMERIC(14,2)` and are aggregated by currency.
+
+- `amount` is the estimated opportunity amount; `expected_close_date` is the estimated close date.
+- `probability` is a constrained integer from 0 through 100.
+- `next_action` is an optional short, actionable note for the next sales step.
+- `sales_stage` is the V7 pipeline: `New Lead`, `Contacted`, `Requirement Confirmed`, `Quotation Sent`, `Negotiation`, `Won`, or `Lost`.
+- `stage` remains the V3 enum (`Lead`, `Qualified`, `Proposal`, `Negotiation`, `Won`, `Lost`) for client compatibility. The service maps changes in either field to the other field.
 
 ### `opportunity_stage_history`
 
 Immutable opportunity stage changes: `id`, `opportunity_id`, nullable `old_stage`, required `new_stage`, nullable `changed_by_id`, and `created_at`. Initial creation is represented by a row with `old_stage = NULL`; every later stage change appends another row.
+
+### `opportunity_sales_stage_history`
+
+V7 immutable sales-pipeline changes: `id`, `opportunity_id`, nullable `old_sales_stage`, required `new_sales_stage`, nullable `changed_by_id`, and `created_at`. Existing opportunities are backfilled with one initial V7 stage record during migration `0014_v7_sales_pipeline`; later stage changes append new records.
 
 ### `product_categories`
 
@@ -99,6 +109,8 @@ customers 1 ──< opportunities (deleted with customer)
 users 1 ──< opportunities (owner_id; SET NULL on user deletion)
 opportunities 1 ──< opportunity_stage_history (deleted with opportunity)
 users 1 ──< opportunity_stage_history (changed_by_id; SET NULL on user deletion)
+opportunities 1 ──< opportunity_sales_stage_history (deleted with opportunity)
+users 1 ──< opportunity_sales_stage_history (changed_by_id; SET NULL on user deletion)
 product_categories 1 ──< products (category_id; SET NULL on category deletion)
 product_categories 1 ──< product_categories (parent_id; SET NULL on parent deletion)
 products 1 ──< product_images (deleted with product)

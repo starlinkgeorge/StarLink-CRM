@@ -2,6 +2,7 @@ export type UserRole = "Admin" | "Sales" | "Viewer";
 
 export type LeadStatus = "New" | "Contacted" | "Qualified" | "Converted" | "Lost";
 export type OpportunityStage = "Lead" | "Qualified" | "Proposal" | "Negotiation" | "Won" | "Lost";
+export type OpportunitySalesStage = "New Lead" | "Contacted" | "Requirement Confirmed" | "Quotation Sent" | "Negotiation" | "Won" | "Lost";
 export interface Lead {
   id: number; public_id: string; company_name: string; contact_name: string;
   country: string | null; email: string | null; phone: string | null; whatsapp: string | null;
@@ -18,6 +19,7 @@ export interface Opportunity {
   owner_id: number | null; name: string; interested_product: string | null;
   inquiry_content: string | null; amount: string | null; currency: string;
   expected_close_date: string | null; stage: OpportunityStage;
+  sales_stage: OpportunitySalesStage; probability: number; next_action: string | null;
   created_at: string; updated_at: string;
 }
 export interface OpportunityListItem extends Opportunity { customer_company: string; owner_name: string | null; }
@@ -25,11 +27,19 @@ export interface OpportunityStageHistory {
   id: number; opportunity_id: number; old_stage: OpportunityStage | null;
   new_stage: OpportunityStage; changed_by_id: number | null; created_at: string;
 }
+export interface OpportunitySalesStageHistory {
+  id: number; opportunity_id: number; old_sales_stage: OpportunitySalesStage | null;
+  new_sales_stage: OpportunitySalesStage; changed_by_id: number | null; created_at: string;
+}
 export interface OpportunityDetail extends OpportunityListItem {
   customer: Customer; stage_history: OpportunityStageHistory[]; followups: FollowUp[];
-  products: OpportunityProduct[];
+  sales_stage_history: OpportunitySalesStageHistory[]; products: OpportunityProduct[];
 }
 export interface OpportunityPage { items: OpportunityListItem[]; total: number; limit: number; offset: number; }
+export interface OpportunityPipelineColumn {
+  sales_stage: OpportunitySalesStage; count: number; opportunities: OpportunityListItem[];
+}
+export interface OpportunityPipeline { columns: OpportunityPipelineColumn[]; }
 export interface LeadConversion {
   lead: Lead; customer: Customer; contact: Contact; opportunity: Opportunity;
 }
@@ -97,6 +107,7 @@ export interface Tag {
 export interface DashboardStats {
   customer_count: number; followup_count: number; new_customers_today: number; due_followups: number;
   today_followup_count: number; overdue_followup_count: number;
+  pending_followup_customer_count: number;
   week_followup_count: number;
   pipeline: { status: CustomerStatus; count: number }[];
   upcoming_followups: { id: number; customer_id: number; customer_name: string; type: string; content: string; next_followup_date: string }[];
@@ -105,6 +116,8 @@ export interface DashboardStats {
   opportunity_count: number; active_opportunity_count: number;
   won_opportunity_count: number; lost_opportunity_count: number;
   opportunity_amounts: { currency: string; amount: string }[];
+  opportunity_total_amounts: { currency: string; amount: string }[];
+  opportunity_pipeline: { sales_stage: OpportunitySalesStage; count: number }[];
 }
 export interface FollowUpReminder {
   id: number; customer_id: number; customer_name: string; type: string; content: string;

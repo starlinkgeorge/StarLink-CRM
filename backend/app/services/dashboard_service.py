@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.models.customer import Customer, CustomerStatus
 from app.models.followup import FollowUp
-from app.models.lead import Opportunity, OpportunityStage
+from app.models.lead import Opportunity, OpportunitySalesStage
 from app.models.user import User, UserRole
 from app.services.access_service import customer_scope
 
@@ -100,13 +100,15 @@ def get_dashboard_stats(session: Session, user: User) -> dict:
     if user.role is UserRole.SALES:
         opportunity_filters.append(Opportunity.owner_id == user.id)
     opportunity_rows = session.execute(
-        select(Opportunity.stage, func.count(Opportunity.id))
+        select(Opportunity.sales_stage, func.count(Opportunity.id))
         .where(*opportunity_filters)
-        .group_by(Opportunity.stage)
+        .group_by(Opportunity.sales_stage)
     ).all()
-    opportunity_counts = {stage: count for stage, count in opportunity_rows}
-    won_opportunities = opportunity_counts.get(OpportunityStage.WON, 0)
-    lost_opportunities = opportunity_counts.get(OpportunityStage.LOST, 0)
+    opportunity_counts = {
+        OpportunitySalesStage(stage): count for stage, count in opportunity_rows
+    }
+    won_opportunities = opportunity_counts.get(OpportunitySalesStage.WON, 0)
+    lost_opportunities = opportunity_counts.get(OpportunitySalesStage.LOST, 0)
     opportunity_count = sum(opportunity_counts.values())
     amount_rows = session.execute(
         select(Opportunity.currency, func.coalesce(func.sum(Opportunity.amount), 0))
@@ -121,6 +123,7 @@ def get_dashboard_stats(session: Session, user: User) -> dict:
         "due_followups": due_followups,
         "today_followup_count": len(today_reminders),
         "overdue_followup_count": len(overdue_reminders),
+        "pending_followup_customer_count": len(current_reminders),
         "week_followup_count": week_followup_count,
         "pipeline": [
             {"status": status.value, "count": counts[status.value]}
@@ -141,5 +144,17 @@ def get_dashboard_stats(session: Session, user: User) -> dict:
         "lost_opportunity_count": lost_opportunities,
         "opportunity_amounts": [
             {"currency": currency, "amount": amount} for currency, amount in amount_rows
+        ],
+        # Kept separately so V7 consumers can label it as the sales total while
+        # existing dashboards continue to use opportunity_amounts unchanged.
+        "opportunity_total_amounts": [
+            {"currency": currency, "amount": amount} for currency, amount in amount_rows
+        ],
+        "opportunity_pipeline": [
+            {
+                "sales_stage": sales_stage.value,
+                "count": opportunity_counts.get(sales_stage, 0),
+            }
+            for sales_stage in OpportunitySalesStage
         ],
     }

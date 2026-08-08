@@ -2,7 +2,7 @@
 
 StarLink-CRM is the foundation for a long-lived customer relationship management platform for **Dalian StarLink International Trade**, an exporter of Montessori educational products and wooden kindergarten furniture.
 
-## Current release: CRM V6
+## Current release: CRM V7
 
 The current release includes:
 
@@ -12,6 +12,7 @@ The current release includes:
 - Customer profiles capture customer type, acquisition source, interested products, and sales stage
 - Full follow-up timeline with edit/delete, opportunity links, file attachments, activity date, and next-follow-up dates
 - Customer Center that unifies the profile, contacts, opportunities, quotations, follow-ups, attachments, and customer activity in one view
+- V7 sales pipeline with seven Kanban stages, probability, next action, estimated amount, expected close date, and immutable sales-stage history
 - Dashboard statistics backed by PostgreSQL, including total follow-ups and upcoming work
 - Lead inquiry pool, Lead conversion, Alibaba inquiry simulation, and opportunity management
 - Product catalog with categories, specifications, prices, URL images, and opportunity product lines
@@ -100,7 +101,7 @@ Roles: `Admin` manages all records and users; `Sales` reads and manages only cus
 | Customers | `GET /customers?limit=20&offset=0&q=keyword`, `POST /customers`, `GET /customers/{id}`, `GET /customers/{id}/center`, `GET /customers/{id}/timeline`, `PUT /customers/{id}`, `DELETE /customers/{id}` |
 | Customer classification | `GET /customer-categories`, `POST /customer-categories`, `PUT /customer-categories/{id}`, `GET /customers?category_id={id}&score_min=50&score_max=100` |
 | Leads | `GET /leads`, `POST /leads`, `GET /leads/{id}`, `POST /leads/{id}/convert` |
-| Opportunities | `GET /opportunities`, `POST /opportunities`, `GET /opportunities/{id}`, `PUT /opportunities/{id}`, `PUT /opportunities/{id}/products` |
+| Opportunities | `GET /opportunities?sales_stage={stage}`, `GET /opportunities/pipeline`, `POST /opportunities`, `GET /opportunities/{id}`, `PUT /opportunities/{id}`, `PUT /opportunities/{id}/products` |
 | Product categories | `GET /product-categories`, `POST /product-categories`, `PUT /product-categories/{id}` |
 | Products | `GET /products`, `POST /products`, `GET /products/{id}`, `PUT /products/{id}` |
 | Quotations | `GET /quotations?customer_id={id}`, `POST /quotations`, `GET /quotations/{id}`, `PUT /quotations/{id}`, `POST /quotations/{id}/versions`, `POST /quotations/{id}/pdf`, `GET /quotations/{id}/pdf`, `POST /quotations/{id}/send` |
@@ -119,6 +120,10 @@ V5 expands follow-ups without changing the legacy records or create payload. Eac
 Apply migration `0013_v5_followup_management` with `alembic upgrade head`. It backfills `followup_date` from existing `created_at` values and adds only nullable opportunity links, timestamps, and the new attachment table; it does not remove or rewrite legacy follow-up content.
 
 V6 adds the read-only Customer Center endpoint and page without changing the database schema. `GET /customers/{id}/center` returns the same customer fields as the legacy detail endpoint plus permission-scoped opportunities, quotations, activities, score history, follow-ups, and attachment metadata. The legacy `/customers/{id}`, timeline, opportunity, and quotation endpoints remain unchanged. `GET /quotations` also accepts optional `customer_id` filtering. No new Alembic migration is required for this API/UI-only release.
+
+V7 adds a sales pipeline without replacing the existing V3 `opportunities.stage` enum or its immutable history. The new `sales_stage` values are `New Lead`, `Contacted`, `Requirement Confirmed`, `Quotation Sent`, `Negotiation`, `Won`, and `Lost`. The API maps each V7 stage to the closest legacy stage, so existing Lead conversion, quotation, dashboard, and integration clients remain compatible. Opportunities now also have `probability` (0-100), `next_action`, and the existing `amount`/`expected_close_date` fields are presented as estimated sales values. `GET /opportunities/pipeline` returns seven permission-scoped Kanban columns; Sales users see only their assigned opportunities and Viewer users remain read-only. Dashboard statistics retain every existing field and add `opportunity_pipeline`, `opportunity_total_amounts`, and `pending_followup_customer_count`.
+
+Apply migration `0014_v7_sales_pipeline` with `alembic upgrade head`. It adds fields and a sales-stage history table, backfills V7 stages/probabilities from the legacy stage, and does not delete or alter the existing `stage` field or `opportunity_stage_history` table.
 
 The Lead inquiry pool accepts new inquiries, supports pagination and filtering, and exposes a detail view. `POST /leads/{id}/convert` atomically creates a customer, its primary contact, and a base opportunity, then marks the Lead as `Converted`. The unique opportunity-to-Lead link prevents duplicate conversion. Admin and Sales users may create and convert Leads; Viewer users retain read-only access.
 

@@ -4,6 +4,8 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+from app.models.lead import OpportunitySalesStage
+
 
 class PipelineItem(BaseModel):
     status: str
@@ -28,6 +30,11 @@ class OpportunityAmountItem(BaseModel):
     amount: Decimal
 
 
+class OpportunityPipelineItem(BaseModel):
+    sales_stage: OpportunitySalesStage
+    count: int
+
+
 class DashboardStats(BaseModel):
     customer_count: int
     followup_count: int
@@ -35,6 +42,7 @@ class DashboardStats(BaseModel):
     due_followups: int
     today_followup_count: int
     overdue_followup_count: int
+    pending_followup_customer_count: int
     week_followup_count: int
     pipeline: list[PipelineItem]
     upcoming_followups: list[UpcomingFollowUp]
@@ -45,3 +53,5 @@ class DashboardStats(BaseModel):
     won_opportunity_count: int
     lost_opportunity_count: int
     opportunity_amounts: list[OpportunityAmountItem]
+    opportunity_total_amounts: list[OpportunityAmountItem]
+    opportunity_pipeline: list[OpportunityPipelineItem]

@@ -1251,3 +1251,90 @@ def test_quotation_versioning_pdf_and_immutable_sent_snapshot(client: TestClient
     assert client.delete(
         f"/api/v1/customers/{customer.json()['id']}", headers=admin_token
     ).status_code == 409
+
+
+def test_v7_sales_pipeline_keeps_legacy_stage_compatible(client: TestClient) -> None:
+    admin_token = login(client, "admin@example.com", "AdminPass123!")
+    customer = client.post(
+        "/api/v1/customers",
+        json={"company_name": "V7 Pipeline School", "contact_name": "Marie"},
+        headers=admin_token,
+    )
+    assert customer.status_code == 201
+    created = client.post(
+        "/api/v1/opportunities",
+        json={
+            "customer_id": customer.json()["id"],
+            "name": "V7 Furniture Pipeline",
+            "amount": "4800.00",
+            "currency": "USD",
+            "sales_stage": "Contacted",
+            "next_action": "Confirm classroom dimensions",
+        },
+        headers=admin_token,
+    )
+    assert created.status_code == 201
+    opportunity = created.json()
+    assert opportunity["sales_stage"] == "Contacted"
+    assert opportunity["stage"] == "Qualified"
+    assert opportunity["probability"] == 20
+
+    legacy_filtered = client.get(
+        "/api/v1/opportunities",
+        params={"stage": "Qualified"},
+        headers=admin_token,
+    )
+    assert legacy_filtered.status_code == 200
+    assert legacy_filtered.json()["total"] == 1
+    sales_filtered = client.get(
+        "/api/v1/opportunities",
+        params={"sales_stage": "Contacted"},
+        headers=admin_token,
+    )
+    assert sales_filtered.status_code == 200
+    assert sales_filtered.json()["total"] == 1
+
+    updated = client.put(
+        f"/api/v1/opportunities/{opportunity['id']}",
+        json={
+            "sales_stage": "Quotation Sent",
+            "probability": 65,
+            "expected_close_date": "2026-12-31",
+            "next_action": "Review quotation with buyer",
+        },
+        headers=admin_token,
+    )
+    assert updated.status_code == 200
+    detail = updated.json()
+    assert detail["sales_stage"] == "Quotation Sent"
+    assert detail["stage"] == "Proposal"
+    assert detail["probability"] == 65
+    assert detail["next_action"] == "Review quotation with buyer"
+    sales_transitions = {
+        (item["old_sales_stage"], item["new_sales_stage"])
+        for item in detail["sales_stage_history"]
+    }
+    assert sales_transitions == {
+        (None, "Contacted"),
+        ("Contacted", "Quotation Sent"),
+    }
+
+    pipeline = client.get("/api/v1/opportunities/pipeline", headers=admin_token)
+    assert pipeline.status_code == 200
+    quotation_column = next(
+        item for item in pipeline.json()["columns"] if item["sales_stage"] == "Quotation Sent"
+    )
+    assert quotation_column["count"] == 1
+    assert quotation_column["opportunities"][0]["id"] == opportunity["id"]
+
+    dashboard = client.get("/api/v1/dashboard/stats", headers=admin_token)
+    assert dashboard.status_code == 200
+    stats = dashboard.json()
+    quotation_stage = next(
+        item
+        for item in stats["opportunity_pipeline"]
+        if item["sales_stage"] == "Quotation Sent"
+    )
+    assert quotation_stage["count"] == 1
+    assert Decimal(stats["opportunity_total_amounts"][0]["amount"]) == Decimal("4800.00")
+    assert stats["pending_followup_customer_count"] == 0

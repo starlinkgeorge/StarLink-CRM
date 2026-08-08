@@ -7,6 +7,8 @@ from app.models.lead import (
     Lead,
     LeadStatus,
     Opportunity,
+    OpportunitySalesStage,
+    OpportunitySalesStageHistory,
     OpportunityStage,
     OpportunityStageHistory,
 )
@@ -117,6 +119,8 @@ def convert_lead(
             interested_product=lead.interested_product,
             inquiry_content=lead.inquiry_content,
             stage=OpportunityStage.LEAD,
+            sales_stage=OpportunitySalesStage.NEW_LEAD.value,
+            probability=10,
         )
         lead.status = LeadStatus.CONVERTED
         session.add_all((contact, opportunity))
@@ -126,6 +130,14 @@ def convert_lead(
                 opportunity_id=opportunity.id,
                 old_stage=None,
                 new_stage=OpportunityStage.LEAD,
+                changed_by_id=converter.id,
+            )
+        )
+        session.add(
+            OpportunitySalesStageHistory(
+                opportunity_id=opportunity.id,
+                old_sales_stage=None,
+                new_sales_stage=OpportunitySalesStage.NEW_LEAD.value,
                 changed_by_id=converter.id,
             )
         )
