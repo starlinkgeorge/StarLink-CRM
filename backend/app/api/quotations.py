@@ -43,11 +43,18 @@ def list_quotations(
     offset: int = Query(default=0, ge=0),
     q: str | None = Query(default=None, max_length=255),
     status_filter: str | None = Query(default=None, alias="status", max_length=30),
+    customer_id: int | None = Query(default=None, gt=0),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ) -> QuotationPage:
     items, total = quotation_service.list_quotations(
-        session, current_user, limit, offset, q, _parse_status(status_filter)
+        session,
+        current_user,
+        limit,
+        offset,
+        q,
+        _parse_status(status_filter),
+        customer_id,
     )
     return QuotationPage(items=items, total=total, limit=limit, offset=offset)
 

@@ -389,6 +389,11 @@ def test_followup_can_link_opportunity_and_manage_attachments(client: TestClient
     assert uploaded.status_code == 201
     attachment = uploaded.json()
     assert attachment["file_name"] == "buyer-notes.txt"
+    customer_center = client.get(
+        f"/api/v1/customers/{customer_id}/center", headers=admin_token
+    )
+    assert customer_center.status_code == 200
+    assert customer_center.json()["followups"][0]["attachments"][0]["id"] == attachment["id"]
     downloaded = client.get(
         f"/api/v1/followups/{followup['id']}/attachments/{attachment['id']}",
         headers=admin_token,
@@ -1040,6 +1045,10 @@ def test_sales_cannot_access_another_users_customer(client: TestClient) -> None:
         f"/api/v1/customers/{customer.json()['id']}/timeline", headers=sales_token
     )
     assert blocked_timeline.status_code == 403
+    blocked_center = client.get(
+        f"/api/v1/customers/{customer.json()['id']}/center", headers=sales_token
+    )
+    assert blocked_center.status_code == 403
 
 
 def test_quotation_versioning_pdf_and_immutable_sent_snapshot(client: TestClient) -> None:
@@ -1109,6 +1118,23 @@ def test_quotation_versioning_pdf_and_immutable_sent_snapshot(client: TestClient
     assert quotation["selected_version"]["items"][0]["product_name_snapshot"] == (
         "Preschool Wooden Chair"
     )
+
+    customer_center = client.get(
+        f"/api/v1/customers/{customer.json()['id']}/center", headers=admin_token
+    )
+    assert customer_center.status_code == 200
+    center_data = customer_center.json()
+    assert center_data["id"] == customer.json()["id"]
+    assert [item["id"] for item in center_data["opportunities"]] == [opportunity["id"]]
+    assert [item["id"] for item in center_data["quotations"]] == [quotation_id]
+    assert any(item["event_type"] == "customer_created" for item in center_data["activities"])
+    filtered_listing = client.get(
+        "/api/v1/quotations",
+        params={"customer_id": customer.json()["id"]},
+        headers=admin_token,
+    )
+    assert filtered_listing.status_code == 200
+    assert filtered_listing.json()["total"] == 1
 
     changed = client.put(
         f"/api/v1/quotations/{quotation_id}",

@@ -1,5 +1,5 @@
 import api from "./api";
-import type { AlibabaInquiryResult, AlibabaIntegrationStatus, Customer, CustomerActivity, CustomerCategory, CustomerDetail, CustomerPage, CustomerScoreHistory, DashboardStats, FollowUp, FollowUpAttachment, Lead, LeadConversion, LeadDetail, LeadPage, LeadStatus, OpportunityDetail, OpportunityListItem, OpportunityPage, OpportunityStage, Product, ProductCategory, ProductPage, QuotationDetail, QuotationPage, QuotationStatus, Tag } from "../types";
+import type { AlibabaInquiryResult, AlibabaIntegrationStatus, Customer, CustomerActivity, CustomerCategory, CustomerCenter, CustomerDetail, CustomerPage, CustomerScoreHistory, DashboardStats, FollowUp, FollowUpAttachment, Lead, LeadConversion, LeadDetail, LeadPage, LeadStatus, OpportunityDetail, OpportunityListItem, OpportunityPage, OpportunityStage, Product, ProductCategory, ProductPage, QuotationDetail, QuotationPage, QuotationStatus, Tag } from "../types";
 
 export type CustomerCreatePayload = {
   company_name: string; contact_name?: string; country?: string; email?: string; phone?: string;
@@ -16,6 +16,7 @@ export type CustomerFilters = {
 };
 export const getCustomers = async (params: CustomerFilters) => (await api.get<CustomerPage>("/customers", { params })).data;
 export const getCustomer = async (id: string) => (await api.get<CustomerDetail>(`/customers/${id}`)).data;
+export const getCustomerCenter = async (id: string) => (await api.get<CustomerCenter>(`/customers/${id}/center`)).data;
 export const getCustomerTimeline = async (id: string) => (await api.get<CustomerActivity[]>(`/customers/${id}/timeline`)).data;
 export const createCustomer = async (data: CustomerCreatePayload) => (await api.post<Customer>("/customers", data)).data;
 export const updateCustomer = async (id: number, data: Partial<CustomerCreatePayload>) => (await api.put<Customer>(`/customers/${id}`, data)).data;
@@ -100,7 +101,7 @@ export type QuotationCreatePayload = {
   validity_days?: number; shipping_cost?: string; items?: QuotationItemPayload[];
 };
 export type QuotationUpdatePayload = Omit<QuotationCreatePayload, "opportunity_id">;
-export const getQuotations = async (params: { limit: number; offset: number; q?: string; status?: QuotationStatus | "" }) => (await api.get<QuotationPage>("/quotations", { params })).data;
+export const getQuotations = async (params: { limit: number; offset: number; q?: string; status?: QuotationStatus | ""; customer_id?: number }) => (await api.get<QuotationPage>("/quotations", { params })).data;
 export const createQuotation = async (data: QuotationCreatePayload) => (await api.post<QuotationDetail>("/quotations", data)).data;
 export const getQuotation = async (id: string | number, version_no?: number) => (await api.get<QuotationDetail>(`/quotations/${id}`, { params: { version_no } })).data;
 export const updateQuotation = async (id: number, data: QuotationUpdatePayload) => (await api.put<QuotationDetail>(`/quotations/${id}`, data)).data;

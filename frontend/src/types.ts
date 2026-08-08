@@ -83,6 +83,12 @@ export interface CustomerActivity {
   new_status: CustomerStatus | null;
 }
 export interface CustomerDetail extends Customer { contacts: Contact[]; tags: { id: number; name: string; created_at: string }[]; followups: FollowUp[]; }
+export interface CustomerCenter extends CustomerDetail {
+  opportunities: OpportunityListItem[];
+  quotations: QuotationListItem[];
+  activities: CustomerActivity[];
+  score_history: CustomerScoreHistory[];
+}
 export interface CustomerPage { items: Customer[]; total: number; limit: number; offset: number; }
 export interface Tag {
   id: number; name: string; description: string | null; color: string;

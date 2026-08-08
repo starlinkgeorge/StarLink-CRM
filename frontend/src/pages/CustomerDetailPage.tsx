@@ -10,10 +10,7 @@ import {
   deleteFollowup,
   deleteFollowupAttachment,
   downloadFollowupAttachment,
-  getCustomer,
-  getCustomerScoreHistory,
-  getCustomerTimeline,
-  getOpportunities,
+  getCustomerCenter,
   getTags,
   removeTag,
   updateFollowup,
@@ -22,7 +19,7 @@ import {
   uploadFollowupAttachment,
 } from "../services/crm";
 import { useAuth } from "../store/auth";
-import type { CustomerActivity, CustomerDetail, CustomerScoreHistory, CustomerStatus, FollowUp, FollowUpType, OpportunityListItem, OpportunityStage, Tag } from "../types";
+import type { CustomerActivity, CustomerCenter, CustomerScoreHistory, CustomerStatus, FollowUp, FollowUpType, OpportunityListItem, OpportunityStage, QuotationListItem, QuotationStatus, Tag } from "../types";
 
 const stages: CustomerStatus[] = ["Lead", "Contacted", "Quotation", "Negotiation", "Won", "Lost"];
 const stageText: Record<CustomerStatus, string> = {
@@ -36,6 +33,9 @@ const stageText: Record<CustomerStatus, string> = {
 const opportunityStageText: Record<OpportunityStage, string> = {
   Lead: "初始商机", Qualified: "已确认", Proposal: "方案/报价",
   Negotiation: "谈判中", Won: "已成交", Lost: "已丢失",
+};
+const quotationStatusText: Record<QuotationStatus, string> = {
+  Draft: "草稿", Sent: "已发送", Accepted: "已接受", Rejected: "已拒绝", Expired: "已过期",
 };
 
 function localDateString() {
@@ -96,9 +96,10 @@ function ActivityItem({ activity }: { activity: CustomerActivity }) {
 export function CustomerDetailPage() {
   const { id } = useParams();
   const { user } = useAuth();
-  const [customer, setCustomer] = useState<CustomerDetail | null>(null);
+  const [customer, setCustomer] = useState<CustomerCenter | null>(null);
   const [timeline, setTimeline] = useState<CustomerActivity[]>([]);
   const [opportunities, setOpportunities] = useState<OpportunityListItem[]>([]);
+  const [quotations, setQuotations] = useState<QuotationListItem[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [scoreHistory, setScoreHistory] = useState<CustomerScoreHistory[]>([]);
   const [error, setError] = useState("");
@@ -119,17 +120,13 @@ export function CustomerDetailPage() {
   const load = useCallback(async () => {
     if (!id) return;
     try {
-      const [customerData, timelineData, opportunityData, scoreHistoryData] = await Promise.all([
-        getCustomer(id),
-        getCustomerTimeline(id),
-        getOpportunities({ limit: 100, offset: 0, customer_id: Number(id) }),
-        getCustomerScoreHistory(Number(id)),
-      ]);
-      setCustomer(customerData);
-      setTimeline(timelineData);
-      setOpportunities(opportunityData.items);
-      setScoreHistory(scoreHistoryData);
-      setScoreInput(String(customerData.customer_score));
+      const center = await getCustomerCenter(id);
+      setCustomer(center);
+      setTimeline(center.activities);
+      setOpportunities(center.opportunities);
+      setQuotations(center.quotations);
+      setScoreHistory(center.score_history);
+      setScoreInput(String(center.customer_score));
       setError("");
     } catch {
       setError("无法加载客户详情。");
@@ -285,13 +282,16 @@ export function CustomerDetailPage() {
   }
 
   if (!customer) return <p className="text-slate-500">{error || "加载中…"}</p>;
+  const attachments = customer.followups.flatMap((followup) =>
+    followup.attachments.map((attachment) => ({ attachment, followup })),
+  );
 
   return (
     <>
       <Link to="/customers" className="text-sm text-blue-700">← 返回客户列表</Link>
       <div className="mt-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-sm text-slate-500">{customer.country ?? "未填写国家/地区"}</p>
+          <p className="text-sm text-slate-500">客户中心 · {customer.country ?? "未填写国家/地区"}</p>
           <h2 className="text-3xl font-bold">{customer.company_name}</h2>
           <p className="mt-1 text-slate-600">{customer.contact_name ?? "未设置主联系人"}</p>
         </div>
@@ -310,6 +310,14 @@ export function CustomerDetailPage() {
       </div>
 
       {error && <p className="mt-4 text-sm text-rose-600">{error}</p>}
+
+      <section className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <article className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200"><p className="text-sm text-slate-500">联系人</p><p className="mt-1 text-2xl font-bold">{customer.contacts.length}</p></article>
+        <article className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200"><p className="text-sm text-slate-500">商机</p><p className="mt-1 text-2xl font-bold">{opportunities.length}</p></article>
+        <article className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200"><p className="text-sm text-slate-500">报价</p><p className="mt-1 text-2xl font-bold">{quotations.length}</p></article>
+        <article className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200"><p className="text-sm text-slate-500">跟进记录</p><p className="mt-1 text-2xl font-bold">{customer.followups.length}</p></article>
+        <article className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200"><p className="text-sm text-slate-500">客户附件</p><p className="mt-1 text-2xl font-bold">{attachments.length}</p></article>
+      </section>
 
       <section className="mt-5 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -395,7 +403,9 @@ export function CustomerDetailPage() {
             {customer.contacts.length ? customer.contacts.map((contact) => (
               <div key={contact.id} className="rounded-lg bg-slate-50 p-3 text-sm">
                 <p className="font-semibold">{contact.name}</p>
-                <p className="text-slate-500">{contact.position ?? "—"} · {contact.email ?? contact.phone ?? "—"}</p>
+                <p className="text-slate-500">{contact.position ?? "未填写职位"}</p>
+                <p className="mt-1 text-slate-600">{contact.email ?? "未填写邮箱"}</p>
+                <p className="text-slate-600">{contact.phone ?? contact.whatsapp ?? "未填写电话"}</p>
               </div>
             )) : <p className="text-sm text-slate-500">暂无其他联系人。</p>}
           </div>
@@ -416,6 +426,34 @@ export function CustomerDetailPage() {
             </Link>
           ))}
           {!opportunities.length && <p className="text-sm text-slate-500">该客户暂无商机。</p>}
+        </div>
+      </section>
+
+      <section className="mt-5 rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+        <div className="flex items-center justify-between gap-3">
+          <div><h3 className="font-bold">报价</h3><p className="mt-1 text-sm text-slate-500">客户所有报价及其当前版本</p></div>
+          <Link to="/quotations" className="text-sm text-blue-700">查看全部报价</Link>
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {quotations.map((quotation) => (
+            <article key={quotation.id} className="rounded-lg bg-slate-50 p-4">
+              <div className="flex items-start justify-between gap-2"><Link to={`/quotations/${quotation.id}`} className="font-semibold text-blue-700">{quotation.quotation_number}</Link><span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs">{quotationStatusText[quotation.status]}</span></div>
+              <p className="mt-2 text-sm">V{quotation.current_version} · {quotation.currency} {Number(quotation.total_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+              {quotation.opportunity_id && <Link to={`/opportunities/${quotation.opportunity_id}`} className="mt-2 inline-block text-sm text-blue-700">{quotation.opportunity_name ?? "关联商机"}</Link>}
+              <p className="mt-2 text-xs text-slate-500">更新于 {new Date(quotation.updated_at).toLocaleString()}</p>
+            </article>
+          ))}
+          {!quotations.length && <p className="text-sm text-slate-500">暂无报价；可在商机详情中创建第一份报价。</p>}
+        </div>
+      </section>
+
+      <section className="mt-5 rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+        <div className="flex items-center justify-between gap-3"><div><h3 className="font-bold">客户附件</h3><p className="mt-1 text-sm text-slate-500">来自跟进记录的文件，统一在客户中心查看。</p></div><span className="text-sm text-slate-500">共 {attachments.length} 个</span></div>
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {attachments.map(({ attachment, followup }) => (
+            <article key={attachment.id} className="rounded-lg bg-slate-50 p-3 text-sm"><button type="button" onClick={() => void openFollowupFile(followup.id, attachment.id)} className="font-medium text-blue-700">{attachment.file_name}</button><p className="mt-1 text-slate-500">{followup.type} · {followup.followup_date}</p><p className="text-xs text-slate-500">{Math.ceil(attachment.size_bytes / 1024)} KB · {new Date(attachment.created_at).toLocaleString()}</p></article>
+          ))}
+          {!attachments.length && <p className="text-sm text-slate-500">暂无客户附件。</p>}
         </div>
       </section>
 

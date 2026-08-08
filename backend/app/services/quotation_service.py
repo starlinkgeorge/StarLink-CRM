@@ -120,12 +120,17 @@ def list_quotations(
     offset: int,
     query: str | None = None,
     status: QuotationStatus | None = None,
+    customer_id: int | None = None,
 ) -> tuple[list[QuotationListItem], int]:
     filters = []
     if user.role is UserRole.SALES:
-        filters.append(Opportunity.owner_id == user.id)
+        filters.append(
+            or_(Quotation.opportunity_id.is_(None), Opportunity.owner_id == user.id)
+        )
     if status is not None:
         filters.append(Quotation.status == status)
+    if customer_id is not None:
+        filters.append(Quotation.customer_id == customer_id)
     search_term = query.strip() if query else ""
     if search_term:
         term = f"%{search_term}%"

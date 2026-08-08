@@ -2,7 +2,7 @@
 
 StarLink-CRM is the foundation for a long-lived customer relationship management platform for **Dalian StarLink International Trade**, an exporter of Montessori educational products and wooden kindergarten furniture.
 
-## Current release: CRM V5
+## Current release: CRM V6
 
 The current release includes:
 
@@ -11,6 +11,7 @@ The current release includes:
 - Customer detail profiles with contacts, tags, sales stage, and follow-up timeline
 - Customer profiles capture customer type, acquisition source, interested products, and sales stage
 - Full follow-up timeline with edit/delete, opportunity links, file attachments, activity date, and next-follow-up dates
+- Customer Center that unifies the profile, contacts, opportunities, quotations, follow-ups, attachments, and customer activity in one view
 - Dashboard statistics backed by PostgreSQL, including total follow-ups and upcoming work
 - Lead inquiry pool, Lead conversion, Alibaba inquiry simulation, and opportunity management
 - Product catalog with categories, specifications, prices, URL images, and opportunity product lines
@@ -96,13 +97,13 @@ Roles: `Admin` manages all records and users; `Sales` reads and manages only cus
 | Resource | Endpoints |
 | --- | --- |
 | Users | `GET /users`, `POST /users`, `GET /users/{id}` |
-| Customers | `GET /customers?limit=20&offset=0&q=keyword`, `POST /customers`, `GET /customers/{id}`, `GET /customers/{id}/timeline`, `PUT /customers/{id}`, `DELETE /customers/{id}` |
+| Customers | `GET /customers?limit=20&offset=0&q=keyword`, `POST /customers`, `GET /customers/{id}`, `GET /customers/{id}/center`, `GET /customers/{id}/timeline`, `PUT /customers/{id}`, `DELETE /customers/{id}` |
 | Customer classification | `GET /customer-categories`, `POST /customer-categories`, `PUT /customer-categories/{id}`, `GET /customers?category_id={id}&score_min=50&score_max=100` |
 | Leads | `GET /leads`, `POST /leads`, `GET /leads/{id}`, `POST /leads/{id}/convert` |
 | Opportunities | `GET /opportunities`, `POST /opportunities`, `GET /opportunities/{id}`, `PUT /opportunities/{id}`, `PUT /opportunities/{id}/products` |
 | Product categories | `GET /product-categories`, `POST /product-categories`, `PUT /product-categories/{id}` |
 | Products | `GET /products`, `POST /products`, `GET /products/{id}`, `PUT /products/{id}` |
-| Quotations | `GET /quotations`, `POST /quotations`, `GET /quotations/{id}`, `PUT /quotations/{id}`, `POST /quotations/{id}/versions`, `POST /quotations/{id}/pdf`, `GET /quotations/{id}/pdf`, `POST /quotations/{id}/send` |
+| Quotations | `GET /quotations?customer_id={id}`, `POST /quotations`, `GET /quotations/{id}`, `PUT /quotations/{id}`, `POST /quotations/{id}/versions`, `POST /quotations/{id}/pdf`, `GET /quotations/{id}/pdf`, `POST /quotations/{id}/send` |
 | Alibaba integration | `GET /integrations/alibaba/status`, `POST /integrations/alibaba/inquiries` |
 | Contacts | `POST /contacts`, `GET /contacts/{id}`, `PUT /contacts/{id}` |
 | Follow-ups | `POST /followups`, `GET /followups?customer_id={id}`, `PUT /followups/{id}`, `DELETE /followups/{id}`, `POST /followups/{id}/attachments`, `GET /followups/{id}/attachments/{attachment_id}`, `DELETE /followups/{id}/attachments/{attachment_id}` |
@@ -116,6 +117,8 @@ V4 adds configurable customer categories and score-based grading without removin
 V5 expands follow-ups without changing the legacy records or create payload. Each record can optionally link to an opportunity, records a business `followup_date`, supports edit/delete, and can store multiple attachments. Supported channels are `Email`, `WhatsApp`, `Alibaba`, `Phone`, and `Meeting`. `next_followup_date` still drives reminders: the latest follow-up for each customer defines its current reminder, so an older planned date is superseded when a newer follow-up is recorded. Dashboard statistics expose `today_followup_count`, `overdue_followup_count`, `week_followup_count`, `today_followups`, and `overdue_followups`, while retaining the existing response fields for compatibility. Reminder lists contain up to ten visible customers per category and respect the current user's customer scope. Attachments accept PDF, image, Office, and TXT files up to 10 MB and are stored outside the database in `FOLLOWUP_ATTACHMENT_DIR` (a persistent Docker volume by default). Interactive API documentation is available at `/api/v1/docs` while the backend is running.
 
 Apply migration `0013_v5_followup_management` with `alembic upgrade head`. It backfills `followup_date` from existing `created_at` values and adds only nullable opportunity links, timestamps, and the new attachment table; it does not remove or rewrite legacy follow-up content.
+
+V6 adds the read-only Customer Center endpoint and page without changing the database schema. `GET /customers/{id}/center` returns the same customer fields as the legacy detail endpoint plus permission-scoped opportunities, quotations, activities, score history, follow-ups, and attachment metadata. The legacy `/customers/{id}`, timeline, opportunity, and quotation endpoints remain unchanged. `GET /quotations` also accepts optional `customer_id` filtering. No new Alembic migration is required for this API/UI-only release.
 
 The Lead inquiry pool accepts new inquiries, supports pagination and filtering, and exposes a detail view. `POST /leads/{id}/convert` atomically creates a customer, its primary contact, and a base opportunity, then marks the Lead as `Converted`. The unique opportunity-to-Lead link prevents duplicate conversion. Admin and Sales users may create and convert Leads; Viewer users retain read-only access.
 

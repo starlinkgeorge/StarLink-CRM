@@ -15,7 +15,13 @@ from app.schemas.customer import (
     CustomerUpdate,
 )
 from app.schemas.customer_activity import CustomerActivityRead
-from app.services import access_service, customer_activity_service, customer_service
+from app.schemas.customer_center import CustomerCenter
+from app.services import (
+    access_service,
+    customer_activity_service,
+    customer_center_service,
+    customer_service,
+)
 from app.services.errors import ConflictError, ForbiddenError, NotFoundError
 
 router = APIRouter(prefix="/customers", tags=["customers"])
@@ -95,6 +101,20 @@ def create_customer(
 ) -> CustomerRead:
     try:
         return customer_service.create_customer(session, payload, current_user)
+    except NotFoundError as error:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+    except ForbiddenError as error:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(error)) from error
+
+
+@router.get("/{customer_id}/center", response_model=CustomerCenter)
+def get_customer_center(
+    customer_id: int,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> CustomerCenter:
+    try:
+        return customer_center_service.get_customer_center(session, customer_id, current_user)
     except NotFoundError as error:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
     except ForbiddenError as error:
