@@ -2,7 +2,7 @@ import enum
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, String, Table
+from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, String, Table, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -45,6 +45,8 @@ class Customer(TimestampMixin, Base):
     website: Mapped[Optional[str]] = mapped_column(String(255))
     customer_type: Mapped[Optional[str]] = mapped_column(String(80))
     source: Mapped[Optional[str]] = mapped_column(String(80), index=True)
+    source_platform: Mapped[Optional[str]] = mapped_column(String(80), index=True)
+    original_inquiry: Mapped[Optional[str]] = mapped_column(Text)
     interested_product: Mapped[Optional[str]] = mapped_column(String(500))
     level: Mapped[CustomerLevel] = mapped_column(
         Enum(

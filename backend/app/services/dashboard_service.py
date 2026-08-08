@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.models.customer import Customer, CustomerStatus
 from app.models.followup import FollowUp
+from app.models.inquiry import Inquiry, InquiryStatus
 from app.models.lead import Opportunity, OpportunitySalesStage
 from app.models.user import User, UserRole
 from app.services.access_service import customer_scope
@@ -41,6 +42,21 @@ def get_dashboard_stats(session: Session, user: User) -> dict:
         .select_from(Customer)
         .where(*filters, func.date(Customer.created_at) == today)
     ) or 0
+    today_inquiry_count = session.scalar(
+        select(func.count())
+        .select_from(Inquiry)
+        .where(func.date(Inquiry.created_at) == today)
+    ) or 0
+    pending_inquiry_count = session.scalar(
+        select(func.count())
+        .select_from(Inquiry)
+        .where(Inquiry.status.in_((InquiryStatus.NEW.value, InquiryStatus.PROCESSING.value)))
+    ) or 0
+    inquiry_source_rows = session.execute(
+        select(Inquiry.source, func.count(Inquiry.id))
+        .group_by(Inquiry.source)
+        .order_by(Inquiry.source.asc())
+    ).all()
     due_followups = session.scalar(
         select(func.count()).select_from(FollowUp).join(Customer).where(
             *filters, FollowUp.next_followup_date.is_not(None), FollowUp.next_followup_date <= today
@@ -120,6 +136,11 @@ def get_dashboard_stats(session: Session, user: User) -> dict:
         "customer_count": customer_count,
         "followup_count": followup_count,
         "new_customers_today": new_customers_today,
+        "today_inquiry_count": today_inquiry_count,
+        "pending_inquiry_count": pending_inquiry_count,
+        "inquiry_source_stats": [
+            {"source": source, "count": count} for source, count in inquiry_source_rows
+        ],
         "due_followups": due_followups,
         "today_followup_count": len(today_reminders),
         "overdue_followup_count": len(overdue_reminders),

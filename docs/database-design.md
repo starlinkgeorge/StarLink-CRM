@@ -1,4 +1,4 @@
-# CRM database design — phase 1
+# StarLink CRM database design – V8
 
 ## Principles
 
@@ -15,10 +15,12 @@ Application users who own customers and record follow-ups: `id`, `name`, unique 
 
 ### `customers`
 
-Companies managed by sales: `id`, `company_name`, `contact_name`, `country`, `email`, `phone`, `whatsapp`, `website`, `customer_type`, `source`, `interested_product`, `level`, `status`, `sales_stage`, `owner_id`, `created_at`, and `updated_at`.
+Companies managed by sales: `id`, `company_name`, `contact_name`, `country`, `email`, `phone`, `whatsapp`, `website`, `customer_type`, `source`, `source_platform`, `original_inquiry`, `interested_product`, `level`, `status`, `sales_stage`, `owner_id`, `created_at`, and `updated_at`.
 
 - `customer_type`: optional business classification such as Kindergarten, School, Distributor, or Retailer.
 - `source`: optional acquisition channel such as Alibaba, Website, Facebook, or LinkedIn.
+- `source_platform`: optional originating marketplace or system, such as Alibaba International. Existing rows are backfilled from `source` where that value is available.
+- `original_inquiry`: optional immutable-at-conversion copy of the source inquiry content; it is nullable so existing customer records remain compatible.
 - `interested_product`: optional free-text summary of the products requested by the customer.
 - `level`: `A`, `B`, or `C` (default `C`).
 - `status`: `Lead`, `Contacted`, `Quotation`, `Negotiation`, `Won`, or `Lost` (default `Lead`).
@@ -44,6 +46,15 @@ Immutable sales-stage audit records: `id`, `customer_id`, nullable `old_status`,
 ### `leads`
 
 Inbound trade inquiries before customer qualification: `id`, UUID `public_id`, `company_name`, `contact_name`, `country`, `email`, `phone`, `whatsapp`, `source`, `inquiry_content`, `interested_product`, `status`, `created_at`, and `updated_at`. Status values are `New`, `Contacted`, `Qualified`, `Converted`, and `Lost`.
+
+### `inquiries`
+
+V8 external marketplace inquiries, independent from the existing `leads` table: `id`, UUID `public_id`, nullable `customer_id`, nullable unique `converted_opportunity_id`, `company_name`, `contact_name`, `country`, `email`, `phone`, `whatsapp`, `source`, `source_platform`, `interested_product`, `inquiry_content`, `status`, `created_at`, and `updated_at`.
+
+- `source` records the acquisition channel (for example `Alibaba`); `source_platform` identifies the external system or marketplace (for example `Alibaba International`). Both are required for new inquiries and default to `Alibaba`.
+- `inquiry_content` preserves the original incoming message. It is required even when an inquiry is entered manually, making the payload suitable for a future Alibaba API adapter.
+- `status` is constrained to `New`, `Processing`, `Converted`, or `Closed`. A closed Inquiry must be reopened before conversion; a converted Inquiry is immutable.
+- Conversion atomically creates one customer, its primary contact, and one opportunity. `converted_opportunity_id` is unique, preventing repeat conversions, while `customer_id` preserves a direct audit link.
 
 ### `opportunities`
 
@@ -105,6 +116,8 @@ customers 1 ──< contacts (deleted with customer)
 customers 1 ──< followups (deleted with customer)
 customers 1 ──< customer_status_history (deleted with customer)
 leads 1 ── 0..1 opportunities (source_lead_id; SET NULL on Lead deletion)
+customers 1 ──< inquiries (customer_id; SET NULL on Customer deletion)
+inquiries 1 ── 0..1 opportunities (converted_opportunity_id; SET NULL on Opportunity deletion)
 customers 1 ──< opportunities (deleted with customer)
 users 1 ──< opportunities (owner_id; SET NULL on user deletion)
 opportunities 1 ──< opportunity_stage_history (deleted with opportunity)

@@ -8,6 +8,7 @@ from app.api import (
     customers,
     dashboard,
     followups,
+    inquiries,
     integrations,
     leads,
     opportunities,
@@ -22,7 +23,7 @@ settings = get_settings()
 
 app = FastAPI(
     title="StarLink CRM API",
-    version="7.0.0",
+    version="8.0.0",
     openapi_url=f"{settings['api_prefix']}/openapi.json",
     docs_url=f"{settings['api_prefix']}/docs",
 )
@@ -43,6 +44,7 @@ app.include_router(customer_categories.router, prefix=settings["api_prefix"])
 app.include_router(tags.router, prefix=settings["api_prefix"])
 app.include_router(contacts.router, prefix=settings["api_prefix"])
 app.include_router(followups.router, prefix=settings["api_prefix"])
+app.include_router(inquiries.router, prefix=settings["api_prefix"])
 app.include_router(leads.router, prefix=settings["api_prefix"])
 app.include_router(integrations.router, prefix=settings["api_prefix"])
 app.include_router(opportunities.router, prefix=settings["api_prefix"])

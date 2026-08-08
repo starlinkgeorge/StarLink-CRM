@@ -1,9 +1,10 @@
 import api from "./api";
-import type { AlibabaInquiryResult, AlibabaIntegrationStatus, Customer, CustomerActivity, CustomerCategory, CustomerCenter, CustomerDetail, CustomerPage, CustomerScoreHistory, DashboardStats, FollowUp, FollowUpAttachment, Lead, LeadConversion, LeadDetail, LeadPage, LeadStatus, OpportunityDetail, OpportunityListItem, OpportunityPage, OpportunityPipeline, OpportunitySalesStage, OpportunityStage, Product, ProductCategory, ProductPage, QuotationDetail, QuotationPage, QuotationStatus, Tag } from "../types";
+import type { AlibabaInquiryResult, AlibabaIntegrationStatus, Customer, CustomerActivity, CustomerCategory, CustomerCenter, CustomerDetail, CustomerPage, CustomerScoreHistory, DashboardStats, FollowUp, FollowUpAttachment, Inquiry, InquiryConversion, InquiryPage, InquiryStatus, Lead, LeadConversion, LeadDetail, LeadPage, LeadStatus, OpportunityDetail, OpportunityListItem, OpportunityPage, OpportunityPipeline, OpportunitySalesStage, OpportunityStage, Product, ProductCategory, ProductPage, QuotationDetail, QuotationPage, QuotationStatus, Tag } from "../types";
 
 export type CustomerCreatePayload = {
   company_name: string; contact_name?: string; country?: string; email?: string; phone?: string;
   whatsapp?: string; website?: string; customer_type?: string; source?: string;
+  source_platform?: string; original_inquiry?: string;
   interested_product?: string; level?: Customer["level"]; status?: Customer["status"];
   sales_stage?: Customer["sales_stage"]; category_id?: number; customer_score?: number;
 };
@@ -58,6 +59,18 @@ export const getLeads = async (params: LeadFilters) => (await api.get<LeadPage>(
 export const getLead = async (id: string) => (await api.get<LeadDetail>(`/leads/${id}`)).data;
 export const createLead = async (data: LeadCreatePayload) => (await api.post<Lead>("/leads", data)).data;
 export const convertLead = async (id: number) => (await api.post<LeadConversion>(`/leads/${id}/convert`)).data;
+
+export type InquiryPayload = {
+  company_name: string; contact_name: string; country?: string; email?: string; phone?: string;
+  whatsapp?: string; source?: string; source_platform?: string; interested_product?: string;
+  inquiry_content: string; status?: InquiryStatus;
+};
+export type InquiryFilters = { limit: number; offset: number; q?: string; status?: string; source?: string; source_platform?: string };
+export const getInquiries = async (params: InquiryFilters) => (await api.get<InquiryPage>("/inquiries", { params })).data;
+export const getInquiry = async (id: string) => (await api.get<Inquiry>(`/inquiries/${id}`)).data;
+export const createInquiry = async (data: InquiryPayload) => (await api.post<Inquiry>("/inquiries", data)).data;
+export const updateInquiry = async (id: number, data: Partial<InquiryPayload>) => (await api.put<Inquiry>(`/inquiries/${id}`, data)).data;
+export const convertInquiry = async (id: number) => (await api.post<InquiryConversion>(`/inquiries/${id}/convert`)).data;
 
 export type AlibabaInquiryPayload = {
   company_name: string; contact_name: string; country?: string; email?: string; phone?: string;

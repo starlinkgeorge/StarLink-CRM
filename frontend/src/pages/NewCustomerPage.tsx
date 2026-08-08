@@ -36,6 +36,8 @@ const initialForm: CustomerCreatePayload = {
   website: "",
   customer_type: "",
   source: "",
+  source_platform: "",
+  original_inquiry: "",
   interested_product: "",
   level: "C",
   sales_stage: "Lead",
@@ -131,10 +133,14 @@ export function NewCustomerPage() {
           </label>
           <label className="text-sm font-medium">
             客户来源
-            <select {...field("source")} className="mt-1 w-full rounded border px-3 py-2">
+           <select {...field("source")} className="mt-1 w-full rounded border px-3 py-2">
               <option value="">请选择</option>
               {sources.map((source) => <option key={source} value={source}>{source}</option>)}
             </select>
+          </label>
+          <label className="text-sm font-medium">
+            来源平台
+            <input {...field("source_platform")} placeholder="例如：Alibaba International" className="mt-1 w-full rounded border px-3 py-2" />
           </label>
           <label className="text-sm font-medium">
             感兴趣产品
@@ -142,6 +148,16 @@ export function NewCustomerPage() {
               {...field("interested_product")}
               placeholder="例如：Montessori shelves"
               className="mt-1 w-full rounded border px-3 py-2"
+            />
+          </label>
+          <label className="text-sm font-medium md:col-span-2">
+            原始询盘内容
+            <textarea
+              value={form.original_inquiry ?? ""}
+              onChange={(event) => setForm({ ...form, original_inquiry: event.target.value })}
+              maxLength={10000}
+              placeholder="可选：保存来自平台或邮件的原始询盘内容"
+              className="mt-1 min-h-24 w-full rounded border px-3 py-2"
             />
           </label>
           <label className="text-sm font-medium">

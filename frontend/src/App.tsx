@@ -5,6 +5,8 @@ import { CustomerDetailPage } from "./pages/CustomerDetailPage";
 import { CustomerClassificationPage } from "./pages/CustomerClassificationPage";
 import { CustomersPage } from "./pages/CustomersPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { InquiryDetailPage } from "./pages/InquiryDetailPage";
+import { InquiriesPage } from "./pages/InquiriesPage";
 import { LeadDetailPage } from "./pages/LeadDetailPage";
 import { LeadsPage } from "./pages/LeadsPage";
 import { LoginPage } from "./pages/LoginPage";
@@ -25,6 +27,7 @@ export function App() {
     <Route element={<ProtectedRoute />}><Route element={<AppLayout />}>
       <Route path="/" element={<DashboardPage />} />
       <Route path="/leads" element={<LeadsPage />} /><Route path="/leads/:id" element={<LeadDetailPage />} />
+      <Route path="/inquiries" element={<InquiriesPage />} /><Route path="/inquiries/:id" element={<InquiryDetailPage />} />
       <Route path="/customers" element={<CustomersPage />} /><Route path="/customers/new" element={<NewCustomerPage />} /><Route path="/customers/:id" element={<CustomerDetailPage />} />
       <Route path="/customer-classification" element={<CustomerClassificationPage />} />
       <Route path="/opportunities" element={<OpportunitiesPage />} /><Route path="/opportunities/:id" element={<OpportunityDetailPage />} />

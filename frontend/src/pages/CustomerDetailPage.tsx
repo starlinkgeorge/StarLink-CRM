@@ -338,6 +338,7 @@ export function CustomerDetailPage() {
             <div><dt className="text-slate-500">等级</dt><dd>{customer.level}</dd></div>
             <div><dt className="text-slate-500">客户类型</dt><dd>{customer.customer_type ?? "—"}</dd></div>
             <div><dt className="text-slate-500">来源</dt><dd>{customer.source ?? "—"}</dd></div>
+            <div><dt className="text-slate-500">来源平台</dt><dd>{customer.source_platform ?? "—"}</dd></div>
             <div><dt className="text-slate-500">感兴趣产品</dt><dd>{customer.interested_product ?? "—"}</dd></div>
             <div><dt className="text-slate-500">邮箱</dt><dd>{customer.email ?? "—"}</dd></div>
             <div><dt className="text-slate-500">电话</dt><dd>{customer.phone ?? "—"}</dd></div>
@@ -349,6 +350,12 @@ export function CustomerDetailPage() {
             <div><dt className="text-slate-500">创建时间</dt><dd>{new Date(customer.created_at).toLocaleString()}</dd></div>
             <div><dt className="text-slate-500">最近更新</dt><dd>{new Date(customer.updated_at).toLocaleString()}</dd></div>
           </dl>
+          {customer.original_inquiry && (
+            <div className="mt-4 rounded-lg bg-slate-50 p-3 text-sm">
+              <p className="font-medium text-slate-700">原始询盘内容</p>
+              <p className="mt-1 whitespace-pre-wrap text-slate-600">{customer.original_inquiry}</p>
+            </div>
+          )}
           {editable && (
             <form onSubmit={saveScore} className="mt-5 rounded-lg bg-slate-50 p-3">
               <p className="text-sm font-semibold">更新客户等级评分</p>

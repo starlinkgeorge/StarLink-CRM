@@ -1,6 +1,7 @@
 export type UserRole = "Admin" | "Sales" | "Viewer";
 
 export type LeadStatus = "New" | "Contacted" | "Qualified" | "Converted" | "Lost";
+export type InquiryStatus = "New" | "Processing" | "Converted" | "Closed";
 export type OpportunityStage = "Lead" | "Qualified" | "Proposal" | "Negotiation" | "Won" | "Lost";
 export type OpportunitySalesStage = "New Lead" | "Contacted" | "Requirement Confirmed" | "Quotation Sent" | "Negotiation" | "Won" | "Lost";
 export interface Lead {
@@ -14,6 +15,15 @@ export interface LeadDetail extends Lead {
   converted_opportunity_id: number | null;
 }
 export interface LeadPage { items: Lead[]; total: number; limit: number; offset: number; }
+export interface Inquiry {
+  id: number; public_id: string; customer_id: number | null; converted_opportunity_id: number | null;
+  company_name: string; contact_name: string; country: string | null; email: string | null;
+  phone: string | null; whatsapp: string | null; source: string; source_platform: string;
+  interested_product: string | null; inquiry_content: string; status: InquiryStatus;
+  created_at: string; updated_at: string;
+}
+export interface InquiryPage { items: Inquiry[]; total: number; limit: number; offset: number; }
+export interface InquiryConversion { inquiry: Inquiry; customer: Customer; contact: Contact; opportunity: Opportunity; }
 export interface Opportunity {
   id: number; public_id: string; customer_id: number; source_lead_id: number | null;
   owner_id: number | null; name: string; interested_product: string | null;
@@ -55,6 +65,7 @@ export interface Customer {
   id: number; company_name: string; contact_name: string | null; country: string | null;
   email: string | null; phone: string | null; whatsapp: string | null; website: string | null;
   customer_type: string | null; source: string | null; interested_product: string | null;
+  source_platform: string | null; original_inquiry: string | null;
   category_id: number | null; category: CustomerCategory | null;
   customer_score: number; score_updated_at: string | null;
   level: "A" | "B" | "C"; status: CustomerStatus; sales_stage: CustomerStatus;
@@ -106,6 +117,8 @@ export interface Tag {
 }
 export interface DashboardStats {
   customer_count: number; followup_count: number; new_customers_today: number; due_followups: number;
+  today_inquiry_count: number; pending_inquiry_count: number;
+  inquiry_source_stats: { source: string; count: number }[];
   today_followup_count: number; overdue_followup_count: number;
   pending_followup_customer_count: number;
   week_followup_count: number;

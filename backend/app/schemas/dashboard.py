@@ -35,10 +35,18 @@ class OpportunityPipelineItem(BaseModel):
     count: int
 
 
+class InquirySourceItem(BaseModel):
+    source: str
+    count: int
+
+
 class DashboardStats(BaseModel):
     customer_count: int
     followup_count: int
     new_customers_today: int
+    today_inquiry_count: int
+    pending_inquiry_count: int
+    inquiry_source_stats: list[InquirySourceItem]
     due_followups: int
     today_followup_count: int
     overdue_followup_count: int
