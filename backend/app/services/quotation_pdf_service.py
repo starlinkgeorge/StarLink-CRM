@@ -364,8 +364,9 @@ def generate_quotation_pdf(
                     ),
                 ],
             ],
-            colWidths=[55 * mm, 42 * mm],
-            hAlign="RIGHT",
+            # Keep the totals block aligned with the 159mm product and terms tables.
+            colWidths=[117 * mm, 42 * mm],
+            hAlign="CENTER",
             style=TableStyle(
                 [
                     ("GRID", (0, 0), (-1, -2), 0.5, colors.HexColor("#C9D4DF")),
