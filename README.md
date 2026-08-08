@@ -80,6 +80,10 @@ Authorization: Bearer <access_token>
 
 `POST /api/v1/auth/refresh` rotates a valid refresh token. Refresh token values are never stored in the database; only SHA-256 token digests are stored.
 
+The frontend API client automatically refreshes an expired access token once and retries the original request. If the
+refresh token is expired or revoked, the session is cleared and the user is returned to the login page instead of
+leaving every page in a failed-loading state.
+
 Create the first administrator only from a trusted local terminal after applying migrations:
 
 ```bash

@@ -382,6 +382,7 @@ def generate_quotation_pdf(
         parent=body,
         fontName="Helvetica-Bold",
         fontSize=10,
+        leftIndent=7.5 * mm,
         textColor=BRAND_BLUE,
     )
     story.append(Paragraph("TERMS AND CONDITIONS", terms_heading))
