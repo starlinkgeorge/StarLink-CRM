@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 
 import {
   createQuotationVersion,
+  downloadQuotationExcel,
   downloadQuotationPdf,
   generateQuotationPdf,
   getProducts,
@@ -274,6 +275,26 @@ export function QuotationDetailPage() {
     }
   }
 
+  async function downloadExcel() {
+    setSaving(true);
+    try {
+      const blob = await downloadQuotationExcel(quotationId, selectedVersionNo);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${quotation?.quotation_number ?? "quotation"}-V${selectedVersionNo}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      setError("");
+    } catch {
+      setError("Excel 下载失败。");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function sendQuotation() {
     setSaving(true);
     try {
@@ -337,6 +358,13 @@ export function QuotationDetailPage() {
               查看 PDF
             </button>
           )}
+          <button
+            disabled={saving}
+            onClick={() => void downloadExcel()}
+            className="rounded border border-emerald-600 px-3 py-2 text-emerald-700"
+          >
+            下载 Excel
+          </button>
           {user?.role !== "Viewer" && (
             <button
               disabled={saving}

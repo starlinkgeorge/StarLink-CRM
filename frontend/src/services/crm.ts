@@ -127,3 +127,4 @@ export const createQuotationVersion = async (id: number) => (await api.post<Quot
 export const generateQuotationPdf = async (id: number, version_no?: number) => (await api.post<QuotationDetail>(`/quotations/${id}/pdf`, undefined, { params: { version_no } })).data;
 export const markQuotationSent = async (id: number) => (await api.post<QuotationDetail>(`/quotations/${id}/send`)).data;
 export const downloadQuotationPdf = async (id: number, version_no?: number) => (await api.get<Blob>(`/quotations/${id}/pdf`, { params: { version_no }, responseType: "blob" })).data;
+export const downloadQuotationExcel = async (id: number, version_no?: number) => (await api.get<Blob>(`/quotations/${id}/excel`, { params: { version_no }, responseType: "blob" })).data;

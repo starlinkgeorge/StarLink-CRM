@@ -26,7 +26,12 @@ from app.schemas.quotation import (
     QuotationVersionRead,
     QuotationVersionSummary,
 )
-from app.services import access_service, opportunity_service, quotation_pdf_service
+from app.services import (
+    access_service,
+    opportunity_service,
+    quotation_excel_service,
+    quotation_pdf_service,
+)
 from app.services.errors import ConflictError, ForbiddenError, NotFoundError
 
 
@@ -369,3 +374,20 @@ def get_pdf_path(
     if path.parent != output_dir or not path.is_file():
         raise NotFoundError("Quotation PDF file not found.")
     return path, f"{quotation.quotation_number}-V{version.version_no}.pdf"
+
+
+def get_excel_bytes(
+    session: Session, quotation_id: int, user: User, version_no: int | None = None
+) -> tuple[bytes, str]:
+    """Export a selected immutable quotation version as an editable workbook."""
+    quotation = _load_quotation(session, quotation_id)
+    _ensure_read_access(user, quotation)
+    version = _version(quotation, version_no)
+    return (
+        quotation_excel_service.generate_quotation_excel(
+            quotation, version, quotation.customer
+        ),
+        quotation_excel_service.quotation_excel_filename(
+            quotation.quotation_number, version.version_no
+        ),
+    )

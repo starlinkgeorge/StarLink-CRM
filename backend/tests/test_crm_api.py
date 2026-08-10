@@ -1,7 +1,9 @@
 from datetime import date, datetime, timedelta
 from decimal import Decimal
+from io import BytesIO
 
 from fastapi.testclient import TestClient
+from openpyxl import load_workbook
 
 
 def create_user(client: TestClient) -> dict:
@@ -1193,6 +1195,20 @@ def test_quotation_versioning_pdf_and_immutable_sent_snapshot(client: TestClient
     assert downloaded.status_code == 200
     assert downloaded.headers["content-type"] == "application/pdf"
     assert downloaded.content.startswith(b"%PDF")
+    downloaded_excel = client.get(
+        f"/api/v1/quotations/{quotation_id}/excel", headers=admin_token
+    )
+    assert downloaded_excel.status_code == 200
+    assert downloaded_excel.headers["content-type"].startswith(
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    workbook = load_workbook(BytesIO(downloaded_excel.content), data_only=False)
+    worksheet = workbook["Quotation"]
+    assert worksheet["A1"].value == "Dalian StarLink International Trade Co., Ltd."
+    assert worksheet["E10"].value == "=C10*D10"
+    assert worksheet["E12"].value == "=SUM(E10:E10)"
+    assert worksheet["E14"].value == "=E12+E13"
+    assert worksheet["C10"].fill.fgColor.rgb == "00FFF2CC"
 
     sent = client.post(
         f"/api/v1/quotations/{quotation_id}/send", headers=admin_token
@@ -1248,6 +1264,9 @@ def test_quotation_versioning_pdf_and_immutable_sent_snapshot(client: TestClient
     assert client.post(
         f"/api/v1/quotations/{quotation_id}/pdf", headers=viewer_token
     ).status_code == 403
+    assert client.get(
+        f"/api/v1/quotations/{quotation_id}/excel", headers=viewer_token
+    ).status_code == 200
     assert client.delete(
         f"/api/v1/customers/{customer.json()['id']}", headers=admin_token
     ).status_code == 409

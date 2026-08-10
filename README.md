@@ -109,7 +109,7 @@ Roles: `Admin` manages all records and users; `Sales` reads and manages only cus
 | Opportunities | `GET /opportunities?deal_stage={stage}`, `GET /opportunities/pipeline` (V7 compatibility), `GET /opportunities/deal-pipeline` (V9), `POST /opportunities`, `GET /opportunities/{id}`, `PUT /opportunities/{id}`, `PUT /opportunities/{id}/products` |
 | Product categories | `GET /product-categories`, `POST /product-categories`, `PUT /product-categories/{id}` |
 | Products | `GET /products`, `POST /products`, `GET /products/{id}`, `PUT /products/{id}` |
-| Quotations | `GET /quotations?customer_id={id}`, `POST /quotations`, `GET /quotations/{id}`, `PUT /quotations/{id}`, `POST /quotations/{id}/versions`, `POST /quotations/{id}/pdf`, `GET /quotations/{id}/pdf`, `POST /quotations/{id}/send` |
+| Quotations | `GET /quotations?customer_id={id}`, `POST /quotations`, `GET /quotations/{id}`, `PUT /quotations/{id}`, `POST /quotations/{id}/versions`, `POST /quotations/{id}/pdf`, `GET /quotations/{id}/pdf`, `GET /quotations/{id}/excel`, `POST /quotations/{id}/send` |
 | Alibaba integration | `GET /integrations/alibaba/status`, `POST /integrations/alibaba/inquiries` |
 | Contacts | `POST /contacts`, `GET /contacts/{id}`, `PUT /contacts/{id}` |
 | Follow-ups | `POST /followups`, `GET /followups?customer_id={id}`, `PUT /followups/{id}`, `DELETE /followups/{id}`, `POST /followups/{id}/attachments`, `GET /followups/{id}/attachments/{attachment_id}`, `DELETE /followups/{id}/attachments/{attachment_id}` |
@@ -210,6 +210,16 @@ Quotation PDF generation resolves URLs under `/product-images/` from the backend
 
 When saving a draft, blank payment terms, delivery time, currency, or shipping cost values are normalized to the configured defaults; product prices and quantities remain strictly validated.
 Quotation draft updates keep nested product inputs as validated Pydantic objects through the service layer, preventing item updates from becoming unhandled 500 errors.
+
+Each quotation version can also be downloaded as an editable Excel workbook
+through `GET /quotations/{id}/excel?version_no={version}` or the **下载 Excel**
+button on the quotation detail page. Excel exports are generated from the
+selected immutable version snapshot and keep the product name/SKU, picture,
+unit-price, quantity, shipping cost, validity, payment terms, and delivery
+time. The editable cells are highlighted in yellow, and line totals, product
+total, and final amount remain Excel formulas so they recalculate after local
+edits. Downloading Excel is read-only and does not change the quotation,
+version, or PDF.
 
 The first-phase Alibaba integration accepts simulated inquiries through an authenticated endpoint. It always sets Lead `source` to `Alibaba` and `status` to `New`, regardless of submitted source data. Existing Leads are returned instead of duplicated when a case-insensitive email match or company-and-contact match is found. The Settings page exposes connection state and a simulation button. No database migration is required for this integration phase; see [docs/alibaba-integration.md](docs/alibaba-integration.md) for the future production-authentication boundary.
 

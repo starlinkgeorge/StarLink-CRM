@@ -1,5 +1,7 @@
+from io import BytesIO
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user
@@ -83,6 +85,31 @@ def download_quotation_pdf(
             session, quotation_id, current_user, version_no
         )
         return FileResponse(path, media_type="application/pdf", filename=download_name)
+    except (NotFoundError, ForbiddenError) as error:
+        _raise_service_error(error)
+
+
+@router.get("/{quotation_id}/excel")
+def download_quotation_excel(
+    quotation_id: int,
+    version_no: int | None = Query(default=None, ge=1),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> StreamingResponse:
+    """Download an editable workbook generated from the selected version snapshot."""
+    try:
+        workbook, download_name = quotation_service.get_excel_bytes(
+            session, quotation_id, current_user, version_no
+        )
+        return StreamingResponse(
+            BytesIO(workbook),
+            media_type=(
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            ),
+            headers={
+                "Content-Disposition": f'attachment; filename="{download_name}"'
+            },
+        )
     except (NotFoundError, ForbiddenError) as error:
         _raise_service_error(error)
 
