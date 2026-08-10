@@ -151,11 +151,28 @@ docker compose up -d --build
 docker compose exec backend python scripts/import_wooden_furniture_catalog.py
 ```
 
+The 2025 **Montessori Materials** catalogue is available through
+`backend/scripts/import_montessori_materials_catalog.py`. It creates 494
+products across Practical Life, Sensorial, Language, Mathematics, Biology,
+Geography, Infant & Toddler, Educational Toys, and Role Play categories. USD
+reference prices, source dimensions, weights, and PDF-extracted product images
+are included. The import is safe to rerun: existing SKUs are preserved and an
+image is added only when that product currently has none.
+
+```bash
+docker compose up -d --build
+docker compose exec backend python scripts/import_montessori_materials_catalog.py
+```
+
 The backend startup runs `scripts/ensure_alembic_version.py` before `alembic upgrade head`. This keeps the Alembic version table able to store long revision IDs such as the V4 migration. The repair migration is `0012_expand_alembic_version`; existing migration files remain unchanged.
 
 The matching catalogue images are stored under `frontend/public/product-images`. After rebuilding the frontend, run `docker compose exec backend python scripts/import_product_images.py` to attach the 45 image URLs to products. The image importer preserves any product that already has an image; set `PRODUCT_IMAGE_BASE_URL` when the frontend is hosted at a different public URL.
 
 Quotations are created from an opportunity and its product lines. Each version stores immutable SKU, product name, picture, unit-price, quantity, and line-total snapshots, so later catalog edits do not alter historical quotations. A Draft version can be edited and regenerated; marking it Sent locks the version. Further changes copy the previous snapshot into V2, V3, and later versions. Generated PDFs use the StarLink company header and the requested `Item Name / Picture / Unit Price / QTY / Total Price` table, followed by product total, door-to-door shipping, amount, validity, payment term, and delivery time. The PDF files are persisted in the Docker `quotation_pdfs` volume and downloaded through an authenticated API endpoint.
+
+When editing a quotation, the product picker supports a server-backed search
+by SKU, product name, or material. Type a search term, choose one result, and
+add it to the draft; products already on the draft are excluded from the list.
 
 Quotation PDF generation resolves URLs under `/product-images/` from the backend's local `PRODUCT_IMAGE_DIR` (default `/app/product-images`) before attempting public HTTP images. The backend Docker image copies the catalog image assets so product pictures remain available inside containers.
 
