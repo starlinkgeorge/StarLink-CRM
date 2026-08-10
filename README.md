@@ -70,6 +70,10 @@ The API health endpoint is available at `http://localhost:8000/api/v1/health`.
 
 Set `DATABASE_URL` to a PostgreSQL connection string, then apply all pending schema migrations:
 
+StarLink CRM normalizes standard Neon `postgresql://` and `postgres://` URLs to
+SQLAlchemy's `postgresql+psycopg://` dialect, so migrations and the API use
+psycopg v3 consistently.
+
 ```bash
 cd backend
 alembic upgrade head

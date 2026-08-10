@@ -44,7 +44,7 @@ the current terminal, then run the migration using the existing backend image:
 
 ```powershell
 $env:DATABASE_URL = 'postgresql+psycopg://<neon-user>:<neon-password>@<neon-host>/<database>?sslmode=require'
-docker compose run --rm --no-deps -e DATABASE_URL=$env:DATABASE_URL backend alembic upgrade head
+docker compose run --rm --no-deps -e DATABASE_URL=$env:DATABASE_URL backend sh -c "python scripts/ensure_alembic_version.py && alembic upgrade head"
 docker compose run --rm --no-deps -e DATABASE_URL=$env:DATABASE_URL backend alembic current
 Remove-Item Env:DATABASE_URL
 ```

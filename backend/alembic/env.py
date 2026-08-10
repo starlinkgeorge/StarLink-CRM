@@ -5,6 +5,7 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from app.db.base import Base
+from app.db.url import normalize_database_url
 import app.models  # noqa: F401
 
 config = context.config
@@ -15,10 +16,7 @@ if config.config_file_name is not None:
 database_url = getenv("DATABASE_URL")
 if not database_url:
     raise RuntimeError("DATABASE_URL must be set before running Alembic migrations.")
-if database_url.startswith("postgresql://"):
-    database_url = database_url.replace("postgresql://", "postgresql+psycopg://", 1)
-elif database_url.startswith("postgres://"):
-    database_url = database_url.replace("postgres://", "postgresql+psycopg://", 1)
+database_url = normalize_database_url(database_url)
 
 config.set_main_option("sqlalchemy.url", database_url)
 target_metadata = Base.metadata
