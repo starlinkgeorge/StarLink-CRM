@@ -144,6 +144,13 @@ The product catalog stores hierarchical categories, SKU, dimensions, material, M
 
 The 2025 solid-wood catalogue can be imported idempotently with `backend/scripts/import_product_catalog.py`. Rebuild the backend image and run `docker compose exec backend python scripts/import_product_catalog.py`; existing SKUs are skipped and new records are assigned to the `Solid Wood Furniture` category.
 
+The 2025 **Wooden Furniture** catalogue is available through `backend/scripts/import_wooden_furniture_catalog.py`. It creates the 85 `K-F-001` through `K-F-085` catalogue products in the `2025 Wooden Furniture` category, including USD reference prices, source dimensions, and the matching PDF-extracted product image. Existing SKUs and product images are preserved, so it is safe to rerun:
+
+```bash
+docker compose up -d --build
+docker compose exec backend python scripts/import_wooden_furniture_catalog.py
+```
+
 The backend startup runs `scripts/ensure_alembic_version.py` before `alembic upgrade head`. This keeps the Alembic version table able to store long revision IDs such as the V4 migration. The repair migration is `0012_expand_alembic_version`; existing migration files remain unchanged.
 
 The matching catalogue images are stored under `frontend/public/product-images`. After rebuilding the frontend, run `docker compose exec backend python scripts/import_product_images.py` to attach the 45 image URLs to products. The image importer preserves any product that already has an image; set `PRODUCT_IMAGE_BASE_URL` when the frontend is hosted at a different public URL.
