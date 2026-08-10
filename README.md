@@ -166,6 +166,23 @@ docker compose up -d --build
 docker compose exec backend python scripts/import_montessori_materials_catalog.py
 ```
 
+The 2025 **Outdoor Playthings** catalogue is available through
+`backend/scripts/import_outdoor_playthings_catalog.py`. It creates 71 outdoor
+products across Sand & Water Play, Nature & Planting, Outdoor Art & Creative,
+Outdoor Living, Outdoor Role Play, Outdoor Traffic, and Outdoor Custom
+Products. It includes the source USD reference prices, dimensions, materials,
+and the matching PDF-extracted product pictures where the catalogue contains a
+product image. The source PDF repeats three model codes; the importer safely
+uses the CRM SKUs `JT-06-UNICYCLE`, `JT-06-SET`, `JT-07-CRANE`,
+`JT-07-SET`, and `G3-BLACKBOARD` for the distinct products while preserving
+the printed model code in the description. Existing SKU records and images are
+preserved, so rerunning the import is safe.
+
+```bash
+docker compose up -d --build
+docker compose exec backend python scripts/import_outdoor_playthings_catalog.py
+```
+
 The backend startup runs `scripts/ensure_alembic_version.py` before `alembic upgrade head`. This keeps the Alembic version table able to store long revision IDs such as the V4 migration. The repair migration is `0012_expand_alembic_version`; existing migration files remain unchanged.
 
 The matching catalogue images are stored under `frontend/public/product-images`. After rebuilding the frontend, run `docker compose exec backend python scripts/import_product_images.py` to attach the 45 image URLs to products. The image importer preserves any product that already has an image; set `PRODUCT_IMAGE_BASE_URL` when the frontend is hosted at a different public URL.
