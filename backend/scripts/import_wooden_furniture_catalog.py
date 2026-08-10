@@ -24,7 +24,7 @@ from app.models.product import Product, ProductCategory, ProductImage
 
 CATEGORY_NAME = "2025 Wooden Furniture"
 IMAGE_BASE_URL = getenv(
-    "PRODUCT_IMAGE_BASE_URL", "http://localhost:5173/product-images"
+    "PRODUCT_IMAGE_BASE_URL", "/product-images"
 ).rstrip("/")
 SOURCE_NOTE = "Imported from the 2025 StarLink Wooden Furniture catalogue."
 

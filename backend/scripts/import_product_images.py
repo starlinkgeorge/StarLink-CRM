@@ -21,7 +21,7 @@ from app.db.session import get_session_factory
 from app.models.product import Product, ProductImage
 
 
-IMAGE_BASE_URL = getenv("PRODUCT_IMAGE_BASE_URL", "http://localhost:5173/product-images").rstrip("/")
+IMAGE_BASE_URL = getenv("PRODUCT_IMAGE_BASE_URL", "/product-images").rstrip("/")
 SKUS = [f"SL-F-{number:03d}" for number in range(1, 46)]
 
 

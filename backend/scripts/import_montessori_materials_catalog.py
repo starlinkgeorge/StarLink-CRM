@@ -37,7 +37,7 @@ CATEGORY_ORDER = (
     "Role Play",
 )
 IMAGE_BASE_URL = getenv(
-    "PRODUCT_IMAGE_BASE_URL", "http://localhost:5173/product-images"
+    "PRODUCT_IMAGE_BASE_URL", "/product-images"
 ).rstrip("/")
 SOURCE_NOTE = "Imported from the 2025 StarLink Montessori Materials catalogue."
 

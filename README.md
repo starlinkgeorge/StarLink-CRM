@@ -37,6 +37,11 @@ AI features and live third-party marketplace credentials remain outside this rel
 
 ## Run locally
 
+For the Vercel + Neon production deployment procedure, environment-variable
+reference, storage behavior, and release smoke test, read
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). Docker Compose remains the supported
+local development environment.
+
 ### Frontend
 
 ```bash

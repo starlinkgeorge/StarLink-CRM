@@ -8,3 +8,7 @@ class ConflictError(Exception):
 
 class ForbiddenError(Exception):
     """Raised when an authenticated user lacks access to a resource."""
+
+
+class StorageConfigurationError(Exception):
+    """Raised when the configured object-storage provider cannot be used."""

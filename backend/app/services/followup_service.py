@@ -1,18 +1,17 @@
-from pathlib import Path
-import re
 from datetime import datetime, timezone
+from pathlib import Path
 from uuid import uuid4
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.config import get_settings
 from app.models.customer import Customer
 from app.models.followup import FollowUp, FollowUpAttachment
 from app.models.lead import Opportunity
 from app.models.user import User
 from app.schemas.followup import FollowUpCreate, FollowUpUpdate
 from app.services.errors import ConflictError, NotFoundError
+from app.services.storage_service import get_attachment_storage
 
 
 MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
@@ -28,12 +27,6 @@ ALLOWED_ATTACHMENT_EXTENSIONS = {
     ".xlsx",
     ".txt",
 }
-
-
-def _attachment_directory() -> Path:
-    directory = Path(get_settings()["followup_attachment_dir"]).resolve()
-    directory.mkdir(parents=True, exist_ok=True)
-    return directory
 
 
 def _validate_opportunity(
@@ -153,7 +146,7 @@ def list_customer_followups(session: Session, customer_id: int) -> list[FollowUp
     return list(session.scalars(statement))
 
 
-def create_attachment(
+async def create_attachment(
     session: Session,
     followup: FollowUp,
     file_name: str,
@@ -168,9 +161,9 @@ def create_attachment(
         raise ConflictError("Attachment must be between 1 byte and 10 MB.")
 
     stored_name = f"{uuid4().hex}{extension}"
-    path = _attachment_directory() / stored_name
+    storage = get_attachment_storage()
     try:
-        path.write_bytes(content)
+        stored_name = await storage.put(stored_name, content, content_type)
         attachment = FollowUpAttachment(
             followup_id=followup.id,
             file_name=safe_name[:255],
@@ -183,7 +176,10 @@ def create_attachment(
         session.refresh(attachment)
         return attachment
     except Exception:
-        path.unlink(missing_ok=True)
+        try:
+            await storage.delete(stored_name)
+        except Exception:
+            pass
         session.rollback()
         raise
 
@@ -200,27 +196,20 @@ def get_attachment(session: Session, followup_id: int, attachment_id: int) -> Fo
     return attachment
 
 
-def attachment_path(attachment: FollowUpAttachment) -> Path:
-    if not re.fullmatch(r"[0-9a-f]{32}\.[a-z0-9]+", attachment.stored_name):
-        raise NotFoundError("Follow-up attachment file is unavailable.")
-    directory = _attachment_directory()
-    path = (directory / attachment.stored_name).resolve()
-    if path.parent != directory or not path.is_file():
-        raise NotFoundError("Follow-up attachment file is unavailable.")
-    return path
+async def attachment_bytes(attachment: FollowUpAttachment) -> bytes:
+    return await get_attachment_storage().get(attachment.stored_name)
 
 
-def delete_attachment(session: Session, attachment: FollowUpAttachment) -> None:
-    path = _attachment_directory() / attachment.stored_name
+async def delete_attachment(session: Session, attachment: FollowUpAttachment) -> None:
+    stored_name = attachment.stored_name
     session.delete(attachment)
     session.commit()
-    path.unlink(missing_ok=True)
+    await get_attachment_storage().delete(stored_name)
 
 
-def delete_followup(session: Session, followup: FollowUp) -> None:
-    attachment_paths = [
-        _attachment_directory() / attachment.stored_name
-        for attachment in followup.attachments
+async def delete_followup(session: Session, followup: FollowUp) -> None:
+    attachment_storage_keys = [
+        attachment.stored_name for attachment in followup.attachments
     ]
     customer_id = followup.customer_id
     opportunity_id = followup.opportunity_id
@@ -229,5 +218,6 @@ def delete_followup(session: Session, followup: FollowUp) -> None:
     _refresh_customer_reminder(session, customer_id)
     _sync_opportunity_followup_activity(session, opportunity_id)
     session.commit()
-    for path in attachment_paths:
-        path.unlink(missing_ok=True)
+    storage = get_attachment_storage()
+    for key in attachment_storage_keys:
+        await storage.delete(key)

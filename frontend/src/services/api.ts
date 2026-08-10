@@ -1,6 +1,8 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios";
 
-const baseURL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api/v1";
+// A relative URL supports same-origin deployments; split frontend/API projects
+// supply their own absolute endpoint through the Vercel environment variable.
+const baseURL = (import.meta.env.VITE_API_BASE_URL || "/api/v1").replace(/\/+$/, "");
 const api = axios.create({ baseURL });
 const refreshClient = axios.create({ baseURL });
 export const AUTH_EXPIRED_EVENT = "starlink.auth.expired";

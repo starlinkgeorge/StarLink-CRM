@@ -1,7 +1,7 @@
 from io import BytesIO
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user
@@ -79,12 +79,16 @@ def download_quotation_pdf(
     version_no: int | None = Query(default=None, ge=1),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
-) -> FileResponse:
+) -> StreamingResponse:
     try:
-        path, download_name = quotation_service.get_pdf_path(
+        content, download_name = quotation_service.get_pdf_bytes(
             session, quotation_id, current_user, version_no
         )
-        return FileResponse(path, media_type="application/pdf", filename=download_name)
+        return StreamingResponse(
+            BytesIO(content),
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{download_name}"'},
+        )
     except (NotFoundError, ForbiddenError) as error:
         _raise_service_error(error)
 

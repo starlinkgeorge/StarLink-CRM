@@ -41,12 +41,13 @@ class _NoRedirect(HTTPRedirectHandler):
 def _fetch_public_image(url: str | None) -> bytes | None:
     if not url:
         return None
-    parsed = urlparse(url)
-    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
-        return None
+    url = _normalise_catalog_image_url(url)
     local_data = _read_catalog_image(url)
     if local_data is not None:
         return local_data
+    parsed = urlparse(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        return None
     try:
         addresses = socket.getaddrinfo(parsed.hostname, parsed.port or 443)
         for address in addresses:
@@ -64,13 +65,26 @@ def _fetch_public_image(url: str | None) -> bytes | None:
         return None
 
 
+def _normalise_catalog_image_url(url: str) -> str:
+    """Point legacy product-image URLs at the configured public catalogue host."""
+    parsed = urlparse(url)
+    if not parsed.path.startswith("/product-images/"):
+        return url
+    configured_base = get_settings()["product_image_base_url"]
+    if not configured_base:
+        return url
+    filename = Path(parsed.path).name
+    if not re.fullmatch(r"[A-Za-z0-9_-]+\.(?:jpe?g|png|webp)", filename, re.IGNORECASE):
+        return url
+    return f"{configured_base}/{filename}"
+
+
 def _read_catalog_image(url: str) -> bytes | None:
     """Read catalogue images copied into the backend image.
 
-    Product records currently store frontend URLs such as
-    ``http://localhost:5173/product-images/SL-F-001.jpg``. A backend container
-    cannot fetch its host's loopback URL, so only the known product-images path
-    is mapped to a local, bounded directory before public URL fetching runs.
+    Older product records can contain a local frontend URL. A backend container
+    cannot fetch its host loopback address, so only the known product-images
+    path is mapped to a local, bounded directory before public URL fetching.
     """
     parsed = urlparse(url)
     if not parsed.path.startswith("/product-images/"):
@@ -156,17 +170,13 @@ def quotation_filename(quotation_number: str, version_no: int) -> str:
     return f"{safe_number}-V{version_no}.pdf"
 
 
-def generate_quotation_pdf(
+def _render_quotation_pdf(
     quotation: Quotation,
     version: QuotationVersion,
     customer: Customer,
-) -> tuple[Path, str]:
+    output: str | BytesIO,
+) -> None:
     settings = get_settings()
-    output_dir = Path(settings["quotation_output_dir"]).resolve()
-    output_dir.mkdir(parents=True, exist_ok=True)
-    filename = quotation_filename(quotation.quotation_number, version.version_no)
-    final_path = output_dir / filename
-    temporary_path = output_dir / f".{filename}.tmp"
 
     styles = getSampleStyleSheet()
     body = ParagraphStyle(
@@ -223,7 +233,7 @@ def generate_quotation_pdf(
     )
 
     document = SimpleDocTemplate(
-        str(temporary_path),
+        output,
         pagesize=A4,
         rightMargin=18 * mm,
         leftMargin=18 * mm,
@@ -406,5 +416,30 @@ def generate_quotation_pdf(
 
     footer = lambda canvas, doc: _footer(canvas, doc, quotation.quotation_number)
     document.build(story, onFirstPage=footer, onLaterPages=footer)
+
+
+def generate_quotation_pdf_bytes(
+    quotation: Quotation,
+    version: QuotationVersion,
+    customer: Customer,
+) -> bytes:
+    """Render a quotation directly to memory for stateless serverless requests."""
+    output = BytesIO()
+    _render_quotation_pdf(quotation, version, customer, output)
+    return output.getvalue()
+
+
+def generate_quotation_pdf(
+    quotation: Quotation,
+    version: QuotationVersion,
+    customer: Customer,
+) -> tuple[Path, str]:
+    """Compatibility writer used by local Docker development and manual export."""
+    output_dir = Path(get_settings()["quotation_output_dir"]).resolve()
+    output_dir.mkdir(parents=True, exist_ok=True)
+    filename = quotation_filename(quotation.quotation_number, version.version_no)
+    final_path = output_dir / filename
+    temporary_path = output_dir / f".{filename}.tmp"
+    _render_quotation_pdf(quotation, version, customer, str(temporary_path))
     temporary_path.replace(final_path)
     return final_path, f"/static/quotations/{filename}"

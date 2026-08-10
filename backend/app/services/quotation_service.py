@@ -1,6 +1,5 @@
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
-from pathlib import Path
 from uuid import uuid4
 
 from sqlalchemy import func, or_, select
@@ -321,7 +320,9 @@ def generate_pdf(
     quotation = _load_quotation(session, quotation_id)
     _ensure_write_access(editor, quotation)
     version = _version(quotation, version_no)
-    quotation_pdf_service.generate_quotation_pdf(
+    # Validate that a PDF can be produced, without persisting it on the
+    # function filesystem. Downloads re-render this immutable version on demand.
+    quotation_pdf_service.generate_quotation_pdf_bytes(
         quotation, version, quotation.customer
     )
     version.pdf_url = (
@@ -338,7 +339,7 @@ def mark_sent(session: Session, quotation_id: int, editor: User) -> QuotationDet
         raise ConflictError("Only a draft quotation can be marked as sent.")
     version = _version(quotation)
     if not version.pdf_url:
-        quotation_pdf_service.generate_quotation_pdf(
+        quotation_pdf_service.generate_quotation_pdf_bytes(
             quotation, version, quotation.customer
         )
         version.pdf_url = (
@@ -358,22 +359,20 @@ def mark_sent(session: Session, quotation_id: int, editor: User) -> QuotationDet
     return _detail(_load_quotation(session, quotation.id))
 
 
-def get_pdf_path(
+def get_pdf_bytes(
     session: Session, quotation_id: int, user: User, version_no: int | None = None
-) -> tuple[Path, str]:
+) -> tuple[bytes, str]:
     quotation = _load_quotation(session, quotation_id)
     _ensure_read_access(user, quotation)
     version = _version(quotation, version_no)
     if not version.pdf_url:
         raise NotFoundError("Generate this quotation version PDF first.")
-    output_dir = Path(get_settings()["quotation_output_dir"]).resolve()
-    filename = quotation_pdf_service.quotation_filename(
-        quotation.quotation_number, version.version_no
+    return (
+        quotation_pdf_service.generate_quotation_pdf_bytes(
+            quotation, version, quotation.customer
+        ),
+        f"{quotation.quotation_number}-V{version.version_no}.pdf",
     )
-    path = (output_dir / filename).resolve()
-    if path.parent != output_dir or not path.is_file():
-        raise NotFoundError("Quotation PDF file not found.")
-    return path, f"{quotation.quotation_number}-V{version.version_no}.pdf"
 
 
 def get_excel_bytes(

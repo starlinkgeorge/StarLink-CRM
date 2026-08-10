@@ -35,7 +35,7 @@ CATEGORY_ORDER = (
     "Outdoor Custom Products",
 )
 IMAGE_BASE_URL = getenv(
-    "PRODUCT_IMAGE_BASE_URL", "http://localhost:5173/product-images"
+    "PRODUCT_IMAGE_BASE_URL", "/product-images"
 ).rstrip("/")
 SOURCE_NOTE = "Imported from the 2025 StarLink Outdoor Playthings catalogue."
 WOOD_MATERIAL = (
