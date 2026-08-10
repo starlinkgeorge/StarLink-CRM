@@ -16,6 +16,7 @@ The current release includes:
 - V8 Alibaba inquiry management with manual entry, search/filtering, source analytics, and atomic Inquiry → Customer + Contact + Opportunity conversion
 - V9 foreign-trade opportunity workflow with six business stages, deal-stage audit history, amount, probability, expected-close-date management, and a customer/contact/product/quotation/follow-up sales workspace
 - V10 customer and opportunity follow-up reminders, including today/overdue/week dashboard summaries, quote follow-up reminders, and inactivity alerts
+- Opportunity list, detail, and both sales Kanban endpoints return the computed reminder state used by the dashboard and work queues
 - Dashboard statistics backed by PostgreSQL, including total follow-ups and upcoming work
 - Lead inquiry pool, Lead conversion, Alibaba inquiry simulation, and opportunity management
 - Product catalog with categories, specifications, prices, URL images, and opportunity product lines

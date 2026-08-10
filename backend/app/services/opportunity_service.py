@@ -145,6 +145,7 @@ def _list_item(opportunity: Opportunity) -> OpportunityListItem:
             **opportunity.__dict__,
             "customer_company": opportunity.customer.company_name,
             "owner_name": opportunity.owner.name if opportunity.owner else None,
+            "reminder_status": opportunity.reminder_status,
         }
     )
     return item
@@ -275,6 +276,7 @@ def get_opportunity_detail(
             **opportunity.__dict__,
             "customer_company": opportunity.customer.company_name,
             "owner_name": opportunity.owner.name if opportunity.owner else None,
+            "reminder_status": opportunity.reminder_status,
             "customer": opportunity.customer,
             "contacts": opportunity.customer.contacts,
             "stage_history": opportunity.stage_history,
