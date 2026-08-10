@@ -170,6 +170,17 @@ export function OpportunityDetailPage() {
         <Link to={`/customers/${opportunity.customer_id}`} className="mt-1 inline-block text-blue-700">
           {opportunity.customer_company}
         </Link>
+        {opportunity.reminder_status !== "None" && (
+          <div className={`mt-3 inline-flex rounded-full px-3 py-1 text-sm font-medium ${
+            opportunity.reminder_status === "Quote Follow-up Due"
+              ? "bg-rose-100 text-rose-700"
+              : "bg-violet-100 text-violet-700"
+          }`}>
+            {opportunity.reminder_status === "Quote Follow-up Due"
+              ? `报价待跟进：${opportunity.quote_followup_due_date ?? "请尽快处理"}`
+              : `长期无活动：最后活动于 ${new Date(opportunity.last_activity_at).toLocaleDateString()}`}
+          </div>
+        )}
       </div>
       {error && <p className="mt-4 text-sm text-rose-600">{error}</p>}
 

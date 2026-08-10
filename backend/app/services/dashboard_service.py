@@ -1,12 +1,12 @@
 from datetime import date, timedelta
 
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.models.customer import Customer, CustomerStatus
 from app.models.followup import FollowUp
 from app.models.inquiry import Inquiry, InquiryStatus
-from app.models.lead import Opportunity, OpportunitySalesStage
+from app.models.lead import Opportunity, OpportunityReminderStatus, OpportunitySalesStage
 from app.models.user import User, UserRole
 from app.services.access_service import customer_scope
 
@@ -72,6 +72,26 @@ def get_dashboard_stats(session: Session, user: User) -> dict:
             func.date(FollowUp.created_at) < week_end,
         )
     ) or 0
+    # V10 planned-task counts use the denormalized current customer reminder.
+    # The V5 week_followup_count above remains a count of records created this
+    # week for backwards-compatible dashboard consumers.
+    today_due_customer_count = session.scalar(
+        select(func.count()).select_from(Customer).where(
+            *filters, Customer.next_followup_date == today
+        )
+    ) or 0
+    overdue_customer_count = session.scalar(
+        select(func.count()).select_from(Customer).where(
+            *filters, Customer.next_followup_date < today
+        )
+    ) or 0
+    week_followup_task_count = session.scalar(
+        select(func.count()).select_from(Customer).where(
+            *filters,
+            Customer.next_followup_date >= week_start,
+            Customer.next_followup_date < week_end,
+        )
+    ) or 0
     pipeline_rows = session.execute(
         select(Customer.status, func.count(Customer.id)).where(*filters).group_by(Customer.status)
     ).all()
@@ -132,6 +152,40 @@ def get_dashboard_stats(session: Session, user: User) -> dict:
         .group_by(Opportunity.currency)
         .order_by(Opportunity.currency.asc())
     ).all()
+    reminder_opportunities = list(
+        session.scalars(
+            select(Opportunity)
+            .where(*opportunity_filters)
+            .options(joinedload(Opportunity.customer))
+            .order_by(
+                Opportunity.quote_followup_due_date.asc().nulls_last(),
+                Opportunity.last_activity_at.asc(),
+                Opportunity.id.asc(),
+            )
+        )
+    )
+    opportunity_reminders = []
+    quote_followup_overdue_count = 0
+    inactive_opportunity_count = 0
+    for opportunity in reminder_opportunities:
+        reminder_status = opportunity.reminder_status
+        if reminder_status is OpportunityReminderStatus.NONE:
+            continue
+        if reminder_status is OpportunityReminderStatus.QUOTE_FOLLOWUP_DUE:
+            quote_followup_overdue_count += 1
+        elif reminder_status is OpportunityReminderStatus.INACTIVE:
+            inactive_opportunity_count += 1
+        opportunity_reminders.append(
+            {
+                "id": opportunity.id,
+                "name": opportunity.name,
+                "customer_id": opportunity.customer_id,
+                "customer_name": opportunity.customer.company_name,
+                "reminder_status": reminder_status,
+                "quote_followup_due_date": opportunity.quote_followup_due_date,
+                "last_activity_at": opportunity.last_activity_at,
+            }
+        )
     return {
         "customer_count": customer_count,
         "followup_count": followup_count,
@@ -146,6 +200,9 @@ def get_dashboard_stats(session: Session, user: User) -> dict:
         "overdue_followup_count": len(overdue_reminders),
         "pending_followup_customer_count": len(current_reminders),
         "week_followup_count": week_followup_count,
+        "today_due_customer_count": today_due_customer_count,
+        "overdue_customer_count": overdue_customer_count,
+        "week_followup_task_count": week_followup_task_count,
         "pipeline": [
             {"status": status.value, "count": counts[status.value]}
             for status in CustomerStatus
@@ -178,4 +235,7 @@ def get_dashboard_stats(session: Session, user: User) -> dict:
             }
             for sales_stage in OpportunitySalesStage
         ],
+        "quote_followup_overdue_count": quote_followup_overdue_count,
+        "inactive_opportunity_count": inactive_opportunity_count,
+        "opportunity_reminders": opportunity_reminders[:10],
     }

@@ -5,6 +5,8 @@ export type InquiryStatus = "New" | "Processing" | "Converted" | "Closed";
 export type OpportunityStage = "Lead" | "Qualified" | "Proposal" | "Negotiation" | "Won" | "Lost";
 export type OpportunitySalesStage = "New Lead" | "Contacted" | "Requirement Confirmed" | "Quotation Sent" | "Negotiation" | "Won" | "Lost";
 export type OpportunityDealStage = "New Inquiry" | "Contacted" | "Quoted" | "Negotiating" | "Won" | "Lost";
+export type OpportunityReminderStatus = "None" | "Quote Follow-up Due" | "Inactive";
+export type CustomerFollowUpReminderStatus = "None" | "Scheduled" | "Today" | "Overdue";
 export interface Lead {
   id: number; public_id: string; company_name: string; contact_name: string;
   country: string | null; email: string | null; phone: string | null; whatsapp: string | null;
@@ -32,6 +34,9 @@ export interface Opportunity {
   expected_close_date: string | null; stage: OpportunityStage;
   sales_stage: OpportunitySalesStage; probability: number; next_action: string | null;
   deal_stage: OpportunityDealStage;
+  last_activity_at: string; last_followup_at: string | null;
+  quotation_sent_at: string | null; quote_followup_due_date: string | null;
+  reminder_status: OpportunityReminderStatus;
   created_at: string; updated_at: string;
 }
 export interface OpportunityListItem extends Opportunity { customer_company: string; owner_name: string | null; }
@@ -80,6 +85,8 @@ export interface Customer {
   source_platform: string | null; original_inquiry: string | null;
   category_id: number | null; category: CustomerCategory | null;
   customer_score: number; score_updated_at: string | null;
+  next_followup_date: string | null; last_followup_at: string | null;
+  followup_reminder_status: CustomerFollowUpReminderStatus;
   level: "A" | "B" | "C"; status: CustomerStatus; sales_stage: CustomerStatus;
   owner_id: number | null;
   created_at: string; updated_at: string;
@@ -134,6 +141,8 @@ export interface DashboardStats {
   today_followup_count: number; overdue_followup_count: number;
   pending_followup_customer_count: number;
   week_followup_count: number;
+  today_due_customer_count: number; overdue_customer_count: number;
+  week_followup_task_count: number;
   pipeline: { status: CustomerStatus; count: number }[];
   upcoming_followups: { id: number; customer_id: number; customer_name: string; type: string; content: string; next_followup_date: string }[];
   today_followups: FollowUpReminder[];
@@ -143,10 +152,17 @@ export interface DashboardStats {
   opportunity_amounts: { currency: string; amount: string }[];
   opportunity_total_amounts: { currency: string; amount: string }[];
   opportunity_pipeline: { sales_stage: OpportunitySalesStage; count: number }[];
+  quote_followup_overdue_count: number; inactive_opportunity_count: number;
+  opportunity_reminders: OpportunityReminder[];
 }
 export interface FollowUpReminder {
   id: number; customer_id: number; customer_name: string; type: string; content: string;
   next_followup_date: string; reminder_status: "today" | "overdue";
+}
+export interface OpportunityReminder {
+  id: number; name: string; customer_id: number; customer_name: string;
+  reminder_status: Exclude<OpportunityReminderStatus, "None">;
+  quote_followup_due_date: string | null; last_activity_at: string;
 }
 
 export interface ProductCategory {

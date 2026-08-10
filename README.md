@@ -2,7 +2,7 @@
 
 StarLink-CRM is the foundation for a long-lived customer relationship management platform for **Dalian StarLink International Trade**, an exporter of Montessori educational products and wooden kindergarten furniture.
 
-## Current release: CRM V9
+## Current release: CRM V10
 
 The current release includes:
 
@@ -15,6 +15,7 @@ The current release includes:
 - V7 sales pipeline with seven Kanban stages, probability, next action, estimated amount, expected close date, and immutable sales-stage history
 - V8 Alibaba inquiry management with manual entry, search/filtering, source analytics, and atomic Inquiry → Customer + Contact + Opportunity conversion
 - V9 foreign-trade opportunity workflow with six business stages, deal-stage audit history, amount, probability, expected-close-date management, and a customer/contact/product/quotation/follow-up sales workspace
+- V10 customer and opportunity follow-up reminders, including today/overdue/week dashboard summaries, quote follow-up reminders, and inactivity alerts
 - Dashboard statistics backed by PostgreSQL, including total follow-ups and upcoming work
 - Lead inquiry pool, Lead conversion, Alibaba inquiry simulation, and opportunity management
 - Product catalog with categories, specifications, prices, URL images, and opportunity product lines
@@ -171,8 +172,15 @@ The matching catalogue images are stored under `frontend/public/product-images`.
 Quotations are created from an opportunity and its product lines. Each version stores immutable SKU, product name, picture, unit-price, quantity, and line-total snapshots, so later catalog edits do not alter historical quotations. A Draft version can be edited and regenerated; marking it Sent locks the version. Further changes copy the previous snapshot into V2, V3, and later versions. Generated PDFs use the StarLink company header and the requested `Item Name / Picture / Unit Price / QTY / Total Price` table, followed by product total, door-to-door shipping, amount, validity, payment term, and delivery time. The PDF files are persisted in the Docker `quotation_pdfs` volume and downloaded through an authenticated API endpoint.
 
 When editing a quotation, the product picker supports a server-backed search
-by SKU, product name, or material. Type a search term, choose one result, and
-add it to the draft; products already on the draft are excluded from the list.
+by SKU, product name, or material. Type a search term and matching products are
+shown directly in the page; click a result to add it to the draft. Products
+already on the draft are excluded from the results.
+
+Apply `0017_v10_sales_followup_reminders` and the additive repair migration
+`0018_repair_v10_opportunity_reminder_schema` on databases that may have a
+stale Alembic stamp. The repair only adds missing V10 reminder columns and
+preserves existing customer, opportunity, inquiry, quotation, and follow-up
+data.
 
 Quotation PDF generation resolves URLs under `/product-images/` from the backend's local `PRODUCT_IMAGE_DIR` (default `/app/product-images`) before attempting public HTTP images. The backend Docker image copies the catalog image assets so product pictures remain available inside containers.
 

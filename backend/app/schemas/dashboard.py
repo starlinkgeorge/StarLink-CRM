@@ -1,10 +1,10 @@
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal
 
 from pydantic import BaseModel
 
-from app.models.lead import OpportunitySalesStage
+from app.models.lead import OpportunityReminderStatus, OpportunitySalesStage
 
 
 class PipelineItem(BaseModel):
@@ -35,6 +35,16 @@ class OpportunityPipelineItem(BaseModel):
     count: int
 
 
+class OpportunityReminder(BaseModel):
+    id: int
+    name: str
+    customer_id: int
+    customer_name: str
+    reminder_status: OpportunityReminderStatus
+    quote_followup_due_date: date | None = None
+    last_activity_at: datetime
+
+
 class InquirySourceItem(BaseModel):
     source: str
     count: int
@@ -52,6 +62,9 @@ class DashboardStats(BaseModel):
     overdue_followup_count: int
     pending_followup_customer_count: int
     week_followup_count: int
+    today_due_customer_count: int
+    overdue_customer_count: int
+    week_followup_task_count: int
     pipeline: list[PipelineItem]
     upcoming_followups: list[UpcomingFollowUp]
     today_followups: list[FollowUpReminder]
@@ -63,3 +76,6 @@ class DashboardStats(BaseModel):
     opportunity_amounts: list[OpportunityAmountItem]
     opportunity_total_amounts: list[OpportunityAmountItem]
     opportunity_pipeline: list[OpportunityPipelineItem]
+    quote_followup_overdue_count: int
+    inactive_opportunity_count: int
+    opportunity_reminders: list[OpportunityReminder]

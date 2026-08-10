@@ -1,8 +1,8 @@
 import enum
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional
 
-from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, String, Table, Text
+from sqlalchemy import Column, Date, DateTime, Enum, ForeignKey, Integer, String, Table, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -22,6 +22,15 @@ class CustomerStatus(str, enum.Enum):
     NEGOTIATION = "Negotiation"
     WON = "Won"
     LOST = "Lost"
+
+
+class CustomerFollowUpReminderStatus(str, enum.Enum):
+    """Computed state of the customer's currently scheduled follow-up."""
+
+    NONE = "None"
+    SCHEDULED = "Scheduled"
+    TODAY = "Today"
+    OVERDUE = "Overdue"
 
 
 CustomerTag = Table(
@@ -87,6 +96,11 @@ class Customer(TimestampMixin, Base):
     )
     customer_score: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     score_updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    # These are denormalized from the latest follow-up.  They make reminder
+    # dashboards inexpensive while the original follow-up history remains the
+    # source of truth.
+    next_followup_date: Mapped[Optional[date]] = mapped_column(Date, index=True)
+    last_followup_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
     owner: Mapped[Optional["User"]] = relationship(back_populates="owned_customers")
     category: Mapped[Optional["CustomerCategory"]] = relationship(back_populates="customers")
@@ -107,6 +121,16 @@ class Customer(TimestampMixin, Base):
         order_by="(FollowUp.followup_date.desc(), FollowUp.created_at.desc(), FollowUp.id.desc())",
     )
     quotations: Mapped[list["Quotation"]] = relationship(back_populates="customer")
+
+    @property
+    def followup_reminder_status(self) -> CustomerFollowUpReminderStatus:
+        if self.next_followup_date is None:
+            return CustomerFollowUpReminderStatus.NONE
+        if self.next_followup_date < date.today():
+            return CustomerFollowUpReminderStatus.OVERDUE
+        if self.next_followup_date == date.today():
+            return CustomerFollowUpReminderStatus.TODAY
+        return CustomerFollowUpReminderStatus.SCHEDULED
 
 
 class Contact(CreatedAtMixin, Base):

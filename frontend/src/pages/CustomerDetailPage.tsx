@@ -139,7 +139,9 @@ export function CustomerDetailPage() {
   }, [load]);
 
   const editable = user?.role !== "Viewer";
-  const currentReminder = customer?.followups[0]?.next_followup_date;
+  // V10 returns the server-calculated current reminder.  It avoids relying on
+  // the page's visible-history ordering and remains correct after edits/deletes.
+  const currentReminder = customer?.next_followup_date;
 
   async function addFollowup(event: FormEvent) {
     event.preventDefault();

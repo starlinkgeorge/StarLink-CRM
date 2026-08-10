@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 from uuid import uuid4
@@ -340,6 +340,15 @@ def mark_sent(session: Session, quotation_id: int, editor: User) -> QuotationDet
             f"/api/v1/quotations/{quotation.id}/pdf?version_no={version.version_no}"
         )
     quotation.status = QuotationStatus.SENT
+    if quotation.opportunity is not None:
+        # A sent quotation creates a short, explicit follow-up task.  It is
+        # cleared only by a later follow-up linked to this opportunity.
+        sent_at = datetime.now(timezone.utc)
+        quotation.opportunity.quotation_sent_at = sent_at
+        quotation.opportunity.last_activity_at = sent_at
+        quotation.opportunity.quote_followup_due_date = (
+            date.today() + timedelta(days=3)
+        )
     session.commit()
     return _detail(_load_quotation(session, quotation.id))
 

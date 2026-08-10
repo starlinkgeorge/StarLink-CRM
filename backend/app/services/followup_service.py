@@ -1,5 +1,6 @@
 from pathlib import Path
 import re
+from datetime import datetime, timezone
 from uuid import uuid4
 
 from sqlalchemy import select
@@ -47,6 +48,50 @@ def _validate_opportunity(
         raise ConflictError("The opportunity does not belong to this customer.")
 
 
+def _refresh_customer_reminder(session: Session, customer_id: int) -> None:
+    """Persist the latest follow-up's reminder on the customer summary row."""
+    customer = session.get(Customer, customer_id)
+    if customer is None:
+        return
+    latest = session.scalar(
+        select(FollowUp)
+        .where(FollowUp.customer_id == customer_id)
+        .order_by(FollowUp.followup_date.desc(), FollowUp.created_at.desc(), FollowUp.id.desc())
+        .limit(1)
+    )
+    customer.next_followup_date = latest.next_followup_date if latest else None
+    customer.last_followup_at = (
+        (latest.updated_at or latest.created_at) if latest else None
+    )
+
+
+def _sync_opportunity_followup_activity(
+    session: Session, opportunity_id: int | None, *, touch_activity: bool = False
+) -> None:
+    """Keep opportunity reminder state in sync without changing follow-up history."""
+    if opportunity_id is None:
+        return
+    opportunity = session.get(Opportunity, opportunity_id)
+    if opportunity is None:
+        return
+    latest = session.scalar(
+        select(FollowUp)
+        .where(FollowUp.opportunity_id == opportunity_id)
+        .order_by(FollowUp.updated_at.desc(), FollowUp.id.desc())
+        .limit(1)
+    )
+    opportunity.last_followup_at = (latest.updated_at or latest.created_at) if latest else None
+    if touch_activity:
+        opportunity.last_activity_at = datetime.now(timezone.utc)
+    if (
+        opportunity.quotation_sent_at is not None
+        and opportunity.last_followup_at is not None
+        and opportunity.last_followup_at >= opportunity.quotation_sent_at
+    ):
+        # A follow-up recorded after sending a quote completes that quote task.
+        opportunity.quote_followup_due_date = None
+
+
 def get_followup(session: Session, followup_id: int) -> FollowUp:
     followup = session.scalar(
         select(FollowUp)
@@ -66,12 +111,18 @@ def create_followup(session: Session, payload: FollowUpCreate) -> FollowUp:
     _validate_opportunity(session, payload.customer_id, payload.opportunity_id)
     followup = FollowUp(**payload.model_dump())
     session.add(followup)
+    session.flush()
+    _refresh_customer_reminder(session, followup.customer_id)
+    _sync_opportunity_followup_activity(
+        session, followup.opportunity_id, touch_activity=True
+    )
     session.commit()
     return get_followup(session, followup.id)
 
 
 def update_followup(session: Session, followup_id: int, payload: FollowUpUpdate) -> FollowUp:
     followup = get_followup(session, followup_id)
+    previous_opportunity_id = followup.opportunity_id
     changes = payload.model_dump(exclude_unset=True)
     for required_field in ("type", "followup_date", "content"):
         if required_field in changes and changes[required_field] is None:
@@ -80,6 +131,12 @@ def update_followup(session: Session, followup_id: int, payload: FollowUpUpdate)
         _validate_opportunity(session, followup.customer_id, changes["opportunity_id"])
     for field, value in changes.items():
         setattr(followup, field, value)
+    session.flush()
+    _refresh_customer_reminder(session, followup.customer_id)
+    _sync_opportunity_followup_activity(session, previous_opportunity_id)
+    _sync_opportunity_followup_activity(
+        session, followup.opportunity_id, touch_activity=bool(changes)
+    )
     session.commit()
     return get_followup(session, followup.id)
 
@@ -165,7 +222,12 @@ def delete_followup(session: Session, followup: FollowUp) -> None:
         _attachment_directory() / attachment.stored_name
         for attachment in followup.attachments
     ]
+    customer_id = followup.customer_id
+    opportunity_id = followup.opportunity_id
     session.delete(followup)
+    session.flush()
+    _refresh_customer_reminder(session, customer_id)
+    _sync_opportunity_followup_activity(session, opportunity_id)
     session.commit()
     for path in attachment_paths:
         path.unlink(missing_ok=True)

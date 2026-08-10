@@ -23,7 +23,7 @@ settings = get_settings()
 
 app = FastAPI(
     title="StarLink CRM API",
-    version="9.0.0",
+    version="10.0.0",
     openapi_url=f"{settings['api_prefix']}/openapi.json",
     docs_url=f"{settings['api_prefix']}/docs",
 )

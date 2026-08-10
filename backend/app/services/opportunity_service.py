@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
@@ -414,6 +416,8 @@ def update_opportunity(
         )
     for field, value in changes.items():
         setattr(opportunity, field, value)
+    if changes:
+        opportunity.last_activity_at = datetime.now(timezone.utc)
     session.commit()
     return get_opportunity_detail(session, opportunity.id, editor)
 
@@ -514,5 +518,6 @@ def replace_opportunity_products(
         )
         for item in payload.items
     )
+    opportunity.last_activity_at = datetime.now(timezone.utc)
     session.commit()
     return get_opportunity_detail(session, opportunity.id, editor)

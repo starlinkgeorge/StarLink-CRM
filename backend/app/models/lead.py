@@ -1,5 +1,5 @@
 import enum
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Optional
 from uuid import UUID, uuid4
@@ -61,6 +61,18 @@ class OpportunityDealStage(str, enum.Enum):
     NEGOTIATING = "Negotiating"
     WON = "Won"
     LOST = "Lost"
+
+
+class OpportunityReminderStatus(str, enum.Enum):
+    """Computed reminder state for an open opportunity."""
+
+    NONE = "None"
+    QUOTE_FOLLOWUP_DUE = "Quote Follow-up Due"
+    INACTIVE = "Inactive"
+
+
+QUOTE_FOLLOWUP_DAYS = 3
+INACTIVITY_DAYS = 14
 
 
 class Lead(TimestampMixin, Base):
@@ -141,6 +153,12 @@ class Opportunity(TimestampMixin, Base):
     )
     probability: Mapped[int] = mapped_column(Integer, nullable=False, default=10)
     next_action: Mapped[Optional[str]] = mapped_column(String(500))
+    last_activity_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), index=True
+    )
+    last_followup_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    quotation_sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    quote_followup_due_date: Mapped[Optional[date]] = mapped_column(Date, index=True)
     stage: Mapped[OpportunityStage] = mapped_column(
         Enum(
             OpportunityStage,
@@ -185,6 +203,33 @@ class Opportunity(TimestampMixin, Base):
         back_populates="opportunity", cascade="all, delete-orphan", passive_deletes=True
     )
     quotations: Mapped[list["Quotation"]] = relationship(back_populates="opportunity")
+
+    @property
+    def reminder_status(self) -> OpportunityReminderStatus:
+        if self.deal_stage in (
+            OpportunityDealStage.WON,
+            OpportunityDealStage.LOST,
+            OpportunityDealStage.WON.value,
+            OpportunityDealStage.LOST.value,
+        ):
+            return OpportunityReminderStatus.NONE
+        today = date.today()
+        has_followed_up_after_quote = (
+            self.quotation_sent_at is not None
+            and self.last_followup_at is not None
+            and self.last_followup_at >= self.quotation_sent_at
+        )
+        if (
+            self.quote_followup_due_date is not None
+            and self.quote_followup_due_date <= today
+            and not has_followed_up_after_quote
+        ):
+            return OpportunityReminderStatus.QUOTE_FOLLOWUP_DUE
+        if self.last_activity_at is not None and self.last_activity_at.date() <= (
+            today - timedelta(days=INACTIVITY_DAYS)
+        ):
+            return OpportunityReminderStatus.INACTIVE
+        return OpportunityReminderStatus.NONE
 
 
 class OpportunityStageHistory(Base):

@@ -1,9 +1,9 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.customer import CustomerLevel, CustomerStatus
+from app.models.customer import CustomerFollowUpReminderStatus, CustomerLevel, CustomerStatus
 from app.schemas.contact import ContactRead
 from app.schemas.followup import FollowUpRead
 
@@ -73,6 +73,9 @@ class CustomerRead(CustomerFields):
     id: int
     customer_score: int
     score_updated_at: Optional[datetime] = None
+    next_followup_date: Optional[date] = None
+    last_followup_at: Optional[datetime] = None
+    followup_reminder_status: CustomerFollowUpReminderStatus = CustomerFollowUpReminderStatus.NONE
     category: Optional["CustomerCategoryRead"] = None
     created_at: datetime
     updated_at: datetime

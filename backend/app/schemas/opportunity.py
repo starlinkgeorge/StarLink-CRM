@@ -4,7 +4,12 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.models.lead import OpportunityDealStage, OpportunitySalesStage, OpportunityStage
+from app.models.lead import (
+    OpportunityDealStage,
+    OpportunityReminderStatus,
+    OpportunitySalesStage,
+    OpportunityStage,
+)
 from app.schemas.contact import ContactRead
 from app.schemas.customer import CustomerRead
 from app.schemas.followup import FollowUpRead
@@ -76,6 +81,11 @@ class OpportunityRead(BaseModel):
     deal_stage: OpportunityDealStage
     probability: int
     next_action: str | None
+    last_activity_at: datetime
+    last_followup_at: datetime | None
+    quotation_sent_at: datetime | None
+    quote_followup_due_date: date | None
+    reminder_status: OpportunityReminderStatus
     created_at: datetime
     updated_at: datetime
 
