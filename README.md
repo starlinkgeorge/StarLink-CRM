@@ -176,6 +176,9 @@ When editing a quotation, the product picker supports a server-backed search
 by SKU, product name, or material. Type a search term and matching products are
 shown directly in the page; click a result to add it to the draft. Products
 already on the draft are excluded from the results.
+The quotation editor keeps the search control on the left and a fixed-height,
+independently scrollable result pane on the right, so searching or adding a
+product does not move the quotation table.
 
 Apply `0017_v10_sales_followup_reminders` and the additive repair migration
 `0018_repair_v10_opportunity_reminder_schema` on databases that may have a

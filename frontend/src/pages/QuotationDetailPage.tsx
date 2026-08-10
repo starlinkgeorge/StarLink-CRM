@@ -166,7 +166,6 @@ export function QuotationDetailPage() {
         line_total: price,
       },
     ]);
-    setCatalogSearch("");
   }
 
   async function saveDraft() {
@@ -351,105 +350,103 @@ export function QuotationDetailPage() {
         </header>
 
         <div className="p-6">
-          <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+          <div className="mb-4">
             <h3 className="font-bold">报价明细</h3>
             {editable && (
-              <div className="flex flex-wrap items-end gap-2">
-                <label className="grid gap-1 text-xs font-medium text-slate-600">
-                  搜索产品
-                  <input
-                    value={catalogSearch}
-                    onChange={(event) => setCatalogSearch(event.target.value)}
-                    placeholder="输入 SKU、产品名称或材质"
-                    className="w-64 rounded border px-3 py-2 text-sm"
-                  />
-                </label>
-                <label className="hidden">
-                  选择产品
-                  <select
-                    value=""
-                    onChange={() => undefined}
-                    className="hidden"
-                    disabled
-                  >
-                    <option value="">
-                      {catalogLoading
-                        ? "正在搜索产品…"
-                        : availableProducts.length
-                          ? "从搜索结果中选择"
-                          : "没有匹配的可添加产品"}
-                    </option>
-                    {availableProducts.map((product) => (
-                      <option key={product.id} value={product.id}>
-                        {product.sku} · {product.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <button
-                  type="button"
-                  disabled
-                  onClick={() => undefined}
-                  className="hidden"
-                >
-                  添加
-                </button>
-                <p className="basis-full text-xs text-slate-500">
-                  {catalogSearch.trim()
-                    ? `找到 ${catalogTotal} 个产品`
-                    : "可输入 SKU、产品名称或材质缩小范围。"}
-                </p>
-                {catalogSearch.trim() && !catalogLoading && (
-                  <div className="basis-full grid max-h-72 gap-2 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-2 sm:grid-cols-2">
-                    {availableProducts.map((product) => {
-                      const primaryImage =
-                        product.images.find((image) => image.is_primary) ??
-                        product.images[0];
-                      return (
-                        <button
-                          key={product.id}
-                          type="button"
-                          onClick={() => addProduct(product)}
-                          className="flex min-w-0 items-center gap-3 rounded-md border border-slate-200 bg-white p-2 text-left transition hover:border-blue-500 hover:bg-blue-50"
-                        >
-                          {primaryImage ? (
-                            <img
-                              src={primaryImage.image_url}
-                              alt=""
-                              className="h-12 w-12 shrink-0 rounded object-cover"
-                            />
-                          ) : (
-                            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded bg-slate-100 text-xs text-slate-400">
-                              No image
-                            </span>
-                          )}
-                          <span className="min-w-0 flex-1">
-                            <span className="block truncate text-xs text-slate-500">
-                              {product.sku}
-                            </span>
-                            <span className="block truncate text-sm font-semibold text-slate-800">
-                              {product.name}
-                            </span>
-                            <span className="block text-xs text-slate-600">
-                              {product.currency_code} {product.reference_price ?? "0.00"}
-                            </span>
-                          </span>
-                          <span className="shrink-0 text-sm font-medium text-blue-700">
-                            Add
-                          </span>
-                        </button>
-                      );
-                    })}
-                    {!availableProducts.length && (
-                      <p className="col-span-full p-3 text-center text-sm text-slate-500">
-                        {catalogTotal
-                          ? "All matching products are already in this quotation."
-                          : "No matching active products found."}
-                      </p>
+              <section className="mt-3 grid gap-4 rounded-lg border border-slate-200 bg-slate-50 p-3 lg:grid-cols-[18rem_minmax(0,1fr)]">
+                <div className="lg:sticky lg:top-4 lg:self-start">
+                  <label className="grid gap-1 text-xs font-medium text-slate-600">
+                    搜索产品
+                    <input
+                      value={catalogSearch}
+                      onChange={(event) => setCatalogSearch(event.target.value)}
+                      placeholder="输入 SKU、产品名称或材质"
+                      className="w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-blue-500 focus:ring-2"
+                    />
+                  </label>
+                  <div className="mt-2 flex min-h-5 items-center justify-between gap-2 text-xs text-slate-500">
+                    <span>
+                      {catalogSearch.trim()
+                        ? catalogLoading
+                          ? "正在搜索产品…"
+                          : `找到 ${catalogTotal} 个产品`
+                        : "输入关键词后，结果会显示在右侧。"}
+                    </span>
+                    {catalogSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setCatalogSearch("")}
+                        className="shrink-0 text-blue-700 hover:underline"
+                      >
+                        清除
+                      </button>
                     )}
                   </div>
-                )}
-              </div>
+                </div>
+
+                <div className="h-72 overflow-y-auto rounded-md border border-slate-200 bg-white p-2">
+                  {!catalogSearch.trim() && (
+                    <p className="flex h-full items-center justify-center text-center text-sm text-slate-500">
+                      输入 SKU、产品名称或材质以搜索产品。
+                    </p>
+                  )}
+                  {catalogSearch.trim() && catalogLoading && (
+                    <p className="flex h-full items-center justify-center text-sm text-slate-500">
+                      正在搜索产品…
+                    </p>
+                  )}
+                  {catalogSearch.trim() && !catalogLoading && (
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {availableProducts.map((product) => {
+                        const primaryImage =
+                          product.images.find((image) => image.is_primary) ??
+                          product.images[0];
+                        return (
+                          <button
+                            key={product.id}
+                            type="button"
+                            onClick={() => addProduct(product)}
+                            className="flex min-w-0 items-center gap-3 rounded-md border border-slate-200 bg-white p-2 text-left transition hover:border-blue-500 hover:bg-blue-50"
+                          >
+                            {primaryImage ? (
+                              <img
+                                src={primaryImage.image_url}
+                                alt=""
+                                className="h-12 w-12 shrink-0 rounded object-cover"
+                              />
+                            ) : (
+                              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded bg-slate-100 text-xs text-slate-400">
+                                No image
+                              </span>
+                            )}
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-xs text-slate-500">
+                                {product.sku}
+                              </span>
+                              <span className="block truncate text-sm font-semibold text-slate-800">
+                                {product.name}
+                              </span>
+                              <span className="block text-xs text-slate-600">
+                                {product.currency_code} {product.reference_price ?? "0.00"}
+                              </span>
+                            </span>
+                            <span className="shrink-0 text-sm font-medium text-blue-700">
+                              添加
+                            </span>
+                          </button>
+                        );
+                      })}
+                      {!availableProducts.length && (
+                        <p className="col-span-full flex h-60 items-center justify-center p-3 text-center text-sm text-slate-500">
+                          {catalogTotal
+                            ? "匹配的产品已全部加入当前报价。"
+                            : "没有匹配的启用产品。"}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </section>
             )}
           </div>
 
