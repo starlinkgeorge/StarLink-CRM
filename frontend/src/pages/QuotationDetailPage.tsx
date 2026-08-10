@@ -24,6 +24,31 @@ type DraftLine = Pick<
   | "line_total"
 >;
 
+const MAX_BATCH_PRODUCT_MODELS = 50;
+
+function parseProductModels(value: string): string[] {
+  return [...new Set(value.trim().split(/[\s,]+/).filter(Boolean))].slice(
+    0,
+    MAX_BATCH_PRODUCT_MODELS,
+  );
+}
+
+function createDraftLine(product: Product): DraftLine {
+  const price = product.reference_price ?? "0";
+  return {
+    product_id: product.id,
+    sku_snapshot: product.sku,
+    product_name_snapshot: product.name,
+    picture_snapshot:
+      product.images.find((image) => image.is_primary)?.image_url ??
+      product.images[0]?.image_url ??
+      null,
+    unit_price: price,
+    quantity: "1",
+    line_total: price,
+  };
+}
+
 export function QuotationDetailPage() {
   const { id } = useParams();
   const { user } = useAuth();
@@ -40,6 +65,10 @@ export function QuotationDetailPage() {
   const [shippingCost, setShippingCost] = useState("0");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const searchModels = useMemo(
+    () => parseProductModels(catalogSearch),
+    [catalogSearch],
+  );
 
   const applyQuotation = useCallback((item: QuotationDetail) => {
     const version = item.selected_version;
@@ -70,19 +99,34 @@ export function QuotationDetailPage() {
 
   useEffect(() => {
     let cancelled = false;
-    const searchTerm = catalogSearch.trim();
+    if (!searchModels.length) {
+      setCatalog([]);
+      setCatalogTotal(0);
+      setCatalogLoading(false);
+      return undefined;
+    }
     const delay = window.setTimeout(() => {
       setCatalogLoading(true);
-      void getProducts({
-        limit: 100,
-        offset: 0,
-        q: searchTerm || undefined,
-        is_active: true,
-      })
-        .then((page) => {
+      void Promise.all(
+        searchModels.map((model) =>
+          getProducts({
+            limit: 20,
+            offset: 0,
+            q: model,
+            is_active: true,
+          }),
+        ),
+      )
+        .then((pages) => {
           if (!cancelled) {
-            setCatalog(page.items);
-            setCatalogTotal(page.total);
+            const productsById = new Map<number, Product>();
+            pages.forEach((page) => {
+              page.items.forEach((product) => productsById.set(product.id, product));
+            });
+            setCatalog([...productsById.values()]);
+            setCatalogTotal(
+              searchModels.length === 1 ? pages[0].total : productsById.size,
+            );
           }
         })
         .catch(() => {
@@ -96,13 +140,13 @@ export function QuotationDetailPage() {
             setCatalogLoading(false);
           }
         });
-    }, searchTerm ? 250 : 0);
+    }, 250);
 
     return () => {
       cancelled = true;
       window.clearTimeout(delay);
     };
-  }, [catalogSearch]);
+  }, [searchModels]);
 
   const availableProducts = useMemo(
     () =>
@@ -147,25 +191,26 @@ export function QuotationDetailPage() {
   }
 
   function addProduct(product: Product) {
-    if (lines.some((line) => line.product_id === product.id)) {
-      return;
-    }
-    const price = product.reference_price ?? "0";
-    setLines([
-      ...lines,
-      {
-        product_id: product.id,
-        sku_snapshot: product.sku,
-        product_name_snapshot: product.name,
-        picture_snapshot:
-          product.images.find((image) => image.is_primary)?.image_url ??
-          product.images[0]?.image_url ??
-          null,
-        unit_price: price,
-        quantity: "1",
-        line_total: price,
-      },
-    ]);
+    setLines((currentLines) => {
+      if (currentLines.some((line) => line.product_id === product.id)) {
+        return currentLines;
+      }
+      return [...currentLines, createDraftLine(product)];
+    });
+  }
+
+  function addAllProducts(products: Product[]) {
+    setLines((currentLines) => {
+      const existingProductIds = new Set(
+        currentLines.map((line) => line.product_id),
+      );
+      const additions = products.filter(
+        (product) => !existingProductIds.has(product.id),
+      );
+      return additions.length
+        ? [...currentLines, ...additions.map(createDraftLine)]
+        : currentLines;
+    });
   }
 
   async function saveDraft() {
@@ -356,11 +401,11 @@ export function QuotationDetailPage() {
               <section className="mt-3 grid gap-4 rounded-lg border border-slate-200 bg-slate-50 p-3 lg:grid-cols-[18rem_minmax(0,1fr)]">
                 <div className="lg:sticky lg:top-4 lg:self-start">
                   <label className="grid gap-1 text-xs font-medium text-slate-600">
-                    搜索产品
+                    搜索产品型号
                     <input
                       value={catalogSearch}
                       onChange={(event) => setCatalogSearch(event.target.value)}
-                      placeholder="输入 SKU、产品名称或材质"
+                      placeholder="输入 SKU；多个型号用空格分隔"
                       className="w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-blue-500 focus:ring-2"
                     />
                   </label>
@@ -369,8 +414,10 @@ export function QuotationDetailPage() {
                       {catalogSearch.trim()
                         ? catalogLoading
                           ? "正在搜索产品…"
-                          : `找到 ${catalogTotal} 个产品`
-                        : "输入关键词后，结果会显示在右侧。"}
+                          : searchModels.length > 1
+                            ? `已识别 ${searchModels.length} 个型号，找到 ${catalogTotal} 个产品`
+                            : `找到 ${catalogTotal} 个产品`
+                        : "可搜索一个产品，或输入多个 SKU（空格分隔）。"}
                     </span>
                     {catalogSearch && (
                       <button
@@ -387,7 +434,7 @@ export function QuotationDetailPage() {
                 <div className="h-72 overflow-y-auto rounded-md border border-slate-200 bg-white p-2">
                   {!catalogSearch.trim() && (
                     <p className="flex h-full items-center justify-center text-center text-sm text-slate-500">
-                      输入 SKU、产品名称或材质以搜索产品。
+                      输入一个产品关键词，或输入多个 SKU（以空格分隔）。
                     </p>
                   )}
                   {catalogSearch.trim() && catalogLoading && (
@@ -396,7 +443,23 @@ export function QuotationDetailPage() {
                     </p>
                   )}
                   {catalogSearch.trim() && !catalogLoading && (
-                    <div className="grid gap-2 sm:grid-cols-2">
+                    <div>
+                      <div className="mb-2 flex items-center justify-between gap-3 border-b border-slate-100 pb-2">
+                        <span className="text-xs text-slate-500">
+                          {availableProducts.length
+                            ? `可添加 ${availableProducts.length} 个产品`
+                            : "没有可添加的产品"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => addAllProducts(availableProducts)}
+                          disabled={!availableProducts.length}
+                          className="rounded border border-blue-600 px-3 py-1 text-xs font-semibold text-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          一次添加全部
+                        </button>
+                      </div>
+                      <div className="grid gap-2 sm:grid-cols-2">
                       {availableProducts.map((product) => {
                         const primaryImage =
                           product.images.find((image) => image.is_primary) ??
@@ -443,6 +506,7 @@ export function QuotationDetailPage() {
                             : "没有匹配的启用产品。"}
                         </p>
                       )}
+                      </div>
                     </div>
                   )}
                 </div>

@@ -179,6 +179,9 @@ already on the draft are excluded from the results.
 The quotation editor keeps the search control on the left and a fixed-height,
 independently scrollable result pane on the right, so searching or adding a
 product does not move the quotation table.
+To add a group of catalogue items, enter up to 50 SKU models separated by
+spaces, commas, or line breaks, then use **Add all results**. Existing quotation
+lines are never duplicated.
 
 Apply `0017_v10_sales_followup_reminders` and the additive repair migration
 `0018_repair_v10_opportunity_reminder_schema` on databases that may have a
