@@ -18,25 +18,25 @@
       }
     },
     {
-      "source": "/api/(.*)",
+      "source": "/api/:path*",
       "destination": {
         "service": "backend"
       }
     },
     {
-      "source": "/assets/(.*)",
+      "source": "/assets/:path*",
       "destination": {
         "service": "frontend"
       }
     },
     {
-      "source": "/product-images/(.*)",
+      "source": "/product-images/:path*",
       "destination": {
         "service": "frontend"
       }
     },
     {
-      "source": "/(.*)",
+      "source": "/:path*",
       "destination": {
         "service": "frontend",
         "path": "/index.html"
