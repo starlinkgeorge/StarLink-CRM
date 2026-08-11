@@ -193,6 +193,20 @@ docker compose up -d --build
 docker compose exec backend python scripts/import_outdoor_playthings_catalog.py
 ```
 
+To attach only the four late-supplied images for `HW-02`, `HW-04`, `YS-04`,
+and `ZZ-04`, use the targeted, idempotent maintenance script instead:
+
+```bash
+docker compose exec backend python scripts/attach_late_outdoor_images.py
+```
+
+For the deployed Neon database, run the same script with the local
+`DATABASE_URL` environment variable that was used for production migrations:
+
+```powershell
+docker compose run --rm --no-deps -e DATABASE_URL=$env:DATABASE_URL backend python scripts/attach_late_outdoor_images.py
+```
+
 The backend startup runs `scripts/ensure_alembic_version.py` before `alembic upgrade head`. This keeps the Alembic version table able to store long revision IDs such as the V4 migration. The repair migration is `0012_expand_alembic_version`; existing migration files remain unchanged.
 
 The matching catalogue images are stored under `frontend/public/product-images`. After rebuilding the frontend, run `docker compose exec backend python scripts/import_product_images.py` to attach the 45 image URLs to products. The image importer preserves any product that already has an image; set `PRODUCT_IMAGE_BASE_URL` when the frontend is hosted at a different public URL.
