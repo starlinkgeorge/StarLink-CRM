@@ -1,7 +1,12 @@
 from pathlib import Path
 
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import mm
+
 from app.config import get_settings
 from app.services.quotation_pdf_service import (
+    QUOTATION_GRID_LEFT_OFFSET,
+    QUOTATION_GRID_WIDTH,
     STARLINK_LOGO_PATH,
     _brand_logo,
     _fetch_public_image,
@@ -16,6 +21,13 @@ def test_quotation_pdf_uses_packaged_starlink_logo() -> None:
 
     assert logo.drawWidth > 0
     assert logo.drawHeight > 0
+
+
+def test_quotation_terms_heading_uses_the_table_grid_offset() -> None:
+    frame_width = A4[0] - (36 * mm) - 12
+    expected_offset = (frame_width - QUOTATION_GRID_WIDTH) / 2
+
+    assert QUOTATION_GRID_LEFT_OFFSET == expected_offset
 
 
 def test_catalog_image_url_reads_from_local_product_image_directory(tmp_path: Path, monkeypatch) -> None:

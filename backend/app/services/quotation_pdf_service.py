@@ -35,6 +35,12 @@ INK = colors.HexColor("#172033")
 BORDER_GREY = colors.HexColor("#D7DEE7")
 STARLINK_LOGO_PATH = Path(__file__).resolve().parents[1] / "assets" / "starlink-logo.png"
 
+# The 159 mm quotation tables are centered inside SimpleDocTemplate's frame.
+# ReportLab reserves 6 pt on each side of that frame, so a title paragraph
+# needs this calculated offset to start on the exact same vertical grid line.
+QUOTATION_GRID_WIDTH = 159 * mm
+QUOTATION_GRID_LEFT_OFFSET = ((A4[0] - (36 * mm) - 12) - QUOTATION_GRID_WIDTH) / 2
+
 
 class _NoRedirect(HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: ANN001
@@ -441,7 +447,7 @@ def _render_quotation_pdf(
             # first column keeps this compact amount block on that same right
             # edge instead of the wider document frame.
             colWidths=[63 * mm, 58 * mm, 38 * mm],
-            hAlign="LEFT",
+            hAlign="CENTER",
             style=TableStyle(
                 [
                     ("BOX", (1, 0), (-1, -1), 0.5, BORDER_GREY),
@@ -461,6 +467,7 @@ def _render_quotation_pdf(
         parent=body,
         fontName="Helvetica-Bold",
         fontSize=10,
+        leftIndent=QUOTATION_GRID_LEFT_OFFSET,
         textColor=BRAND_BLUE,
     )
     story.append(Paragraph("TERMS AND CONDITIONS", terms_heading))
