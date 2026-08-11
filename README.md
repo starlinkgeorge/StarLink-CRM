@@ -184,8 +184,9 @@ and the matching PDF-extracted product pictures where the catalogue contains a
 product image. The source PDF repeats three model codes; the importer safely
 uses the CRM SKUs `JT-06-UNICYCLE`, `JT-06-SET`, `JT-07-CRANE`,
 `JT-07-SET`, and `G3-BLACKBOARD` for the distinct products while preserving
-the printed model code in the description. Existing SKU records and images are
-preserved, so rerunning the import is safe.
+the printed model code in the description. Product pictures supplied after the
+catalogue import are also mapped for `HW-02`, `HW-04`, `YS-04`, and `ZZ-04`.
+Existing SKU records and images are preserved, so rerunning the import is safe.
 
 ```bash
 docker compose up -d --build
