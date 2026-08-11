@@ -118,7 +118,7 @@ Roles: `Admin` manages all records and users; `Sales` reads and manages only cus
 | Resource | Endpoints |
 | --- | --- |
 | Users | `GET /users`, `POST /users`, `GET /users/{id}` |
-| Customers | `GET /customers?limit=20&offset=0&q=keyword`, `POST /customers`, `GET /customers/{id}`, `GET /customers/{id}/center`, `GET /customers/{id}/timeline`, `PUT /customers/{id}`, `DELETE /customers/{id}` |
+| Customers | `GET /customers?limit=20&offset=0&q=keyword`, `POST /customers`, `GET /customers/{id}`, `GET /customers/{id}/center`, `GET /customers/{id}/timeline`, `PUT /customers/{id}`, `DELETE /customers/{id}` (Admin-only list action with confirmation; customers linked to quotations cannot be deleted) |
 | Customer classification | `GET /customer-categories`, `POST /customer-categories`, `PUT /customer-categories/{id}`, `GET /customers?category_id={id}&score_min=50&score_max=100` |
 | Leads | `GET /leads`, `POST /leads`, `GET /leads/{id}`, `POST /leads/{id}/convert` |
 | Inquiries | `GET /inquiries`, `POST /inquiries`, `GET /inquiries/{id}`, `PUT /inquiries/{id}`, `POST /inquiries/{id}/convert` |

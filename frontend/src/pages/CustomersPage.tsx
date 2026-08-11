@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 
 import { StatusBadge } from "../components/StatusBadge";
-import { getCustomerCategories, getCustomers, getTags, type CustomerFilters } from "../services/crm";
+import { deleteCustomer, getCustomerCategories, getCustomers, getTags, type CustomerFilters } from "../services/crm";
 import { useAuth } from "../store/auth";
 import type { CustomerCategory, CustomerPage, Tag } from "../types";
 
@@ -66,6 +66,7 @@ export function CustomersPage() {
   const [active, setActive] = useState<FilterForm>(emptyFilters);
   const [offset, setOffset] = useState(0);
   const [error, setError] = useState("");
+  const [deletingCustomerId, setDeletingCustomerId] = useState<number | null>(null);
 
   useEffect(() => {
     Promise.all([getTags(), getCustomerCategories(true)])
@@ -101,6 +102,35 @@ export function CustomersPage() {
     setActive(emptyFilters);
     setOffset(0);
   };
+
+  async function removeCustomer(customerId: number, companyName: string) {
+    if (!window.confirm(`确定要删除客户“${companyName}”吗？此操作不可恢复。`)) return;
+
+    setDeletingCustomerId(customerId);
+    try {
+      await deleteCustomer(customerId);
+      setError("");
+      const nextOffset = data?.items.length === 1 && offset > 0 ? offset - PAGE_SIZE : offset;
+      if (nextOffset !== offset) setOffset(nextOffset);
+      else {
+        const { tag_id: tagId, category_id: categoryId, score_min: scoreMin, score_max: scoreMax, ...filterValues } = active;
+        const refreshedData = await getCustomers({
+          limit: PAGE_SIZE,
+          offset: nextOffset,
+          ...filterValues,
+          tag_id: tagId ? Number(tagId) : undefined,
+          category_id: categoryId ? Number(categoryId) : undefined,
+          score_min: scoreMin ? Number(scoreMin) : undefined,
+          score_max: scoreMax ? Number(scoreMax) : undefined,
+        });
+        setData(refreshedData);
+      }
+    } catch {
+      setError("无法删除客户。若该客户已关联报价单等业务记录，请先保留该客户或处理关联记录。");
+    } finally {
+      setDeletingCustomerId(null);
+    }
+  }
 
   return (
     <>
@@ -229,6 +259,7 @@ export function CustomersPage() {
               <th className="px-4 py-3">等级</th>
               <th className="px-4 py-3">评分</th>
               <th className="px-4 py-3">阶段</th>
+              {user?.role === "Admin" && <th className="px-4 py-3">操作</th>}
             </tr>
           </thead>
           <tbody>
@@ -246,6 +277,18 @@ export function CustomersPage() {
                 <td className="px-4 py-3">{customer.level}</td>
                 <td className="px-4 py-3 font-semibold">{customer.customer_score}</td>
                 <td className="px-4 py-3"><StatusBadge status={customer.sales_stage} /></td>
+                {user?.role === "Admin" && (
+                  <td className="px-4 py-3">
+                    <button
+                      type="button"
+                      disabled={deletingCustomerId === customer.id}
+                      onClick={() => void removeCustomer(customer.id, customer.company_name)}
+                      className="text-rose-600 disabled:opacity-50"
+                    >
+                      {deletingCustomerId === customer.id ? "删除中..." : "删除"}
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
             {data?.items.length === 0 && (

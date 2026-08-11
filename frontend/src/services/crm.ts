@@ -27,6 +27,7 @@ export const getCustomerCenter = async (id: string) => (await api.get<CustomerCe
 export const getCustomerTimeline = async (id: string) => (await api.get<CustomerActivity[]>(`/customers/${id}/timeline`)).data;
 export const createCustomer = async (data: CustomerCreatePayload) => (await api.post<Customer>("/customers", data)).data;
 export const updateCustomer = async (id: number, data: Partial<CustomerCreatePayload>) => (await api.put<Customer>(`/customers/${id}`, data)).data;
+export const deleteCustomer = async (id: number) => { await api.delete(`/customers/${id}`); };
 export type FollowUpPayload = {
   customer_id: number; user_id?: number; opportunity_id?: number | null; type: FollowUp["type"];
   followup_date?: string; content: string; next_followup_date?: string | null;
