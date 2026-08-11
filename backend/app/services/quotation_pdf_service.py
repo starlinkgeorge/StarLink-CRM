@@ -425,17 +425,14 @@ def _render_quotation_pdf(
         Table(
             [
                 [
-                    "",
                     Paragraph("Total cost", left),
                     Paragraph(f"{version.currency} {_money(version.subtotal)}", right),
                 ],
                 [
-                    "",
                     Paragraph("Door to door shipping cost", left),
                     Paragraph(f"{version.currency} {_money(version.shipping_cost)}", right),
                 ],
                 [
-                    "",
                     Paragraph("Amount", amount_label),
                     Paragraph(
                         f"<b>{version.currency} {_money(version.total_amount)}</b>",
@@ -443,20 +440,19 @@ def _render_quotation_pdf(
                     ),
                 ],
             ],
-            # The quotation tables use a 159 mm content grid.  The invisible
-            # first column keeps this compact amount block on that same right
-            # edge instead of the wider document frame.
-            colWidths=[63 * mm, 58 * mm, 38 * mm],
+            # Use the same full-width grid as the customer, item, and terms
+            # tables so the three financial rows form part of the quotation.
+            colWidths=[104 * mm, 55 * mm],
             hAlign="CENTER",
             style=TableStyle(
                 [
-                    ("BOX", (1, 0), (-1, -1), 0.5, BORDER_GREY),
-                    ("LINEABOVE", (1, 1), (-1, -1), 0.5, BORDER_GREY),
-                    ("BACKGROUND", (1, -1), (-1, -1), BRAND_BLUE),
-                    ("LEFTPADDING", (1, 0), (-1, -1), 7),
-                    ("RIGHTPADDING", (1, 0), (-1, -1), 7),
-                    ("TOPPADDING", (1, 0), (-1, -1), 5),
-                    ("BOTTOMPADDING", (1, 0), (-1, -1), 5),
+                    ("BOX", (0, 0), (-1, -1), 0.5, BORDER_GREY),
+                    ("LINEABOVE", (0, 1), (-1, -1), 0.5, BORDER_GREY),
+                    ("BACKGROUND", (0, -1), (-1, -1), BRAND_BLUE),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 7),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+                    ("TOPPADDING", (0, 0), (-1, -1), 5),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
                 ]
             ),
         )
