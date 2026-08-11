@@ -30,7 +30,10 @@ from app.models.quotation import Quotation, QuotationItem, QuotationVersion
 
 BRAND_BLUE = colors.HexColor("#153A5B")
 LIGHT_BLUE = colors.HexColor("#EAF1F7")
-TEXT_GREY = colors.HexColor("#4B5563")
+TEXT_GREY = colors.HexColor("#64748B")
+INK = colors.HexColor("#172033")
+BORDER_GREY = colors.HexColor("#D7DEE7")
+STARLINK_LOGO_PATH = Path(__file__).resolve().parents[1] / "assets" / "starlink-logo.png"
 
 
 class _NoRedirect(HTTPRedirectHandler):
@@ -146,6 +149,32 @@ def _picture(url: str | None):
     return drawing
 
 
+def _brand_logo():
+    """Return the packaged StarLink logo, with a graceful print-safe fallback."""
+    width = 52 * mm
+    height = 11.55 * mm
+    if STARLINK_LOGO_PATH.is_file():
+        try:
+            logo = Image(str(STARLINK_LOGO_PATH), width=width, height=height)
+            logo.hAlign = "LEFT"
+            return logo
+        except OSError:
+            pass
+
+    drawing = Drawing(width, height)
+    drawing.add(
+        String(
+            0,
+            2.5 * mm,
+            "STARLINK",
+            fontName="Helvetica-Bold",
+            fontSize=18,
+            fillColor=BRAND_BLUE,
+        )
+    )
+    return drawing
+
+
 def _money(value) -> str:  # Decimal-compatible formatting.
     return f"{value:,.2f}"
 
@@ -185,7 +214,7 @@ def _render_quotation_pdf(
         fontName="Helvetica",
         fontSize=8.5,
         leading=11,
-        textColor=colors.HexColor("#1F2937"),
+        textColor=INK,
     )
     small = ParagraphStyle("StarLinkSmall", parent=body, fontSize=7.5, leading=9)
     left = ParagraphStyle("StarLinkLeft", parent=body, alignment=TA_LEFT)
@@ -194,17 +223,38 @@ def _render_quotation_pdf(
         "StarLinkTitle",
         parent=styles["Title"],
         fontName="Helvetica-Bold",
-        fontSize=20,
-        leading=23,
+        fontSize=19,
+        leading=22,
         alignment=TA_RIGHT,
         textColor=BRAND_BLUE,
     )
     company = ParagraphStyle(
         "StarLinkCompany",
-        parent=styles["Heading1"],
+        parent=body,
         fontName="Helvetica-Bold",
-        fontSize=14,
-        leading=17,
+        fontSize=10.5,
+        leading=13,
+        textColor=BRAND_BLUE,
+    )
+    contact = ParagraphStyle(
+        "StarLinkContact",
+        parent=small,
+        leading=10,
+        textColor=TEXT_GREY,
+    )
+    reference = ParagraphStyle(
+        "StarLinkReference",
+        parent=right,
+        fontSize=8.5,
+        leading=11,
+        textColor=BRAND_BLUE,
+    )
+    section_label = ParagraphStyle(
+        "StarLinkSectionLabel",
+        parent=small,
+        fontName="Helvetica-Bold",
+        fontSize=7.5,
+        leading=9,
         textColor=BRAND_BLUE,
     )
     center_small = ParagraphStyle("StarLinkCenter", parent=small, alignment=TA_CENTER)
@@ -250,8 +300,7 @@ def _render_quotation_pdf(
     contact_text = (
         f"Alibaba Store: {_safe_text(alibaba_store)}<br/>"
         f"Company Website: {_safe_text(company_website)}<br/>"
-        f"Email: {_safe_text(email)}"
-        f"<br/>WhatsApp: {_safe_text(whatsapp)}"
+        f"Email: {_safe_text(email)} &nbsp;|&nbsp; WhatsApp: {_safe_text(whatsapp)}"
     )
     reference_text = (
         f"Quotation No.: <b>{_safe_text(quotation.quotation_number)}</b>"
@@ -262,15 +311,26 @@ def _render_quotation_pdf(
         Table(
             [
                 [
-                    Paragraph("Dalian StarLink International Trade Co., Ltd.", company),
+                    _brand_logo(),
                     Paragraph("QUOTATION", title),
                 ],
-                [Paragraph(contact_text, small), Paragraph(reference_text, right)],
+                [
+                    [
+                        Paragraph("Dalian StarLink International Trade Co., Ltd.", company),
+                        Spacer(1, 1.2 * mm),
+                        Paragraph(contact_text, contact),
+                    ],
+                    Paragraph(reference_text, reference),
+                ],
             ],
             colWidths=[112 * mm, 47 * mm],
             style=TableStyle(
                 [
                     ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("TOPPADDING", (0, 0), (-1, 0), 0),
+                    ("BOTTOMPADDING", (0, 0), (-1, 0), 2),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 0),
                     ("LINEBELOW", (0, 1), (-1, 1), 1.2, BRAND_BLUE),
                     ("BOTTOMPADDING", (0, 1), (-1, 1), 7),
                 ]
@@ -279,7 +339,7 @@ def _render_quotation_pdf(
     )
     story.append(Spacer(1, 6 * mm))
     story.append(Table([
-        [Paragraph("QUOTATION TO", small), Paragraph("CUSTOMER CONTACT", small)],
+        [Paragraph("QUOTATION TO", section_label), Paragraph("CUSTOMER CONTACT", section_label)],
         [
             Paragraph(
                 f"<b>{_safe_text(customer.company_name)}</b>"
@@ -295,8 +355,8 @@ def _render_quotation_pdf(
         ],
     ], colWidths=[79.5 * mm, 79.5 * mm], style=TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), LIGHT_BLUE), ("TEXTCOLOR", (0, 0), (-1, 0), BRAND_BLUE),
-        ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#C9D4DF")),
-        ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#D7DEE7")),
+        ("BOX", (0, 0), (-1, -1), 0.5, BORDER_GREY),
+        ("INNERGRID", (0, 0), (-1, -1), 0.5, BORDER_GREY),
         ("VALIGN", (0, 0), (-1, -1), "TOP"), ("PADDING", (0, 0), (-1, -1), 7),
     ])))
     story.append(Spacer(1, 6 * mm))
@@ -335,7 +395,7 @@ def _render_quotation_pdf(
                 ("ALIGN", (2, 1), (2, -1), "RIGHT"),
                 ("ALIGN", (3, 1), (3, -1), "CENTER"),
                 ("ALIGN", (4, 1), (4, -1), "RIGHT"),
-                ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#C9D4DF")),
+                ("GRID", (0, 0), (-1, -1), 0.5, BORDER_GREY),
                 (
                     "ROWBACKGROUNDS",
                     (0, 1),
@@ -374,14 +434,17 @@ def _render_quotation_pdf(
                     ),
                 ],
             ],
-            # Keep the totals block aligned with the 159mm product and terms tables.
-            colWidths=[117 * mm, 42 * mm],
-            hAlign="CENTER",
+            colWidths=[58 * mm, 38 * mm],
+            hAlign="RIGHT",
             style=TableStyle(
                 [
-                    ("GRID", (0, 0), (-1, -2), 0.5, colors.HexColor("#C9D4DF")),
+                    ("BOX", (0, 0), (-1, -1), 0.5, BORDER_GREY),
+                    ("LINEABOVE", (0, 1), (-1, -1), 0.5, BORDER_GREY),
                     ("BACKGROUND", (0, -1), (-1, -1), BRAND_BLUE),
-                    ("PADDING", (0, 0), (-1, -1), 7),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 7),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+                    ("TOPPADDING", (0, 0), (-1, -1), 5),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
                 ]
             ),
         )
@@ -409,7 +472,7 @@ def _render_quotation_pdf(
         )],
     ], colWidths=[35 * mm, 124 * mm], style=TableStyle([
         ("BACKGROUND", (0, 0), (0, -1), LIGHT_BLUE),
-        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#C9D4DF")),
+        ("GRID", (0, 0), (-1, -1), 0.5, BORDER_GREY),
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
         ("PADDING", (0, 0), (-1, -1), 7),
     ])))
