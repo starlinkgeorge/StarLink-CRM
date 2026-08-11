@@ -277,7 +277,7 @@ COMPANY_EMAIL=starlink_george@foxmail.com
 COMPANY_WHATSAPP=+86 17640412406
 ```
 
-Quotation PDFs show the Alibaba Store and Company Website on separate lines. They use the packaged StarLink wordmark at `backend/app/assets/starlink-logo.png`, with a print-safe text fallback if the asset is unavailable. Product rows use fixed-size, vertically centered pictures, with the product name/SKU hierarchy and numeric columns aligned for business quotation readability; the totals and formal terms section follow the same template. The template before this branded redesign is preserved in Git tag `quotation-template-pre-logo-20260811` for rollback.
+Quotation PDFs show the Alibaba Store and Company Website on separate lines. They use the packaged StarLink wordmark at `backend/app/assets/starlink-logo.png`, with a print-safe text fallback if the asset is unavailable; the visible left edge of the logo is aligned to the company-information grid below it. Product rows use fixed-size, vertically centered pictures, with the product name/SKU hierarchy and numeric columns aligned for business quotation readability; the totals and formal terms section follow the same template. The template before this branded redesign is preserved in Git tag `quotation-template-pre-logo-20260811` for rollback.
 Older `.env` files that stored the two website links as `Alibaba URL&Company URL` are split automatically for backward compatibility; new deployments should use the two explicit variables above.
 
 ### Full local stack with Docker

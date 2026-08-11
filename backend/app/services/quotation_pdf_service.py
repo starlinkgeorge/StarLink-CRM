@@ -34,6 +34,12 @@ TEXT_GREY = colors.HexColor("#64748B")
 INK = colors.HexColor("#172033")
 BORDER_GREY = colors.HexColor("#D7DEE7")
 STARLINK_LOGO_PATH = Path(__file__).resolve().parents[1] / "assets" / "starlink-logo.png"
+# The supplied source image includes a 34 px transparent/white inset before
+# the first coloured pixel (source width: 644 px).  Compensating for that
+# inset at draw time aligns the *visible* wordmark, rather than the image
+# canvas, to the company details below it.  Keeping the original asset intact
+# also avoids changing its use outside this PDF template.
+STARLINK_LOGO_VISIBLE_LEFT_INSET = (34 / 644) * (52 * mm)
 
 # The 159 mm quotation tables are centered inside SimpleDocTemplate's frame.
 # ReportLab reserves 6 pt on each side of that frame, so a title paragraph
@@ -163,6 +169,10 @@ def _brand_logo():
         try:
             logo = Image(str(STARLINK_LOGO_PATH), width=width, height=height)
             logo.hAlign = "LEFT"
+            # ReportLab aligns the image canvas.  Shift its source canvas left
+            # by the known internal border so the coloured STARLINK mark shares
+            # the exact left edge of the company-name paragraph below it.
+            logo._offs_x = -STARLINK_LOGO_VISIBLE_LEFT_INSET
             return logo
         except OSError:
             pass

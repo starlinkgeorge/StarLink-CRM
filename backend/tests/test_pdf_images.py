@@ -8,6 +8,7 @@ from app.services.quotation_pdf_service import (
     QUOTATION_GRID_LEFT_OFFSET,
     QUOTATION_GRID_WIDTH,
     STARLINK_LOGO_PATH,
+    STARLINK_LOGO_VISIBLE_LEFT_INSET,
     _brand_logo,
     _fetch_public_image,
 )
@@ -21,6 +22,9 @@ def test_quotation_pdf_uses_packaged_starlink_logo() -> None:
 
     assert logo.drawWidth > 0
     assert logo.drawHeight > 0
+    # Align the visible logo artwork (not its transparent source-image margin)
+    # with the left edge of the company information below it.
+    assert logo._offs_x == -STARLINK_LOGO_VISIBLE_LEFT_INSET
 
 
 def test_quotation_terms_heading_uses_the_table_grid_offset() -> None:
