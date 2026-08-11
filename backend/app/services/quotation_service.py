@@ -109,7 +109,7 @@ def _detail(quotation: Quotation, version_no: int | None = None) -> QuotationDet
         versions=[_version_summary(version) for version in quotation.versions],
         selected_version=_version_read(_version(quotation, version_no)),
         company_contact={
-            "name": "Dalian StarLink International Trade Co., Ltd.",
+            "name": settings["company_name"],
             "website": settings["company_website"],
             "email": settings["company_email"],
             "whatsapp": settings["company_whatsapp"],
@@ -371,7 +371,7 @@ def get_pdf_bytes(
         quotation_pdf_service.generate_quotation_pdf_bytes(
             quotation, version, quotation.customer
         ),
-        f"{quotation.quotation_number}-V{version.version_no}.pdf",
+        f"{quotation.quotation_number}.pdf",
     )
 
 

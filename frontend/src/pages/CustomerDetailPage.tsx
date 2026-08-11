@@ -440,14 +440,14 @@ export function CustomerDetailPage() {
 
       <section className="mt-5 rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
         <div className="flex items-center justify-between gap-3">
-          <div><h3 className="font-bold">报价</h3><p className="mt-1 text-sm text-slate-500">客户所有报价及其当前版本</p></div>
+          <div><h3 className="font-bold">报价</h3><p className="mt-1 text-sm text-slate-500">客户所有报价及其当前状态</p></div>
           <Link to="/quotations" className="text-sm text-blue-700">查看全部报价</Link>
         </div>
         <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {quotations.map((quotation) => (
             <article key={quotation.id} className="rounded-lg bg-slate-50 p-4">
               <div className="flex items-start justify-between gap-2"><Link to={`/quotations/${quotation.id}`} className="font-semibold text-blue-700">{quotation.quotation_number}</Link><span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs">{quotationStatusText[quotation.status]}</span></div>
-              <p className="mt-2 text-sm">V{quotation.current_version} · {quotation.currency} {Number(quotation.total_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+              <p className="mt-2 text-sm">{quotation.currency} {Number(quotation.total_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
               {quotation.opportunity_id && <Link to={`/opportunities/${quotation.opportunity_id}`} className="mt-2 inline-block text-sm text-blue-700">{quotation.opportunity_name ?? "关联商机"}</Link>}
               <p className="mt-2 text-xs text-slate-500">更新于 {new Date(quotation.updated_at).toLocaleString()}</p>
             </article>

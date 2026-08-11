@@ -185,7 +185,7 @@ export function QuotationDetailPage() {
     try {
       applyQuotation(await getQuotation(id, versionNo));
     } catch {
-      setError("无法加载历史版本。");
+      setError("无法加载历史报价。");
     } finally {
       setSaving(false);
     }
@@ -282,7 +282,7 @@ export function QuotationDetailPage() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `${quotation?.quotation_number ?? "quotation"}-V${selectedVersionNo}.xlsx`;
+      link.download = `${quotation?.quotation_number ?? "quotation"}.xlsx`;
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -313,7 +313,7 @@ export function QuotationDetailPage() {
       applyQuotation(await createQuotationVersion(quotationId));
       setError("");
     } catch {
-      setError("无法创建新版本。");
+      setError("无法创建修订报价。");
     } finally {
       setSaving(false);
     }
@@ -331,7 +331,7 @@ export function QuotationDetailPage() {
             {quotation.quotation_number}
           </p>
           <h2 className="text-3xl font-bold">
-            报价 V{selectedVersion.version_no}
+            报价
           </h2>
           <p className="mt-1 text-slate-500">
             {quotation.customer_company} · {quotation.opportunity_name}
@@ -341,11 +341,12 @@ export function QuotationDetailPage() {
           <select
             value={selectedVersion.version_no}
             onChange={(event) => void selectVersion(Number(event.target.value))}
+            aria-label="选择报价记录"
             className="rounded border px-3 py-2"
           >
             {quotation.versions.map((version) => (
               <option key={version.id} value={version.version_no}>
-                V{version.version_no} · {version.currency} {version.total_amount}
+                {new Date(version.created_at).toLocaleDateString()} · {version.currency} {version.total_amount}
               </option>
             ))}
           </select>
@@ -391,7 +392,7 @@ export function QuotationDetailPage() {
                 onClick={() => void reviseQuotation()}
                 className="rounded bg-blue-600 px-3 py-2 font-semibold text-white"
               >
-                创建 V{quotation.current_version + 1}
+                创建修订报价
               </button>
             )}
         </div>
@@ -415,9 +416,7 @@ export function QuotationDetailPage() {
             <div className="text-right">
               <p className="text-2xl font-bold text-[#153A5B]">QUOTATION</p>
               <p className="mt-2 font-mono">{quotation.quotation_number}</p>
-              <p className="text-sm text-slate-500">
-                Version V{selectedVersion.version_no} · {quotation.status}
-              </p>
+              <p className="text-sm text-slate-500">状态：{quotation.status}</p>
             </div>
           </div>
         </header>
@@ -734,7 +733,7 @@ export function QuotationDetailPage() {
               onClick={() => void saveDraft()}
               className="mt-5 rounded bg-slate-900 px-5 py-2 font-semibold text-white disabled:opacity-50"
             >
-              保存草稿 V{quotation.current_version}
+              保存草稿
             </button>
           )}
         </div>

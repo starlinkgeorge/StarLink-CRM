@@ -2,6 +2,13 @@ from functools import lru_cache
 from os import getenv
 
 
+DEFAULT_COMPANY_NAME = "Dalian StarLink International Trade Co., Ltd."
+DEFAULT_COMPANY_ALIBABA_STORE = "https://starlinkforkids.en.alibaba.com"
+DEFAULT_COMPANY_WEBSITE = "https://dlstarlink.com"
+DEFAULT_COMPANY_EMAIL = "starlink_george@foxmail.com"
+DEFAULT_COMPANY_WHATSAPP = "+86 17640412406"
+
+
 def _environment() -> str:
     return getenv("APP_ENV", "development").strip().lower() or "development"
 
@@ -33,10 +40,17 @@ def get_settings() -> dict[str, str]:
         "file_storage_backend": getenv("FILE_STORAGE_BACKEND", "local").strip().lower(),
         "blob_read_write_token": getenv("BLOB_READ_WRITE_TOKEN", ""),
         "product_image_base_url": getenv("PRODUCT_IMAGE_BASE_URL", "").strip().rstrip("/"),
-        "company_alibaba_store": alibaba_store,
-        "company_website": company_website,
-        "company_email": getenv("COMPANY_EMAIL", ""),
-        "company_whatsapp": getenv("COMPANY_WHATSAPP", ""),
+        # Public business contact details have safe defaults so quotation exports
+        # stay customer-ready when a deployment omits optional contact variables.
+        # Deployments may still override any value through their environment.
+        "company_name": getenv("COMPANY_NAME", DEFAULT_COMPANY_NAME).strip()
+        or DEFAULT_COMPANY_NAME,
+        "company_alibaba_store": alibaba_store or DEFAULT_COMPANY_ALIBABA_STORE,
+        "company_website": company_website or DEFAULT_COMPANY_WEBSITE,
+        "company_email": getenv("COMPANY_EMAIL", DEFAULT_COMPANY_EMAIL).strip()
+        or DEFAULT_COMPANY_EMAIL,
+        "company_whatsapp": getenv("COMPANY_WHATSAPP", DEFAULT_COMPANY_WHATSAPP).strip()
+        or DEFAULT_COMPANY_WHATSAPP,
     }
 
 

@@ -20,7 +20,7 @@ The current release includes:
 - Dashboard statistics backed by PostgreSQL, including total follow-ups and upcoming work
 - Lead inquiry pool, Lead conversion, Alibaba inquiry simulation, and opportunity management
 - Product catalog with categories, specifications, prices, URL images, and opportunity product lines
-- Versioned StarLink quotation workflow with product snapshots and PDF generation
+- StarLink quotation workflow with immutable internal snapshots and PDF generation
 - React + TypeScript + Tailwind frontend
 - Python FastAPI + SQLAlchemy backend
 - PostgreSQL service configuration
@@ -218,7 +218,7 @@ The backend startup runs `scripts/ensure_alembic_version.py` before `alembic upg
 
 The matching catalogue images are stored under `frontend/public/product-images`. After rebuilding the frontend, run `docker compose exec backend python scripts/import_product_images.py` to attach the 45 image URLs to products. The image importer preserves any product that already has an image; set `PRODUCT_IMAGE_BASE_URL` when the frontend is hosted at a different public URL.
 
-Quotations are created from an opportunity and its product lines. Each version stores immutable SKU, product name, picture, unit-price, quantity, and line-total snapshots, so later catalog edits do not alter historical quotations. A Draft version can be edited and regenerated; marking it Sent locks the version. Further changes copy the previous snapshot into V2, V3, and later versions. Generated PDFs use the StarLink company header and the requested `Item Name / Picture / Unit Price / QTY / Total Price` table, followed by product total, door-to-door shipping, amount, validity, payment term, and delivery time. The PDF files are persisted in the Docker `quotation_pdfs` volume and downloaded through an authenticated API endpoint.
+Quotations are created from an opportunity and its product lines. Each immutable internal snapshot stores SKU, product name, picture, unit-price, quantity, and line-total data, so later catalog edits do not alter historical quotations. A Draft can be edited and regenerated; marking it Sent locks that snapshot. Further changes create a new immutable snapshot while retaining the previous history. Customer-facing quotation pages, PDF exports, and Excel exports show the quotation number and date without exposing internal revision identifiers. Generated PDFs use the StarLink company header and the requested `Item Name / Picture / Unit Price / QTY / Total Price` table, followed by product total, door-to-door shipping, amount, validity, payment term, and delivery time. The PDF files are persisted in the Docker `quotation_pdfs` volume and downloaded through an authenticated API endpoint.
 
 When editing a quotation, the product picker supports a server-backed search
 by SKU, product name, or material. Type a search term and matching products are
@@ -242,15 +242,15 @@ Quotation PDF generation resolves URLs under `/product-images/` from the backend
 When saving a draft, blank payment terms, delivery time, currency, or shipping cost values are normalized to the configured defaults; product prices and quantities remain strictly validated.
 Quotation draft updates keep nested product inputs as validated Pydantic objects through the service layer, preventing item updates from becoming unhandled 500 errors.
 
-Each quotation version can also be downloaded as an editable Excel workbook
-through `GET /quotations/{id}/excel?version_no={version}` or the **下载 Excel**
-button on the quotation detail page. Excel exports are generated from the
-selected immutable version snapshot and keep the product name/SKU, picture,
+Each quotation can also be downloaded as an editable Excel workbook through
+`GET /quotations/{id}/excel?version_no={version}` or the **下载 Excel** button
+on the quotation detail page. Excel exports are generated from the selected
+immutable snapshot and keep the product name/SKU, picture,
 unit-price, quantity, shipping cost, validity, payment terms, and delivery
 time. The editable cells are highlighted in yellow, and line totals, product
 total, and final amount remain Excel formulas so they recalculate after local
 edits. Downloading Excel is read-only and does not change the quotation,
-version, or PDF.
+stored snapshot, or PDF.
 
 The first-phase Alibaba integration accepts simulated inquiries through an authenticated endpoint. It always sets Lead `source` to `Alibaba` and `status` to `New`, regardless of submitted source data. Existing Leads are returned instead of duplicated when a case-insensitive email match or company-and-contact match is found. The Settings page exposes connection state and a simulation button. No database migration is required for this integration phase; see [docs/alibaba-integration.md](docs/alibaba-integration.md) for the future production-authentication boundary.
 
@@ -263,15 +263,18 @@ pytest
 
 ## Frontend CRM interface
 
-The React frontend includes login, dashboard, Lead inquiry list/detail/creation/conversion, opportunity list/detail/creation/update, product list/detail/creation/editing, quotation list/detail/version/PDF workflows, data-source settings, customer list, customer detail, customer creation, and follow-up creation pages. The product library supports search, category and active-state filters, URL image management, and enable/disable actions. Opportunity details support product lines with quantity and target price and provide the `Create Quotation` action. The Dashboard separates today's reminders from overdue customers and includes scoped opportunity statistics. Set `VITE_API_BASE_URL` in `frontend/.env` if the backend is not running at the local default, then run `npm install` and `npm run dev` from `frontend/`.
+The React frontend includes login, dashboard, Lead inquiry list/detail/creation/conversion, opportunity list/detail/creation/update, product list/detail/creation/editing, quotation list/detail/PDF workflows, data-source settings, customer list, customer detail, customer creation, and follow-up creation pages. The product library supports search, category and active-state filters, URL image management, and enable/disable actions. Opportunity details support product lines with quantity and target price and provide the `Create Quotation` action. The Dashboard separates today's reminders from overdue customers and includes scoped opportunity statistics. Set `VITE_API_BASE_URL` in `frontend/.env` if the backend is not running at the local default, then run `npm install` and `npm run dev` from `frontend/`.
 
-Before generating customer-facing PDFs, set the real company contact values in `.env`:
+Quotation exports read public company details from the centralized backend settings. The
+following defaults are included for StarLink and can be overridden by deployment
+environment variables when necessary:
 
 ```text
-COMPANY_ALIBABA_STORE=https://www.alibaba.com/store/your-store
-COMPANY_WEBSITE=https://your-real-website.example
-COMPANY_EMAIL=sales@your-real-domain.example
-COMPANY_WHATSAPP=+86-your-real-number
+COMPANY_NAME=Dalian StarLink International Trade Co., Ltd.
+COMPANY_ALIBABA_STORE=https://starlinkforkids.en.alibaba.com
+COMPANY_WEBSITE=https://dlstarlink.com
+COMPANY_EMAIL=starlink_george@foxmail.com
+COMPANY_WHATSAPP=+86 17640412406
 ```
 
 Quotation PDFs show the Alibaba Store and Company Website on separate lines. They use the packaged StarLink wordmark at `backend/app/assets/starlink-logo.png`, with a print-safe text fallback if the asset is unavailable. Product rows use fixed-size, vertically centered pictures, with the product name/SKU hierarchy and numeric columns aligned for business quotation readability; the totals and formal terms section follow the same template. The template before this branded redesign is preserved in Git tag `quotation-template-pre-logo-20260811` for rollback.

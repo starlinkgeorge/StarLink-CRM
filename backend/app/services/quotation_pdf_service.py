@@ -189,18 +189,19 @@ def _safe_text(value: str | None, fallback: str = "-") -> str:
     return escape(value.strip()) if value and value.strip() else fallback
 
 
-def _footer(canvas, document, quotation_number: str) -> None:  # noqa: ANN001
+def _footer(canvas, document, company_name: str, quotation_number: str) -> None:  # noqa: ANN001
     canvas.saveState()
     canvas.setStrokeColor(colors.HexColor("#D7DEE7"))
     canvas.line(18 * mm, 14 * mm, A4[0] - 18 * mm, 14 * mm)
     canvas.setFont("Helvetica", 7.5)
     canvas.setFillColor(TEXT_GREY)
-    canvas.drawString(18 * mm, 9 * mm, f"Dalian StarLink International Trade Co., Ltd. | {quotation_number}")
+    canvas.drawString(18 * mm, 9 * mm, f"{company_name} | {quotation_number}")
     canvas.drawRightString(A4[0] - 18 * mm, 9 * mm, f"Page {document.page}")
     canvas.restoreState()
 
 
 def quotation_filename(quotation_number: str, version_no: int) -> str:
+    """Return an internal immutable-snapshot filename for local storage."""
     safe_number = re.sub(r"[^A-Za-z0-9_-]", "_", quotation_number)
     return f"{safe_number}-V{version_no}.pdf"
 
@@ -295,13 +296,13 @@ def _render_quotation_pdf(
         leftMargin=18 * mm,
         topMargin=16 * mm,
         bottomMargin=20 * mm,
-        title=f"Quotation {quotation.quotation_number} V{version.version_no}",
-        author="Dalian StarLink International Trade Co., Ltd.",
+        title=f"Quotation {quotation.quotation_number}",
+        author=settings["company_name"],
     )
-    alibaba_store = settings["company_alibaba_store"] or "Not configured"
-    company_website = settings["company_website"] or "Not configured"
-    email = settings["company_email"] or "Not configured"
-    whatsapp = settings["company_whatsapp"] or "Not configured"
+    alibaba_store = settings["company_alibaba_store"]
+    company_website = settings["company_website"]
+    email = settings["company_email"]
+    whatsapp = settings["company_whatsapp"]
     story = []
     contact_text = (
         f"Alibaba Store: {_safe_text(alibaba_store)}<br/>"
@@ -310,7 +311,6 @@ def _render_quotation_pdf(
     )
     reference_text = (
         f"Quotation No.: <b>{_safe_text(quotation.quotation_number)}</b>"
-        f"<br/>Version: <b>V{version.version_no}</b>"
         f"<br/>Date: {version.created_at:%Y-%m-%d}"
     )
     story.append(
@@ -322,7 +322,7 @@ def _render_quotation_pdf(
                 ],
                 [
                     [
-                        Paragraph("Dalian StarLink International Trade Co., Ltd.", company),
+                        Paragraph(_safe_text(settings["company_name"]), company),
                         Spacer(1, 1.2 * mm),
                         Paragraph(contact_text, contact),
                     ],
@@ -485,8 +485,15 @@ def _render_quotation_pdf(
         ("PADDING", (0, 0), (-1, -1), 7),
     ])))
 
-    footer = lambda canvas, doc: _footer(canvas, doc, quotation.quotation_number)
-    document.build(story, onFirstPage=footer, onLaterPages=footer)
+    document.build(
+        story,
+        onFirstPage=lambda canvas, document: _footer(
+            canvas, document, settings["company_name"], quotation.quotation_number
+        ),
+        onLaterPages=lambda canvas, document: _footer(
+            canvas, document, settings["company_name"], quotation.quotation_number
+        ),
+    )
 
 
 def generate_quotation_pdf_bytes(

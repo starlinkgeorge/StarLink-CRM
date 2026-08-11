@@ -22,10 +22,10 @@ BORDER_GREY = "C9D4DF"
 EDIT_NOTE = "Yellow cells are editable. Amounts recalculate automatically in Excel."
 
 
-def quotation_excel_filename(quotation_number: str, version_no: int) -> str:
+def quotation_excel_filename(quotation_number: str, _version_no: int) -> str:
     """Return a download-safe Excel file name."""
     safe_number = re.sub(r"[^A-Za-z0-9_-]", "_", quotation_number)
-    return f"{safe_number}-V{version_no}.xlsx"
+    return f"{safe_number}.xlsx"
 
 
 def _currency_number_format(currency: str) -> str:
@@ -92,17 +92,17 @@ def generate_quotation_excel(
     right = Alignment(horizontal="right", vertical="center")
 
     sheet.merge_cells("A1:E1")
-    sheet["A1"] = "Dalian StarLink International Trade Co., Ltd."
+    sheet["A1"] = settings["company_name"]
     sheet["A1"].font = Font(bold=True, size=16, color=BRAND_BLUE)
     sheet["A1"].alignment = Alignment(vertical="center")
     sheet.row_dimensions[1].height = 28
 
     sheet.merge_cells("A2:C4")
     sheet["A2"] = (
-        f"Alibaba Store: {settings['company_alibaba_store'] or 'Not configured'}\n"
-        f"Company Website: {settings['company_website'] or 'Not configured'}\n"
-        f"Email: {settings['company_email'] or 'Not configured'}\n"
-        f"WhatsApp: {settings['company_whatsapp'] or 'Not configured'}"
+        f"Alibaba Store: {settings['company_alibaba_store']}\n"
+        f"Company Website: {settings['company_website']}\n"
+        f"Email: {settings['company_email']}\n"
+        f"WhatsApp: {settings['company_whatsapp']}"
     )
     sheet["A2"].alignment = Alignment(vertical="top", wrap_text=True)
     sheet["A2"].font = Font(size=10, color="1F2937")
@@ -111,7 +111,6 @@ def generate_quotation_excel(
     sheet["D2"] = (
         "QUOTATION\n"
         f"Quotation No.: {quotation.quotation_number}\n"
-        f"Version: V{version.version_no}\n"
         f"Date: {version.created_at:%Y-%m-%d}"
     )
     sheet["D2"].alignment = Alignment(horizontal="right", vertical="top", wrap_text=True)

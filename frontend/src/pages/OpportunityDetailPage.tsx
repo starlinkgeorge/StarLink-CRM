@@ -295,7 +295,7 @@ export function OpportunityDetailPage() {
             {opportunity.quotations.map((quotation) => (
               <Link key={quotation.id} to={`/quotations/${quotation.id}`} className="block rounded-lg bg-slate-50 p-3 hover:ring-1 hover:ring-blue-300">
                 <div className="flex flex-wrap items-center justify-between gap-2"><strong className="text-blue-700">{quotation.quotation_number}</strong><span className="text-sm text-slate-500">{quotation.status}</span></div>
-                <p className="mt-1 text-sm">V{quotation.current_version} · {quotation.currency} {quotation.total_amount}</p>
+                <p className="mt-1 text-sm">{quotation.currency} {quotation.total_amount}</p>
               </Link>
             ))}
             {opportunity.quotations.length === 0 && <p className="text-sm text-slate-500">暂无关联报价。</p>}

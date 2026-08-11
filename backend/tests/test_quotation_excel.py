@@ -5,13 +5,23 @@ from types import SimpleNamespace
 
 from openpyxl import load_workbook
 
+from app.config import get_settings
 from app.services.quotation_excel_service import (
     generate_quotation_excel,
     quotation_excel_filename,
 )
 
 
-def test_excel_export_keeps_editable_inputs_and_formula_totals() -> None:
+def test_excel_export_keeps_editable_inputs_and_formula_totals(monkeypatch) -> None:
+    for name in (
+        "COMPANY_NAME",
+        "COMPANY_ALIBABA_STORE",
+        "COMPANY_WEBSITE",
+        "COMPANY_EMAIL",
+        "COMPANY_WHATSAPP",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    get_settings.cache_clear()
     quotation = SimpleNamespace(quotation_number="SLQ-20260810-000001")
     customer = SimpleNamespace(
         company_name="Happy Kids Preschool",
@@ -46,16 +56,26 @@ def test_excel_export_keeps_editable_inputs_and_formula_totals() -> None:
         ],
     )
 
-    workbook_bytes = generate_quotation_excel(quotation, version, customer)
-    workbook = load_workbook(BytesIO(workbook_bytes), data_only=False)
-    sheet = workbook["Quotation"]
+    try:
+        workbook_bytes = generate_quotation_excel(quotation, version, customer)
+        workbook = load_workbook(BytesIO(workbook_bytes), data_only=False)
+        sheet = workbook["Quotation"]
 
-    assert sheet["A1"].value == "Dalian StarLink International Trade Co., Ltd."
-    assert sheet["E10"].value == "=C10*D10"
-    assert sheet["E11"].value == "=C11*D11"
-    assert sheet["E13"].value == "=SUM(E10:E11)"
-    assert sheet["E15"].value == "=E13+E14"
-    assert sheet["C10"].fill.fgColor.rgb == "00FFF2CC"
-    assert sheet["E14"].fill.fgColor.rgb == "00FFF2CC"
-    assert workbook.calculation.fullCalcOnLoad is True
-    assert quotation_excel_filename("SLQ-1/unsafe", 2) == "SLQ-1_unsafe-V2.xlsx"
+        assert sheet["A1"].value == "Dalian StarLink International Trade Co., Ltd."
+        assert sheet["E10"].value == "=C10*D10"
+        assert sheet["E11"].value == "=C11*D11"
+        assert sheet["E13"].value == "=SUM(E10:E11)"
+        assert sheet["E15"].value == "=E13+E14"
+        assert sheet["C10"].fill.fgColor.rgb == "00FFF2CC"
+        assert sheet["E14"].fill.fgColor.rgb == "00FFF2CC"
+        assert workbook.calculation.fullCalcOnLoad is True
+        assert quotation_excel_filename("SLQ-1/unsafe", 2) == "SLQ-1_unsafe.xlsx"
+        assert "Version" not in sheet["D2"].value
+        assert sheet["A2"].value == (
+            "Alibaba Store: https://starlinkforkids.en.alibaba.com\n"
+            "Company Website: https://dlstarlink.com\n"
+            "Email: starlink_george@foxmail.com\n"
+            "WhatsApp: +86 17640412406"
+        )
+    finally:
+        get_settings.cache_clear()
