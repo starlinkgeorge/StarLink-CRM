@@ -75,10 +75,11 @@ or database before applying a future production migration.
 The root `vercel.json` applies public routes in order: `/api` and
 `/api/(.*)` go to the backend unchanged; `/assets/(.*)` and
 `/product-images/(.*)` go to the frontend unchanged; the final `/(.*)`
-rule selects the frontend service-local `index.html` with `destination.path`.
-This makes Vite SPA routes—including `/products`, `/customers`,
-`/opportunities`, and `/quotations`—safe to open directly or refresh without
-intercepting API calls or static files.
+rule selects the frontend service. That service explicitly sets
+`framework: "vite"` and performs the SPA rewrite from `/(.*)` to
+`/index.html`. This makes Vite SPA routes—including `/products`,
+`/customers`, `/opportunities`, and `/quotations`—safe to open directly or
+refresh without intercepting API calls or static files.
 
 ## Legacy split deployment: FastAPI backend
 

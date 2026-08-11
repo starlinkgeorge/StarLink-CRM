@@ -44,10 +44,10 @@ local development environment.
 
 The production `vercel.json` uses Vercel Services: `/api` and `/api/*` are
 routed to the FastAPI service, while Vite assets and catalogue product images
-retain their original paths. Every other non-API request explicitly selects the
-frontend service-local `index.html`, so direct visits and
-refreshes of client routes such as `/products`, `/customers`, `/opportunities`,
-and `/quotations` load the SPA.
+retain their original paths. The frontend service explicitly declares Vite and
+its SPA rewrite to `/index.html`, so direct visits and refreshes of client
+routes such as `/products`, `/customers`, `/opportunities`, and `/quotations`
+load the SPA.
 
 ### Frontend
 
