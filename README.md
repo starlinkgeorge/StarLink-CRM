@@ -42,6 +42,12 @@ reference, storage behavior, and release smoke test, read
 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). Docker Compose remains the supported
 local development environment.
 
+The production `vercel.json` uses Vercel Services: `/api/*` is routed to the
+FastAPI service, while Vite assets and catalogue product images retain their
+original paths. Every other non-API request explicitly selects the frontend
+`index.html`, so direct visits and refreshes of client routes such as
+`/products`, `/customers`, `/opportunities`, and `/quotations` load the SPA.
+
 ### Frontend
 
 ```bash

@@ -1,15 +1,15 @@
 # Production deployment: Vercel + Neon
 
-This guide deploys StarLink CRM as two Vercel projects and one Neon PostgreSQL
-database. The existing Docker Compose stack remains the local-development
-environment and is not used by the cloud deployment.
+This guide deploys StarLink CRM as one Vercel **Services** project and one Neon
+PostgreSQL database. The existing Docker Compose stack remains the
+local-development environment and is not used by the cloud deployment.
 
 ## Target architecture
 
 | Component | Production service | Source root | Persistent data |
 | --- | --- | --- | --- |
-| Frontend | Vercel static Vite deployment | `frontend` | None |
-| API | Vercel Python / FastAPI function | `backend` | Neon + Vercel Blob |
+| Frontend | Vercel Vite service | `frontend` | None |
+| API | Vercel FastAPI service | `backend` | Neon + Vercel Blob |
 | Database | Neon PostgreSQL | N/A | Neon PostgreSQL |
 | Attachments | Vercel Blob (private) | N/A | Vercel Blob |
 
@@ -52,7 +52,34 @@ Remove-Item Env:DATABASE_URL
 The second command must show the current Alembic head. Back up the Neon branch
 or database before applying a future production migration.
 
-## Deploy the FastAPI backend
+## Deploy as a Vercel Services project
+
+1. Import the repository as one Vercel project and select **Services** as the
+   framework preset. The root `vercel.json` declares the `frontend` Vite
+   service and the `backend` FastAPI service (`backend/server.py`).
+2. Add the backend production variables from `.env.production.example` to the
+   Vercel project: `APP_ENV`, `DATABASE_URL`, `DATABASE_POOL_MODE`,
+   `CORS_ORIGINS`, `JWT_SECRET_KEY`, company contact values,
+   `PRODUCT_IMAGE_BASE_URL`, `FILE_STORAGE_BACKEND=vercel_blob`, and
+   `BLOB_READ_WRITE_TOKEN`.
+3. Add `VITE_API_BASE_URL=/api/v1`. It keeps browser API calls on the same
+   public origin, where the Services route sends `/api/*` to FastAPI.
+4. Deploy and confirm:
+
+   ```text
+   https://<your-production-domain>/api/v1/health
+   ```
+
+### Services route behavior
+
+The root `vercel.json` applies public routes in order: `/api` and `/api/*` go
+to the backend unchanged; `/assets/*` and `/product-images/*` go to the
+frontend unchanged; every other path selects the frontend service's
+`/index.html` with `destination.path`. This makes Vite SPA routes—including
+`/products`, `/customers`, `/opportunities`, and `/quotations`—safe to open
+directly or refresh without intercepting API calls or static files.
+
+## Legacy split deployment: FastAPI backend
 
 1. Create a Vercel project from this repository.
 2. Set **Root Directory** to `backend`.
@@ -80,7 +107,7 @@ https://<your-backend>.vercel.app/api/v1/health
 run Alembic. A missing production setting fails the deployment instead of
 silently serving against an incomplete configuration.
 
-## Deploy the React frontend
+## Legacy split deployment: React frontend
 
 1. Create a second Vercel project from the same repository.
 2. Set **Root Directory** to `frontend` and let Vercel detect Vite.
@@ -111,7 +138,7 @@ whenever the backend domain changes.
 
 ## Production smoke test
 
-After both deployments finish:
+After the production deployment finishes:
 
 1. Visit the frontend URL and log in with a production administrator account.
 2. Load Dashboard, Customers, Opportunities, Pipeline, Quotations, Products,
