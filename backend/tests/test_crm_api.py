@@ -966,6 +966,25 @@ def test_product_catalog_and_opportunity_product_lines(client: TestClient) -> No
     assert client.get(
         "/api/v1/products", params={"is_active": False}, headers=admin_token
     ).json()["total"] == 1
+    assert client.delete(
+        f"/api/v1/products/{product['id']}", headers=admin_token
+    ).status_code == 409
+
+
+def test_admin_can_delete_an_unlinked_product(client: TestClient) -> None:
+    admin_token = login(client, "admin@example.com", "AdminPass123!")
+    product = client.post(
+        "/api/v1/products",
+        json={"sku": "DELETE-001", "name": "Temporary catalog product"},
+        headers=admin_token,
+    )
+    assert product.status_code == 201
+
+    deleted = client.delete(f"/api/v1/products/{product.json()['id']}", headers=admin_token)
+    assert deleted.status_code == 204
+    assert client.get(
+        f"/api/v1/products/{product.json()['id']}", headers=admin_token
+    ).status_code == 404
 
 
 def test_viewer_has_read_only_product_access(client: TestClient) -> None:
@@ -1026,6 +1045,9 @@ def test_viewer_has_read_only_product_access(client: TestClient) -> None:
         json={"material": "Beech wood"},
         headers=sales_token,
     ).status_code == 200
+    assert client.delete(
+        f"/api/v1/products/{sales_product.json()['id']}", headers=sales_token
+    ).status_code == 403
 
 
 def test_sales_cannot_access_another_users_customer(client: TestClient) -> None:

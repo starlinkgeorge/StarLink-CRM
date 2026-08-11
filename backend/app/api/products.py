@@ -114,3 +114,15 @@ def update_product(
         return product_service.update_product(session, product_id, payload, current_user)
     except (NotFoundError, ConflictError, ForbiddenError) as error:
         _raise_service_error(error)
+
+
+@router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_product(
+    product_id: int,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    try:
+        product_service.delete_product(session, product_id, current_user)
+    except (NotFoundError, ConflictError, ForbiddenError) as error:
+        _raise_service_error(error)

@@ -2,7 +2,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, selectinload
 
-from app.models.product import Product, ProductCategory, ProductImage
+from app.models.product import OpportunityProduct, Product, ProductCategory, ProductImage
 from app.models.user import User, UserRole
 from app.schemas.product import (
     ProductCategoryCreate,
@@ -17,6 +17,11 @@ from app.services.errors import ConflictError, ForbiddenError, NotFoundError
 def _ensure_write_access(user: User) -> None:
     if user.role is UserRole.VIEWER:
         raise ForbiddenError("Viewer accounts have read-only access.")
+
+
+def _ensure_delete_access(user: User) -> None:
+    if user.role is not UserRole.ADMIN:
+        raise ForbiddenError("Only Admin accounts can delete products.")
 
 
 def _validate_category(session: Session, category_id: int | None) -> None:
@@ -172,3 +177,25 @@ def update_product(
         session.rollback()
         raise ConflictError("A product with this SKU already exists.") from error
     return get_product_read(session, product.id)
+
+
+def delete_product(session: Session, product_id: int, user: User) -> None:
+    _ensure_delete_access(user)
+    product = get_product(session, product_id)
+    linked_opportunity_id = session.scalar(
+        select(OpportunityProduct.opportunity_id)
+        .where(OpportunityProduct.product_id == product.id)
+        .limit(1)
+    )
+    if linked_opportunity_id is not None:
+        raise ConflictError(
+            "Product is linked to an opportunity and cannot be deleted. "
+            "Remove it from the opportunity first."
+        )
+
+    session.delete(product)
+    try:
+        session.commit()
+    except IntegrityError as error:
+        session.rollback()
+        raise ConflictError("Product is still referenced and cannot be deleted.") from error

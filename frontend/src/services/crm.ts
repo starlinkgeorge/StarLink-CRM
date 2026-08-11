@@ -111,6 +111,7 @@ export const getProducts = async (params: ProductFilters) => (await api.get<Prod
 export const getProduct = async (id: string) => (await api.get<Product>(`/products/${id}`)).data;
 export const createProduct = async (data: ProductPayload) => (await api.post<Product>("/products", data)).data;
 export const updateProduct = async (id: number, data: Partial<ProductPayload>) => (await api.put<Product>(`/products/${id}`, data)).data;
+export const deleteProduct = async (id: number) => { await api.delete(`/products/${id}`); };
 export const replaceOpportunityProducts = async (id: number, items: { product_id: number; quantity: string; target_price?: string }[]) => (await api.put<OpportunityDetail>(`/opportunities/${id}/products`, { items })).data;
 
 export type QuotationItemPayload = { product_id: number; unit_price: string; quantity: string };
