@@ -1,8 +1,10 @@
+from collections.abc import Iterable
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from uuid import uuid4
+from zoneinfo import ZoneInfo
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, text
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.config import get_settings
@@ -35,6 +37,41 @@ from app.services.errors import ConflictError, ForbiddenError, NotFoundError
 
 
 MONEY = Decimal("0.01")
+BUSINESS_TIME_ZONE = ZoneInfo("Asia/Shanghai")
+
+
+def _daily_quotation_prefix(quotation_date: date) -> str:
+    return f"SLQ-{quotation_date:%Y%m%d}-"
+
+
+def _next_daily_sequence(quotation_numbers: Iterable[str], prefix: str) -> int:
+    """Use the highest existing numeric suffix so gaps are never reused by count."""
+    largest_sequence = 0
+    for quotation_number in quotation_numbers:
+        suffix = quotation_number.removeprefix(prefix)
+        if suffix != quotation_number and suffix.isdecimal():
+            largest_sequence = max(largest_sequence, int(suffix))
+    return largest_sequence + 1
+
+
+def _lock_daily_quotation_sequence(session: Session, quotation_date: date) -> None:
+    """Serialize daily allocations across serverless PostgreSQL instances."""
+    if session.get_bind().dialect.name == "postgresql":
+        session.execute(
+            text("SELECT pg_advisory_xact_lock(CAST(:lock_key AS bigint))"),
+            {"lock_key": int(quotation_date.strftime("%Y%m%d"))},
+        )
+
+
+def _next_quotation_number(session: Session, quotation_date: date | None = None) -> str:
+    """Allocate the next human-readable number for the China business day."""
+    allocation_date = quotation_date or datetime.now(BUSINESS_TIME_ZONE).date()
+    prefix = _daily_quotation_prefix(allocation_date)
+    _lock_daily_quotation_sequence(session, allocation_date)
+    existing_numbers = session.scalars(
+        select(Quotation.quotation_number).where(Quotation.quotation_number.like(f"{prefix}%"))
+    ).all()
+    return f"{prefix}{_next_daily_sequence(existing_numbers, prefix)}"
 
 
 def _ensure_read_access(user: User, quotation: Quotation) -> None:
@@ -237,7 +274,8 @@ def create_quotation(
     )
     session.add(quotation)
     session.flush()
-    quotation.quotation_number = f"SLQ-{date.today():%Y%m%d}-{quotation.id:06d}"
+    quotation.quotation_number = _next_quotation_number(session)
+    session.flush()
     version = QuotationVersion(
         version_no=1,
         currency=payload.currency,

@@ -1,6 +1,7 @@
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from io import BytesIO
+import re
 
 from fastapi.testclient import TestClient
 from openpyxl import load_workbook
@@ -1134,7 +1135,7 @@ def test_quotation_versioning_pdf_and_immutable_sent_snapshot(client: TestClient
     assert created.status_code == 201
     quotation = created.json()
     quotation_id = quotation["id"]
-    assert quotation["quotation_number"].startswith("SLQ-")
+    assert re.fullmatch(r"SLQ-\d{8}-1", quotation["quotation_number"])
     assert quotation["current_version"] == 1
     assert quotation["status"] == "Draft"
     assert quotation["selected_version"]["subtotal"] == "600.00"
