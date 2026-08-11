@@ -73,9 +73,9 @@ or database before applying a future production migration.
 ### Services route behavior
 
 The root `vercel.json` applies public routes in order: `/api` and
-`/api/:path*` go to the backend unchanged; `/assets/:path*` and
-`/product-images/:path*` go to the frontend unchanged; the final `/:path*`
-rule selects the frontend service's `/index.html` with `destination.path`.
+`/api/(.*)` go to the backend unchanged; `/assets/(.*)` and
+`/product-images/(.*)` go to the frontend unchanged; the final `/(.*)`
+rule selects the frontend service-local `index.html` with `destination.path`.
 This makes Vite SPA routes—including `/products`, `/customers`,
 `/opportunities`, and `/quotations`—safe to open directly or refresh without
 intercepting API calls or static files.
