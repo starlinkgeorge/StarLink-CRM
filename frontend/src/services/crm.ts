@@ -5,7 +5,11 @@ export type CustomerCreatePayload = {
   company_name: string; contact_name?: string; country?: string; email?: string; phone?: string;
   whatsapp?: string; website?: string; customer_type?: string; source?: string;
   source_platform?: string; original_inquiry?: string;
+  customer_acquired_at?: string; position?: string; notes?: string;
   interested_product?: string; level?: Customer["level"]; status?: Customer["status"];
+  customer_level_value?: number; customer_size?: number; customer_total_score?: number;
+  followup_stage?: string; automatic_stage_judgement?: string; latest_followup_date?: string;
+  response_status?: string; followup_requirement?: string;
   sales_stage?: Customer["sales_stage"]; category_id?: number; customer_score?: number;
 };
 
@@ -13,6 +17,8 @@ export const getDashboardStats = async () => (await api.get<DashboardStats>("/da
 export type CustomerFilters = {
   limit: number; offset: number; q?: string; status?: string; level?: string; country?: string;
   customer_type?: string; source?: string; interested_product?: string; sales_stage?: string;
+  followup_stage?: string; response_status?: string; followup_requirement?: string;
+  customer_level_value?: number;
   tag_id?: number; category_id?: number; score_min?: number; score_max?: number;
 };
 export const getCustomers = async (params: CustomerFilters) => (await api.get<CustomerPage>("/customers", { params })).data;

@@ -81,8 +81,13 @@ export interface User { id: number; name: string; email: string; role: UserRole;
 export interface Customer {
   id: number; company_name: string; contact_name: string | null; country: string | null;
   email: string | null; phone: string | null; whatsapp: string | null; website: string | null;
+  customer_acquired_at: string | null; position: string | null; notes: string | null;
   customer_type: string | null; source: string | null; interested_product: string | null;
   source_platform: string | null; original_inquiry: string | null;
+  customer_level_value: number | null; customer_size: number | null;
+  customer_total_score: number | null; followup_stage: string | null;
+  automatic_stage_judgement: string | null; latest_followup_date: string | null;
+  response_status: string | null; followup_requirement: string | null;
   category_id: number | null; category: CustomerCategory | null;
   customer_score: number; score_updated_at: string | null;
   next_followup_date: string | null; last_followup_at: string | null;

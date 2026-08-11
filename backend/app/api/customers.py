@@ -70,6 +70,10 @@ def list_customers(
     category_id: int | None = Query(default=None, gt=0),
     score_min: int | None = Query(default=None, ge=0, le=100),
     score_max: int | None = Query(default=None, ge=0, le=100),
+    followup_stage: str | None = Query(default=None, max_length=120),
+    response_status: str | None = Query(default=None, max_length=80),
+    followup_requirement: str | None = Query(default=None, max_length=80),
+    customer_level_value: int | None = Query(default=None, ge=0, le=9999),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ) -> CustomerPage:
@@ -91,6 +95,10 @@ def list_customers(
         category_id=category_id,
         score_min=score_min,
         score_max=score_max,
+        followup_stage=followup_stage,
+        response_status=response_status,
+        followup_requirement=followup_requirement,
+        customer_level_value=customer_level_value,
     )
     return CustomerPage(items=items, total=total, limit=limit, offset=offset)
 

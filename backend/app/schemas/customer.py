@@ -16,11 +16,22 @@ class CustomerFields(BaseModel):
     phone: Optional[str] = Field(default=None, max_length=50)
     whatsapp: Optional[str] = Field(default=None, max_length=50)
     website: Optional[str] = Field(default=None, max_length=255)
+    customer_acquired_at: Optional[date] = None
+    position: Optional[str] = Field(default=None, max_length=120)
+    notes: Optional[str] = None
     customer_type: Optional[str] = Field(default=None, max_length=80)
     source: Optional[str] = Field(default=None, max_length=80)
     source_platform: Optional[str] = Field(default=None, max_length=80)
     original_inquiry: Optional[str] = Field(default=None, max_length=10000)
     interested_product: Optional[str] = Field(default=None, max_length=500)
+    customer_level_value: Optional[int] = Field(default=None, ge=0, le=9999)
+    customer_size: Optional[int] = Field(default=None, ge=0, le=9999)
+    customer_total_score: Optional[int] = Field(default=None, ge=0, le=9999)
+    followup_stage: Optional[str] = Field(default=None, max_length=120)
+    automatic_stage_judgement: Optional[str] = Field(default=None, max_length=120)
+    latest_followup_date: Optional[date] = None
+    response_status: Optional[str] = Field(default=None, max_length=80)
+    followup_requirement: Optional[str] = Field(default=None, max_length=80)
     category_id: Optional[int] = Field(default=None, gt=0)
     customer_score: Optional[int] = Field(default=None, ge=0, le=100)
     level: CustomerLevel = CustomerLevel.C
@@ -41,11 +52,22 @@ class CustomerUpdate(BaseModel):
     phone: Optional[str] = Field(default=None, max_length=50)
     whatsapp: Optional[str] = Field(default=None, max_length=50)
     website: Optional[str] = Field(default=None, max_length=255)
+    customer_acquired_at: Optional[date] = None
+    position: Optional[str] = Field(default=None, max_length=120)
+    notes: Optional[str] = None
     customer_type: Optional[str] = Field(default=None, max_length=80)
     source: Optional[str] = Field(default=None, max_length=80)
     source_platform: Optional[str] = Field(default=None, max_length=80)
     original_inquiry: Optional[str] = Field(default=None, max_length=10000)
     interested_product: Optional[str] = Field(default=None, max_length=500)
+    customer_level_value: Optional[int] = Field(default=None, ge=0, le=9999)
+    customer_size: Optional[int] = Field(default=None, ge=0, le=9999)
+    customer_total_score: Optional[int] = Field(default=None, ge=0, le=9999)
+    followup_stage: Optional[str] = Field(default=None, max_length=120)
+    automatic_stage_judgement: Optional[str] = Field(default=None, max_length=120)
+    latest_followup_date: Optional[date] = None
+    response_status: Optional[str] = Field(default=None, max_length=80)
+    followup_requirement: Optional[str] = Field(default=None, max_length=80)
     category_id: Optional[int] = Field(default=None, gt=0)
     customer_score: Optional[int] = Field(default=None, ge=0, le=100)
     level: Optional[CustomerLevel] = None

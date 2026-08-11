@@ -1,190 +1,76 @@
 import axios from "axios";
-import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+import { useState, type ChangeEvent, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { createCustomer, getCustomerCategories, type CustomerCreatePayload } from "../services/crm";
-import type { CustomerCategory } from "../types";
+import { createCustomer, type CustomerCreatePayload } from "../services/crm";
 
-const customerTypes = [
-  "Kindergarten",
-  "School",
-  "Distributor",
-  "Wholesaler",
-  "Retailer",
-  "Project Contractor",
-  "Other",
-];
-
-const sources = ["Alibaba", "Website", "Facebook", "LinkedIn", "Other"];
-
-const salesStages = [
-  ["Lead", "新线索"],
-  ["Contacted", "已联系"],
-  ["Quotation", "报价中"],
-  ["Negotiation", "谈判中"],
-  ["Won", "已成交"],
-  ["Lost", "已流失"],
-] as const;
-
-const initialForm: CustomerCreatePayload = {
-  company_name: "",
-  contact_name: "",
-  country: "",
-  email: "",
-  phone: "",
-  whatsapp: "",
-  website: "",
-  customer_type: "",
-  source: "",
-  source_platform: "",
-  original_inquiry: "",
-  interested_product: "",
-  level: "C",
-  sales_stage: "Lead",
-};
+const initialForm: CustomerCreatePayload = { company_name: "" };
+type FormKey = keyof CustomerCreatePayload;
 
 export function NewCustomerPage() {
   const navigate = useNavigate();
-  const [error, setError] = useState("");
-  const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<CustomerCreatePayload>(initialForm);
-  const [categories, setCategories] = useState<CustomerCategory[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
-  useEffect(() => {
-    getCustomerCategories(true).then(setCategories).catch(() => undefined);
-  }, []);
-
-  const field = (key: keyof CustomerCreatePayload) => ({
-    value: form[key] ?? "",
-    onChange: (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-      setForm({ ...form, [key]: event.target.value } as CustomerCreatePayload),
+  const text = (key: FormKey) => ({
+    value: typeof form[key] === "string" ? form[key] : "",
+    onChange: (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setForm((current) => ({ ...current, [key]: event.target.value })),
+  });
+  const number = (key: FormKey) => ({
+    value: typeof form[key] === "number" ? form[key] : "",
+    onChange: (event: ChangeEvent<HTMLInputElement>) => setForm((current) => ({ ...current, [key]: event.target.value === "" ? undefined : Number(event.target.value) })),
   });
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    setSaving(true);
-    setError("");
+    setSaving(true); setError("");
     try {
-      const customer = await createCustomer(form);
+      const optionalText = (value: string | undefined) => value?.trim() || undefined;
+      const payload: CustomerCreatePayload = {
+        ...form, company_name: form.company_name.trim(),
+        contact_name: optionalText(form.contact_name), country: optionalText(form.country), email: optionalText(form.email),
+        phone: optionalText(form.phone), whatsapp: optionalText(form.whatsapp), customer_acquired_at: optionalText(form.customer_acquired_at),
+        position: optionalText(form.position), notes: optionalText(form.notes), customer_type: optionalText(form.customer_type),
+        source: optionalText(form.source), interested_product: optionalText(form.interested_product), followup_stage: optionalText(form.followup_stage),
+        automatic_stage_judgement: optionalText(form.automatic_stage_judgement), latest_followup_date: optionalText(form.latest_followup_date),
+        response_status: optionalText(form.response_status), followup_requirement: optionalText(form.followup_requirement),
+      };
+      const customer = await createCustomer(payload);
       navigate(`/customers/${customer.id}`);
     } catch (err) {
-      setError(
-        axios.isAxiosError(err)
-          ? (err.response?.data?.detail ?? "无法创建客户。")
-          : "无法创建客户。",
-      );
-    } finally {
-      setSaving(false);
-    }
+      setError(axios.isAxiosError(err) ? String(err.response?.data?.detail ?? "无法创建客户。") : "无法创建客户。");
+    } finally { setSaving(false); }
   }
 
-  return (
-    <>
-      <h2 className="text-3xl font-bold">新增客户</h2>
-      <p className="mt-1 text-sm text-slate-500">
-        建立客户档案并记录客户类型、来源、感兴趣产品和当前销售阶段。
-      </p>
-      <form
-        onSubmit={submit}
-        className="mt-6 max-w-3xl rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200"
-      >
-        <div className="grid gap-4 md:grid-cols-2">
-          <label className="text-sm font-medium">
-            公司名称
-            <input required {...field("company_name")} className="mt-1 w-full rounded border px-3 py-2" />
-          </label>
-          <label className="text-sm font-medium">
-            客户类型
-            <select {...field("customer_type")} className="mt-1 w-full rounded border px-3 py-2">
-              <option value="">请选择</option>
-              {customerTypes.map((type) => <option key={type} value={type}>{type}</option>)}
-            </select>
-          </label>
-          <label className="text-sm font-medium">
-            客户分类
-            <select value={form.category_id ?? ""} onChange={(event) => setForm({ ...form, category_id: event.target.value ? Number(event.target.value) : undefined })} className="mt-1 w-full rounded border px-3 py-2">
-              <option value="">请选择分类</option>
-              {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
-            </select>
-          </label>
-          <label className="text-sm font-medium">
-            主联系人
-            <input {...field("contact_name")} className="mt-1 w-full rounded border px-3 py-2" />
-          </label>
-          <label className="text-sm font-medium">
-            国家/地区
-            <input {...field("country")} className="mt-1 w-full rounded border px-3 py-2" />
-          </label>
-          <label className="text-sm font-medium">
-            邮箱
-            <input type="email" {...field("email")} className="mt-1 w-full rounded border px-3 py-2" />
-          </label>
-          <label className="text-sm font-medium">
-            电话
-            <input {...field("phone")} className="mt-1 w-full rounded border px-3 py-2" />
-          </label>
-          <label className="text-sm font-medium">
-            WhatsApp
-            <input {...field("whatsapp")} className="mt-1 w-full rounded border px-3 py-2" />
-          </label>
-          <label className="text-sm font-medium">
-            网站
-            <input {...field("website")} className="mt-1 w-full rounded border px-3 py-2" />
-          </label>
-          <label className="text-sm font-medium">
-            客户来源
-           <select {...field("source")} className="mt-1 w-full rounded border px-3 py-2">
-              <option value="">请选择</option>
-              {sources.map((source) => <option key={source} value={source}>{source}</option>)}
-            </select>
-          </label>
-          <label className="text-sm font-medium">
-            来源平台
-            <input {...field("source_platform")} placeholder="例如：Alibaba International" className="mt-1 w-full rounded border px-3 py-2" />
-          </label>
-          <label className="text-sm font-medium">
-            感兴趣产品
-            <input
-              {...field("interested_product")}
-              placeholder="例如：Montessori shelves"
-              className="mt-1 w-full rounded border px-3 py-2"
-            />
-          </label>
-          <label className="text-sm font-medium md:col-span-2">
-            原始询盘内容
-            <textarea
-              value={form.original_inquiry ?? ""}
-              onChange={(event) => setForm({ ...form, original_inquiry: event.target.value })}
-              maxLength={10000}
-              placeholder="可选：保存来自平台或邮件的原始询盘内容"
-              className="mt-1 min-h-24 w-full rounded border px-3 py-2"
-            />
-          </label>
-          <label className="text-sm font-medium">
-            客户等级
-            <select {...field("level")} className="mt-1 w-full rounded border px-3 py-2">
-              <option>A</option><option>B</option><option>C</option>
-            </select>
-          </label>
-          <label className="text-sm font-medium">
-            客户评分（0-100）
-            <input type="number" min="0" max="100" value={form.customer_score ?? ""} onChange={(event) => setForm({ ...form, customer_score: event.target.value === "" ? undefined : Number(event.target.value) })} className="mt-1 w-full rounded border px-3 py-2" />
-          </label>
-          <label className="text-sm font-medium">
-            销售阶段
-            <select {...field("sales_stage")} className="mt-1 w-full rounded border px-3 py-2">
-              {salesStages.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-            </select>
-          </label>
-        </div>
-        {error && <p className="mt-4 text-sm text-rose-600">{error}</p>}
-        <div className="mt-6 flex gap-3">
-          <button disabled={saving} className="rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white disabled:opacity-60">
-            {saving ? "保存中…" : "创建客户"}
-          </button>
-          <button type="button" onClick={() => navigate(-1)} className="rounded-lg border px-4 py-2">取消</button>
-        </div>
-      </form>
-    </>
-  );
+  return <>
+    <h2 className="text-3xl font-bold">新增客户</h2>
+    <p className="mt-1 text-sm text-slate-500">字段与“客户档案表”一致；未填写的字段将保持为空。</p>
+    <form onSubmit={submit} className="mt-6 max-w-6xl rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <label className="text-sm font-medium">获得客户时间<input type="date" {...text("customer_acquired_at")} className="mt-1 w-full rounded border px-3 py-2" /></label>
+        <label className="text-sm font-medium">来源<input {...text("source")} className="mt-1 w-full rounded border px-3 py-2" /></label>
+        <label className="text-sm font-medium">客户名<input {...text("contact_name")} className="mt-1 w-full rounded border px-3 py-2" /></label>
+        <label className="text-sm font-medium">公司名<input required {...text("company_name")} className="mt-1 w-full rounded border px-3 py-2" /></label>
+        <label className="text-sm font-medium">职位<input {...text("position")} className="mt-1 w-full rounded border px-3 py-2" /></label>
+        <label className="text-sm font-medium">国家<input {...text("country")} className="mt-1 w-full rounded border px-3 py-2" /></label>
+        <label className="text-sm font-medium">客户类型<input {...text("customer_type")} className="mt-1 w-full rounded border px-3 py-2" /></label>
+        <label className="text-sm font-medium">兴趣产品<input {...text("interested_product")} className="mt-1 w-full rounded border px-3 py-2" /></label>
+        <label className="text-sm font-medium">WhatsApp<input {...text("whatsapp")} className="mt-1 w-full rounded border px-3 py-2" /></label>
+        <label className="text-sm font-medium">邮箱<input type="email" {...text("email")} className="mt-1 w-full rounded border px-3 py-2" /></label>
+        <label className="text-sm font-medium">电话<input {...text("phone")} className="mt-1 w-full rounded border px-3 py-2" /></label>
+        <label className="text-sm font-medium">客户等级<input type="number" min="0" {...number("customer_level_value")} className="mt-1 w-full rounded border px-3 py-2" /></label>
+        <label className="text-sm font-medium">客户体量<input type="number" min="0" {...number("customer_size")} className="mt-1 w-full rounded border px-3 py-2" /></label>
+        <label className="text-sm font-medium">客户总分<input type="number" min="0" {...number("customer_total_score")} className="mt-1 w-full rounded border px-3 py-2" /></label>
+        <label className="text-sm font-medium">跟进阶段<input {...text("followup_stage")} className="mt-1 w-full rounded border px-3 py-2" /></label>
+        <label className="text-sm font-medium">自动阶段判断<input {...text("automatic_stage_judgement")} className="mt-1 w-full rounded border px-3 py-2" /></label>
+        <label className="text-sm font-medium">最近跟进日期<input type="date" {...text("latest_followup_date")} className="mt-1 w-full rounded border px-3 py-2" /></label>
+        <label className="text-sm font-medium">是否回复<input {...text("response_status")} className="mt-1 w-full rounded border px-3 py-2" /></label>
+        <label className="text-sm font-medium">是否需要跟进<input {...text("followup_requirement")} className="mt-1 w-full rounded border px-3 py-2" /></label>
+        <label className="text-sm font-medium md:col-span-2 xl:col-span-3">备注<textarea {...text("notes")} className="mt-1 min-h-28 w-full rounded border px-3 py-2" /></label>
+      </div>
+      {error && <p className="mt-4 text-sm text-rose-600">{error}</p>}
+      <div className="mt-6 flex gap-3"><button disabled={saving} className="rounded bg-blue-600 px-4 py-2 font-semibold text-white disabled:opacity-60">{saving ? "保存中…" : "创建客户"}</button><button type="button" onClick={() => navigate(-1)} className="rounded border px-4 py-2">取消</button></div>
+    </form>
+  </>;
 }

@@ -26,6 +26,8 @@ def list_customers(
     customer_type: str | None = None, interested_product: str | None = None,
     sales_stage: CustomerStatus | None = None, category_id: int | None = None,
     score_min: int | None = None, score_max: int | None = None,
+    followup_stage: str | None = None, response_status: str | None = None,
+    followup_requirement: str | None = None, customer_level_value: int | None = None,
 ) -> tuple[list[Customer], int]:
     filters = []
     if owner_id is not None:
@@ -39,6 +41,12 @@ def list_customers(
                 Customer.contact_name.ilike(term),
                 Customer.country.ilike(term),
                 Customer.email.ilike(term),
+                Customer.phone.ilike(term),
+                Customer.whatsapp.ilike(term),
+                Customer.position.ilike(term),
+                Customer.notes.ilike(term),
+                Customer.interested_product.ilike(term),
+                Customer.followup_stage.ilike(term),
             )
         )
     if status:
@@ -59,6 +67,17 @@ def list_customers(
     interested_product_term = interested_product.strip() if interested_product else ""
     if interested_product_term:
         filters.append(Customer.interested_product.ilike(f"%{interested_product_term}%"))
+    followup_stage_term = followup_stage.strip() if followup_stage else ""
+    if followup_stage_term:
+        filters.append(Customer.followup_stage.ilike(f"%{followup_stage_term}%"))
+    response_status_term = response_status.strip() if response_status else ""
+    if response_status_term:
+        filters.append(Customer.response_status.ilike(f"%{response_status_term}%"))
+    followup_requirement_term = followup_requirement.strip() if followup_requirement else ""
+    if followup_requirement_term:
+        filters.append(Customer.followup_requirement.ilike(f"%{followup_requirement_term}%"))
+    if customer_level_value is not None:
+        filters.append(Customer.customer_level_value == customer_level_value)
     if tag_id:
         filters.append(Customer.tags.any(Tag.id == tag_id))
     if category_id:

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { StatusBadge } from "../components/StatusBadge";
+import { CustomerArchiveProfile } from "../components/CustomerArchiveProfile";
 import {
   assignTag,
   createFollowup,
@@ -329,6 +330,10 @@ export function CustomerDetailPage() {
           </div>
           {currentReminder ? <ReminderBadge followupDate={currentReminder} /> : <span className="text-sm text-slate-500">暂无待跟进提醒</span>}
         </div>
+      </section>
+
+      <section className="mt-7">
+        <CustomerArchiveProfile customer={customer} editable={editable} onSaved={load} />
       </section>
 
       <section className="mt-7 grid gap-5 lg:grid-cols-2">

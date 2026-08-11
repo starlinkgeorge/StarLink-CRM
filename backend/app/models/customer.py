@@ -52,11 +52,28 @@ class Customer(TimestampMixin, Base):
     phone: Mapped[Optional[str]] = mapped_column(String(50))
     whatsapp: Mapped[Optional[str]] = mapped_column(String(50))
     website: Mapped[Optional[str]] = mapped_column(String(255))
+    # Customer-archive fields follow the user's source workbook.  Existing
+    # CRM fields remain in place so commercial-record foreign keys and legacy
+    # API consumers continue to work without data loss.
+    customer_acquired_at: Mapped[Optional[date]] = mapped_column(Date, index=True)
+    position: Mapped[Optional[str]] = mapped_column(String(120))
+    notes: Mapped[Optional[str]] = mapped_column(Text)
     customer_type: Mapped[Optional[str]] = mapped_column(String(80))
     source: Mapped[Optional[str]] = mapped_column(String(80), index=True)
     source_platform: Mapped[Optional[str]] = mapped_column(String(80), index=True)
     original_inquiry: Mapped[Optional[str]] = mapped_column(Text)
     interested_product: Mapped[Optional[str]] = mapped_column(String(500))
+    customer_level_value: Mapped[Optional[int]] = mapped_column(Integer)
+    customer_size: Mapped[Optional[int]] = mapped_column(Integer)
+    customer_total_score: Mapped[Optional[int]] = mapped_column(Integer)
+    followup_stage: Mapped[Optional[str]] = mapped_column(String(120), index=True)
+    automatic_stage_judgement: Mapped[Optional[str]] = mapped_column(String(120))
+    latest_followup_date: Mapped[Optional[date]] = mapped_column(Date, index=True)
+    response_status: Mapped[Optional[str]] = mapped_column(String(80))
+    followup_requirement: Mapped[Optional[str]] = mapped_column(String(80), index=True)
+    # Import-only identity: hidden from the public API, immutable external
+    # data such as an Excel row can be re-run without creating a new customer.
+    archive_import_key: Mapped[Optional[str]] = mapped_column(String(160), unique=True)
     level: Mapped[CustomerLevel] = mapped_column(
         Enum(
             CustomerLevel,

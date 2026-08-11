@@ -289,6 +289,35 @@ docker compose up --build
 
 The backend image installs its explicit runtime dependency list from `backend/requirements.txt`; it does not build the local Python package during image construction.
 
+### 客户档案表导入
+
+“客户管理”以 Excel 工作表 **客户档案表** 的 20 个字段为业务标准。`0019_customer_archive_fields` 只新增可空字段和索引，不会删除 `customers`、改写客户 ID，或破坏 contacts、opportunities、quotations、inquiries、followups 的 `customer_id` 关联。已有 CRM 的销售阶段只会被映射到新的“跟进阶段”展示字段；原有枚举字段仍保留给旧页面和 Dashboard 使用。
+
+| Excel 字段 | CRM 字段 |
+| --- | --- |
+| 获得客户时间、来源、客户名、公司名、职位、备注、国家 | `customer_acquired_at`、`source`、`contact_name`、`company_name`、`position`、`notes`、`country` |
+| 客户类型、兴趣产品、WhatsApp、邮箱、电话 | `customer_type`、`interested_product`、`whatsapp`、`email`、`phone` |
+| 客户等级、客户体量、客户总分 | `customer_level_value`、`customer_size`、`customer_total_score` |
+| 跟进阶段、自动阶段判断、最近跟进日期、是否回复、是否需要跟进 | `followup_stage`、`automatic_stage_judgement`、`latest_followup_date`、`response_status`、`followup_requirement` |
+
+先进行无数据库的只读预检：
+
+```powershell
+docker compose exec backend python scripts/import_customer_archive.py /tmp/George外贸工作表.xlsx --validate-only
+```
+
+在本地 Docker 数据库执行实际导入前，先应用迁移，再把上传文件复制到 backend 容器。导入按保存的 Excel 行键、完全一致的邮箱、完全一致的 WhatsApp 或完整的“公司名+客户名+国家”精确匹配，因此可安全重复执行，且不会做模糊合并。
+
+```powershell
+docker compose up -d --build
+docker compose exec backend alembic upgrade head
+$backendContainer = docker compose ps -q backend
+docker cp "C:\Users\1\Desktop\George外贸工作表.xlsx" "${backendContainer}:/tmp/George外贸工作表.xlsx"
+docker compose exec backend python scripts/import_customer_archive.py /tmp/George外贸工作表.xlsx
+```
+
+脚本会输出 Excel 总行数、空白/公式行、有效客户、明确重复、新增、更新、失败行及 CRM 最终客户数。空单元格保持 `null`；电话和 WhatsApp 一律按文本导入，不会转换成科学计数法。
+
 ## Project layout
 
 ```text
