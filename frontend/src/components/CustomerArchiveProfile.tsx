@@ -1,6 +1,7 @@
 import { useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
 
 import { updateCustomer, type CustomerCreatePayload } from "../services/crm";
+import { customerArchiveOptions } from "../constants/customerArchiveOptions";
 import type { CustomerCenter } from "../types";
 
 type Props = {
@@ -62,10 +63,10 @@ export function CustomerArchiveProfile({ customer, editable, onSaved }: Props) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const updateText = (key: FieldKey) => (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const updateText = (key: FieldKey) => (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setForm((current) => ({ ...current, [key]: event.target.value }));
   };
-  const updateNumber = (key: FieldKey) => (event: ChangeEvent<HTMLInputElement>) => {
+  const updateNumber = (key: FieldKey) => (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const value = event.target.value;
     setForm((current) => ({ ...current, [key]: value === "" ? undefined : Number(value) }));
   };
@@ -108,23 +109,23 @@ export function CustomerArchiveProfile({ customer, editable, onSaved }: Props) {
       <div className="flex items-center justify-between gap-3"><h3 className="text-lg font-bold">编辑客户档案</h3><span className="text-xs text-slate-500">字段与“客户档案表”一致</span></div>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <label className="text-sm font-medium">获得客户时间<input type="date" value={form.customer_acquired_at ?? ""} onChange={updateText("customer_acquired_at")} className="mt-1 w-full rounded border px-3 py-2" /></label>
-        <label className="text-sm font-medium">来源<input value={form.source ?? ""} onChange={updateText("source")} className="mt-1 w-full rounded border px-3 py-2" /></label>
+        <label className="text-sm font-medium">来源<select value={form.source ?? ""} onChange={updateText("source")} className="mt-1 w-full rounded border px-3 py-2"><option value="" />{customerArchiveOptions.source.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
         <label className="text-sm font-medium">客户名<input value={form.contact_name ?? ""} onChange={updateText("contact_name")} className="mt-1 w-full rounded border px-3 py-2" /></label>
         <label className="text-sm font-medium">公司名<input required value={form.company_name} onChange={updateText("company_name")} className="mt-1 w-full rounded border px-3 py-2" /></label>
         <label className="text-sm font-medium">职位<input value={form.position ?? ""} onChange={updateText("position")} className="mt-1 w-full rounded border px-3 py-2" /></label>
         <label className="text-sm font-medium">国家<input value={form.country ?? ""} onChange={updateText("country")} className="mt-1 w-full rounded border px-3 py-2" /></label>
-        <label className="text-sm font-medium">客户类型<input value={form.customer_type ?? ""} onChange={updateText("customer_type")} className="mt-1 w-full rounded border px-3 py-2" /></label>
-        <label className="text-sm font-medium">兴趣产品<input value={form.interested_product ?? ""} onChange={updateText("interested_product")} className="mt-1 w-full rounded border px-3 py-2" /></label>
+        <label className="text-sm font-medium">客户类型<select value={form.customer_type ?? ""} onChange={updateText("customer_type")} className="mt-1 w-full rounded border px-3 py-2"><option value="" />{customerArchiveOptions.customerType.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
+        <label className="text-sm font-medium">兴趣产品<select value={form.interested_product ?? ""} onChange={updateText("interested_product")} className="mt-1 w-full rounded border px-3 py-2"><option value="" />{customerArchiveOptions.interestedProduct.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
         <label className="text-sm font-medium">WhatsApp<input value={form.whatsapp ?? ""} onChange={updateText("whatsapp")} className="mt-1 w-full rounded border px-3 py-2" /></label>
         <label className="text-sm font-medium">邮箱<input type="email" value={form.email ?? ""} onChange={updateText("email")} className="mt-1 w-full rounded border px-3 py-2" /></label>
         <label className="text-sm font-medium">电话<input value={form.phone ?? ""} onChange={updateText("phone")} className="mt-1 w-full rounded border px-3 py-2" /></label>
-        <label className="text-sm font-medium">客户等级<input type="number" min="0" value={form.customer_level_value ?? ""} onChange={updateNumber("customer_level_value")} className="mt-1 w-full rounded border px-3 py-2" /></label>
-        <label className="text-sm font-medium">客户体量<input type="number" min="0" value={form.customer_size ?? ""} onChange={updateNumber("customer_size")} className="mt-1 w-full rounded border px-3 py-2" /></label>
+        <label className="text-sm font-medium">客户等级<select value={form.customer_level_value ?? ""} onChange={updateNumber("customer_level_value")} className="mt-1 w-full rounded border px-3 py-2"><option value="" />{customerArchiveOptions.customerLevelValue.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
+        <label className="text-sm font-medium">客户体量<select value={form.customer_size ?? ""} onChange={updateNumber("customer_size")} className="mt-1 w-full rounded border px-3 py-2"><option value="" />{customerArchiveOptions.customerSize.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
         <label className="text-sm font-medium">客户总分<input type="number" min="0" value={form.customer_total_score ?? ""} onChange={updateNumber("customer_total_score")} className="mt-1 w-full rounded border px-3 py-2" /></label>
-        <label className="text-sm font-medium">跟进阶段<input value={form.followup_stage ?? ""} onChange={updateText("followup_stage")} className="mt-1 w-full rounded border px-3 py-2" /></label>
+        <label className="text-sm font-medium">跟进阶段<select value={form.followup_stage ?? ""} onChange={updateText("followup_stage")} className="mt-1 w-full rounded border px-3 py-2"><option value="" />{customerArchiveOptions.followupStage.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
         <label className="text-sm font-medium">自动阶段判断<input value={form.automatic_stage_judgement ?? ""} onChange={updateText("automatic_stage_judgement")} className="mt-1 w-full rounded border px-3 py-2" /></label>
         <label className="text-sm font-medium">最近跟进日期<input type="date" value={form.latest_followup_date ?? ""} onChange={updateText("latest_followup_date")} className="mt-1 w-full rounded border px-3 py-2" /></label>
-        <label className="text-sm font-medium">是否回复<input value={form.response_status ?? ""} onChange={updateText("response_status")} className="mt-1 w-full rounded border px-3 py-2" /></label>
+        <label className="text-sm font-medium">是否回复<select value={form.response_status ?? ""} onChange={updateText("response_status")} className="mt-1 w-full rounded border px-3 py-2"><option value="" />{customerArchiveOptions.responseStatus.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
         <label className="text-sm font-medium">是否需要跟进<input value={form.followup_requirement ?? ""} onChange={updateText("followup_requirement")} className="mt-1 w-full rounded border px-3 py-2" /></label>
         <label className="text-sm font-medium md:col-span-2 xl:col-span-3">备注<textarea value={form.notes ?? ""} onChange={updateText("notes")} className="mt-1 min-h-28 w-full rounded border px-3 py-2" /></label>
       </div>

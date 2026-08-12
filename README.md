@@ -295,6 +295,18 @@ The backend image installs its explicit runtime dependency list from `backend/re
 
 客户管理列表以每页 10 位客户显示档案表的核心字段；表格顶部的横向滚动条与数据表同步，便于在页首查看所有列。列表同时提供页码、总页数和跳页输入框。`GET /api/v1/customers` 未传 `limit` 时默认返回 10 位客户；其他模块仍可显式传入所需的安全页大小。
 
+新增及编辑客户档案会严格使用工作簿的数据验证选项。工作簿没有 Named Range 或隐藏 Sheet 选项源；所有下拉选项直接定义在“客户档案表”中，且均允许为空。
+
+| 字段 | Excel 下拉选项（原顺序） |
+| --- | --- |
+| 来源 | 询盘、RFQ、访客营销、中国制造、FB、INS、领英、开发信、WhatsApp、客户介绍 |
+| 客户类型 | 幼儿园、网店、实体店、个人 |
+| 兴趣产品 | 家具、蒙氏、木制玩具、皮克勒、学习塔、其它 |
+| 客户等级 | 1、2、3、4 |
+| 客户体量 | 1、2、3、4 |
+| 跟进阶段 | 新开发未回复、新开发已回复、已报价、已采购样品、已成交、已复购、冷客户 |
+| 是否回复 | 是、否 |
+
 | Excel 字段 | CRM 字段 |
 | --- | --- |
 | 获得客户时间、来源、客户名、公司名、职位、备注、国家 | `customer_acquired_at`、`source`、`contact_name`、`company_name`、`position`、`notes`、`country` |
