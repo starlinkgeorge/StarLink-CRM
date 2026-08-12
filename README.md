@@ -345,8 +345,11 @@ Use **Export all customers** to download every customer record accessible to
 the signed-in user as a real `.xlsx` workbook. The workbook contains one
 `客户档案表` sheet, preserves Chinese and special characters, exports WhatsApp
 and telephone values as text, and safely escapes values that Excel could treat
-as formulas. The export is read-only: it does not alter customers or their
-commercial relationships.
+as formulas. Timezone-aware PostgreSQL timestamps are converted to China
+business time and made timezone-free only in the generated workbook, which
+keeps the export compatible with Excel without changing stored data. The
+export is read-only: it does not alter customers or their commercial
+relationships.
 
 ```text
 StarLink-CRM/

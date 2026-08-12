@@ -1,6 +1,7 @@
-from datetime import date, datetime
+from datetime import date, datetime, time
 from io import BytesIO
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
@@ -20,6 +21,7 @@ TEXT_HEADERS = {"WhatsApp", "电话"}
 DATE_HEADERS = {"获得客户时间", "最近跟进日期", "下次跟进日期"}
 DATETIME_HEADERS = {"最后跟进时间"}
 WRAPPED_HEADERS = {"备注", "原始询盘内容"}
+EXPORT_TIMEZONE = ZoneInfo("Asia/Shanghai")
 WIDTHS = {
     "客户名": 18, "公司名": 28, "国家": 16, "获得客户时间": 14, "职位": 16,
     "WhatsApp": 20, "邮箱": 32, "电话": 20, "来源": 16, "客户类型": 16,
@@ -38,6 +40,34 @@ def _safe_cell_text(value: Any) -> str | None:
     if text and text[0] in "=+-@":
         return f"'{text}"
     return text
+
+
+def normalize_excel_value(
+    value: Any, *, date_only: bool = False, text_only: bool = False
+) -> Any:
+    """Convert values to Excel-compatible values without changing stored data.
+
+    PostgreSQL returns timezone-aware datetimes for the CRM timestamp columns,
+    while openpyxl cannot write them. Values are represented in the CRM's
+    business timezone before the timezone information is removed. Date-only
+    archive columns are reduced to their business-date value.
+    """
+    normalized = value
+    if isinstance(normalized, datetime):
+        if normalized.tzinfo is not None and normalized.utcoffset() is not None:
+            normalized = normalized.astimezone(EXPORT_TIMEZONE).replace(tzinfo=None)
+        elif normalized.tzinfo is not None:
+            normalized = normalized.replace(tzinfo=None)
+        if date_only:
+            return normalized.date()
+    elif isinstance(normalized, time) and normalized.tzinfo is not None:
+        normalized = normalized.replace(tzinfo=None)
+
+    if text_only:
+        return _safe_cell_text(normalized)
+    if isinstance(normalized, str):
+        return _safe_cell_text(normalized)
+    return normalized
 
 
 def _stage_value(value: Any) -> str | None:
@@ -75,7 +105,17 @@ def build_customer_archive_export(customers: list[Customer]) -> bytes:
         cell.alignment = Alignment(horizontal="center", vertical="center")
 
     for customer in customers:
-        worksheet.append(_customer_values(customer))
+        values = _customer_values(customer)
+        worksheet.append(
+            [
+                normalize_excel_value(
+                    value,
+                    date_only=header in DATE_HEADERS,
+                    text_only=header in TEXT_HEADERS,
+                )
+                for header, value in zip(ARCHIVE_HEADERS, values, strict=True)
+            ]
+        )
 
     for row in worksheet.iter_rows(min_row=2, max_row=worksheet.max_row):
         for index, cell in enumerate(row):
@@ -85,10 +125,7 @@ def build_customer_archive_export(customers: list[Customer]) -> bytes:
             elif header in DATETIME_HEADERS and isinstance(cell.value, datetime):
                 cell.number_format = "yyyy-mm-dd hh:mm"
             elif header in TEXT_HEADERS:
-                cell.value = _safe_cell_text(cell.value)
                 cell.number_format = "@"
-            elif isinstance(cell.value, str):
-                cell.value = _safe_cell_text(cell.value)
             cell.alignment = Alignment(vertical="top", wrap_text=header in WRAPPED_HEADERS)
 
     for index, header in enumerate(ARCHIVE_HEADERS, 1):
