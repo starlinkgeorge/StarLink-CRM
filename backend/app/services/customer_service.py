@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
@@ -28,6 +28,13 @@ def list_customers(
     score_min: int | None = None, score_max: int | None = None,
     followup_stage: str | None = None, response_status: str | None = None,
     followup_requirement: str | None = None, customer_level_value: int | None = None,
+    customer_name: str | None = None, company_name: str | None = None,
+    position: str | None = None, whatsapp: str | None = None, email: str | None = None,
+    phone: str | None = None, notes: str | None = None,
+    customer_acquired_from: date | None = None, customer_acquired_to: date | None = None,
+    customer_size: int | None = None, customer_total_score_min: int | None = None,
+    customer_total_score_max: int | None = None, automatic_stage_judgement: str | None = None,
+    latest_followup_from: date | None = None, latest_followup_to: date | None = None,
 ) -> tuple[list[Customer], int]:
     filters = []
     if owner_id is not None:
@@ -78,6 +85,34 @@ def list_customers(
         filters.append(Customer.followup_requirement.ilike(f"%{followup_requirement_term}%"))
     if customer_level_value is not None:
         filters.append(Customer.customer_level_value == customer_level_value)
+    if customer_size is not None:
+        filters.append(Customer.customer_size == customer_size)
+    if customer_total_score_min is not None:
+        filters.append(Customer.customer_total_score >= customer_total_score_min)
+    if customer_total_score_max is not None:
+        filters.append(Customer.customer_total_score <= customer_total_score_max)
+    if customer_acquired_from is not None:
+        filters.append(Customer.customer_acquired_at >= customer_acquired_from)
+    if customer_acquired_to is not None:
+        filters.append(Customer.customer_acquired_at <= customer_acquired_to)
+    if latest_followup_from is not None:
+        filters.append(Customer.latest_followup_date >= latest_followup_from)
+    if latest_followup_to is not None:
+        filters.append(Customer.latest_followup_date <= latest_followup_to)
+
+    for column, value in (
+        (Customer.contact_name, customer_name),
+        (Customer.company_name, company_name),
+        (Customer.position, position),
+        (Customer.whatsapp, whatsapp),
+        (Customer.email, email),
+        (Customer.phone, phone),
+        (Customer.notes, notes),
+        (Customer.automatic_stage_judgement, automatic_stage_judgement),
+    ):
+        term_value = value.strip() if value else ""
+        if term_value:
+            filters.append(column.ilike(f"%{term_value}%"))
     if tag_id:
         filters.append(Customer.tags.any(Tag.id == tag_id))
     if category_id:
@@ -95,6 +130,14 @@ def list_customers(
     total = session.scalar(select(func.count()).select_from(Customer).where(*filters)) or 0
     customers = list(session.scalars(statement.limit(limit).offset(offset)))
     return customers, total
+
+
+def list_customers_for_export(session: Session, owner_id: int | None = None) -> list[Customer]:
+    statement = select(Customer).options(selectinload(Customer.owner))
+    if owner_id is not None:
+        statement = statement.where(Customer.owner_id == owner_id)
+    statement = statement.order_by(Customer.customer_acquired_at.desc(), Customer.id.desc())
+    return list(session.scalars(statement))
 
 
 def get_customer(session: Session, customer_id: int, include_relations: bool = False) -> Customer:

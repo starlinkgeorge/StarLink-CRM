@@ -334,6 +334,20 @@ docker compose exec backend python scripts/import_customer_archive.py /tmp/Georg
 
 ## Project layout
 
+## Customer archive filtering and export
+
+The customer-management page supports combined archive-field filters while
+keeping pagination fixed at 10 results per page. Date fields accept inclusive
+from/to values; the Excel-validated archive fields use the same controlled
+options as customer create and edit forms.
+
+Use **Export all customers** to download every customer record accessible to
+the signed-in user as a real `.xlsx` workbook. The workbook contains one
+`客户档案表` sheet, preserves Chinese and special characters, exports WhatsApp
+and telephone values as text, and safely escapes values that Excel could treat
+as formulas. The export is read-only: it does not alter customers or their
+commercial relationships.
+
 ```text
 StarLink-CRM/
 ├── frontend/       # React + TypeScript application

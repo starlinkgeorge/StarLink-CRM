@@ -19,9 +19,15 @@ export type CustomerFilters = {
   customer_type?: string; source?: string; interested_product?: string; sales_stage?: string;
   followup_stage?: string; response_status?: string; followup_requirement?: string;
   customer_level_value?: number;
+  customer_name?: string; company_name?: string; position?: string; whatsapp?: string;
+  email?: string; phone?: string; notes?: string;
+  customer_acquired_from?: string; customer_acquired_to?: string;
+  customer_size?: number; customer_total_score_min?: number; customer_total_score_max?: number;
+  automatic_stage_judgement?: string; latest_followup_from?: string; latest_followup_to?: string;
   tag_id?: number; category_id?: number; score_min?: number; score_max?: number;
 };
 export const getCustomers = async (params: CustomerFilters) => (await api.get<CustomerPage>("/customers", { params })).data;
+export const downloadCustomerArchive = async () => (await api.get<Blob>("/customers/export", { responseType: "blob" })).data;
 export const getCustomer = async (id: string) => (await api.get<CustomerDetail>(`/customers/${id}`)).data;
 export const getCustomerCenter = async (id: string) => (await api.get<CustomerCenter>(`/customers/${id}/center`)).data;
 export const getCustomerTimeline = async (id: string) => (await api.get<CustomerActivity[]>(`/customers/${id}/timeline`)).data;

@@ -1,4 +1,8 @@
+from datetime import date
+from urllib.parse import quote
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi.responses import Response as FileResponse
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db_session
@@ -74,6 +78,21 @@ def list_customers(
     response_status: str | None = Query(default=None, max_length=80),
     followup_requirement: str | None = Query(default=None, max_length=80),
     customer_level_value: int | None = Query(default=None, ge=0, le=9999),
+    customer_name: str | None = Query(default=None, max_length=120),
+    company_name: str | None = Query(default=None, max_length=255),
+    position: str | None = Query(default=None, max_length=120),
+    whatsapp: str | None = Query(default=None, max_length=50),
+    email: str | None = Query(default=None, max_length=320),
+    phone: str | None = Query(default=None, max_length=50),
+    notes: str | None = Query(default=None, max_length=10000),
+    customer_acquired_from: date | None = None,
+    customer_acquired_to: date | None = None,
+    customer_size: int | None = Query(default=None, ge=0, le=9999),
+    customer_total_score_min: int | None = Query(default=None, ge=0, le=9999),
+    customer_total_score_max: int | None = Query(default=None, ge=0, le=9999),
+    automatic_stage_judgement: str | None = Query(default=None, max_length=120),
+    latest_followup_from: date | None = None,
+    latest_followup_to: date | None = None,
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ) -> CustomerPage:
@@ -99,8 +118,43 @@ def list_customers(
         response_status=response_status,
         followup_requirement=followup_requirement,
         customer_level_value=customer_level_value,
+        customer_name=customer_name,
+        company_name=company_name,
+        position=position,
+        whatsapp=whatsapp,
+        email=email,
+        phone=phone,
+        notes=notes,
+        customer_acquired_from=customer_acquired_from,
+        customer_acquired_to=customer_acquired_to,
+        customer_size=customer_size,
+        customer_total_score_min=customer_total_score_min,
+        customer_total_score_max=customer_total_score_max,
+        automatic_stage_judgement=automatic_stage_judgement,
+        latest_followup_from=latest_followup_from,
+        latest_followup_to=latest_followup_to,
     )
     return CustomerPage(items=items, total=total, limit=limit, offset=offset)
+
+
+@router.get("/export")
+def export_customer_archive(
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> FileResponse:
+    """Download every customer accessible to the current user as a real .xlsx archive."""
+    from app.services.customer_export_service import build_customer_archive_export
+
+    owner_id = current_user.id if current_user.role is UserRole.SALES else None
+    content = build_customer_archive_export(customer_service.list_customers_for_export(session, owner_id))
+    filename = "StarLink-CRM-客户档案表.xlsx"
+    return FileResponse(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f"attachment; filename=StarLink-CRM-customers.xlsx; filename*=UTF-8''{quote(filename)}",
+        },
+    )
 
 
 @router.post("", response_model=CustomerRead, status_code=status.HTTP_201_CREATED)
