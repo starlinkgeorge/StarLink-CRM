@@ -88,7 +88,6 @@ export interface Customer {
   customer_level_value: number | null; customer_size: number | null;
   customer_total_score: number | null; followup_stage: string | null;
   automatic_stage_judgement: string | null; latest_followup_date: string | null;
-  response_status: string | null; followup_requirement: string | null;
   category_id: number | null; category: CustomerCategory | null;
   customer_score: number; score_updated_at: string | null;
   next_followup_date: string | null; last_followup_at: string | null;

@@ -13,7 +13,7 @@ from app.models.customer import Customer
 ARCHIVE_HEADERS = (
     "客户名", "公司名", "国家", "获得客户时间", "职位", "WhatsApp", "邮箱", "电话",
     "来源", "客户类型", "兴趣产品", "客户体量", "客户等级", "客户总分", "跟进阶段",
-    "自动判断阶段", "最近跟进日期", "是否需要跟进", "是否回复", "备注", "网站", "来源平台",
+    "自动判断阶段", "最近跟进日期", "备注", "网站", "来源平台",
     "原始询盘内容", "CRM 客户评分", "CRM 销售阶段", "下次跟进日期", "最后跟进时间", "负责人",
 )
 
@@ -26,7 +26,7 @@ WIDTHS = {
     "客户名": 18, "公司名": 28, "国家": 16, "获得客户时间": 14, "职位": 16,
     "WhatsApp": 20, "邮箱": 32, "电话": 20, "来源": 16, "客户类型": 16,
     "兴趣产品": 22, "客户体量": 12, "客户等级": 12, "客户总分": 12, "跟进阶段": 18,
-    "自动判断阶段": 18, "最近跟进日期": 14, "是否需要跟进": 18, "是否回复": 12,
+    "自动判断阶段": 18, "最近跟进日期": 14,
     "备注": 44, "网站": 32, "来源平台": 16, "原始询盘内容": 48, "CRM 客户评分": 14,
     "CRM 销售阶段": 18, "下次跟进日期": 14, "最后跟进时间": 20, "负责人": 18,
 }
@@ -82,7 +82,7 @@ def _customer_values(customer: Customer) -> tuple[Any, ...]:
         customer.position, customer.whatsapp, customer.email, customer.phone, customer.source,
         customer.customer_type, customer.interested_product, customer.customer_size, customer.customer_level_value,
         customer.customer_total_score, customer.followup_stage, customer.automatic_stage_judgement,
-        customer.latest_followup_date, customer.followup_requirement, customer.response_status, customer.notes,
+        customer.latest_followup_date, customer.notes,
         customer.website, customer.source_platform, customer.original_inquiry, customer.customer_score,
         _stage_value(customer.sales_stage), customer.next_followup_date, customer.last_followup_at,
         customer.owner.name if customer.owner is not None else None,

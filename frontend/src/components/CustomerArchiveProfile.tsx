@@ -21,6 +21,10 @@ function dateInput(value: string | null) {
   return value ? value.slice(0, 10) : "";
 }
 
+function editableFollowupStage(value: string | null): string | undefined {
+  return customerArchiveOptions.followupStage.includes(value as never) ? value ?? undefined : undefined;
+}
+
 function initialForm(customer: CustomerCenter): CustomerCreatePayload {
   return {
     company_name: customer.company_name,
@@ -38,11 +42,8 @@ function initialForm(customer: CustomerCenter): CustomerCreatePayload {
     customer_level_value: customer.customer_level_value ?? undefined,
     customer_size: customer.customer_size ?? undefined,
     customer_total_score: customer.customer_total_score ?? undefined,
-    followup_stage: customer.followup_stage ?? undefined,
-    automatic_stage_judgement: customer.automatic_stage_judgement ?? undefined,
+    followup_stage: editableFollowupStage(customer.followup_stage),
     latest_followup_date: dateInput(customer.latest_followup_date),
-    response_status: customer.response_status ?? undefined,
-    followup_requirement: customer.followup_requirement ?? undefined,
   };
 }
 
@@ -90,7 +91,7 @@ export function CustomerArchiveProfile({ customer, editable, onSaved }: Props) {
         ...form,
         company_name: form.company_name.trim(),
       };
-      for (const key of ["contact_name", "country", "email", "phone", "whatsapp", "position", "notes", "customer_type", "source", "interested_product", "followup_stage", "automatic_stage_judgement", "response_status", "followup_requirement", "customer_acquired_at", "latest_followup_date"] as FieldKey[]) {
+      for (const key of ["contact_name", "country", "email", "phone", "whatsapp", "position", "notes", "customer_type", "source", "interested_product", "followup_stage", "customer_acquired_at", "latest_followup_date"] as FieldKey[]) {
         const value = normalized[key];
         if (typeof value === "string") normalized[key] = emptyToUndefined(value) as never;
       }
@@ -123,10 +124,7 @@ export function CustomerArchiveProfile({ customer, editable, onSaved }: Props) {
         <label className="text-sm font-medium">客户体量<select value={form.customer_size ?? ""} onChange={updateNumber("customer_size")} className="mt-1 w-full rounded border px-3 py-2"><option value="" />{customerArchiveOptions.customerSize.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
         <label className="text-sm font-medium">客户总分<input type="number" min="0" value={form.customer_total_score ?? ""} onChange={updateNumber("customer_total_score")} className="mt-1 w-full rounded border px-3 py-2" /></label>
         <label className="text-sm font-medium">跟进阶段<select value={form.followup_stage ?? ""} onChange={updateText("followup_stage")} className="mt-1 w-full rounded border px-3 py-2"><option value="" />{customerArchiveOptions.followupStage.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
-        <label className="text-sm font-medium">自动阶段判断<input value={form.automatic_stage_judgement ?? ""} onChange={updateText("automatic_stage_judgement")} className="mt-1 w-full rounded border px-3 py-2" /></label>
         <label className="text-sm font-medium">最近跟进日期<input type="date" value={form.latest_followup_date ?? ""} onChange={updateText("latest_followup_date")} className="mt-1 w-full rounded border px-3 py-2" /></label>
-        <label className="text-sm font-medium">是否回复<select value={form.response_status ?? ""} onChange={updateText("response_status")} className="mt-1 w-full rounded border px-3 py-2"><option value="" />{customerArchiveOptions.responseStatus.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
-        <label className="text-sm font-medium">是否需要跟进<input value={form.followup_requirement ?? ""} onChange={updateText("followup_requirement")} className="mt-1 w-full rounded border px-3 py-2" /></label>
         <label className="text-sm font-medium md:col-span-2 xl:col-span-3">备注<textarea value={form.notes ?? ""} onChange={updateText("notes")} className="mt-1 min-h-28 w-full rounded border px-3 py-2" /></label>
       </div>
       {error && <p className="text-sm text-rose-600">{error}</p>}
@@ -140,7 +138,7 @@ export function CustomerArchiveProfile({ customer, editable, onSaved }: Props) {
       <Section title="基础信息"><dl className="mt-3 grid gap-x-5 gap-y-3 sm:grid-cols-2"><dt>获得客户时间</dt><dd><Value value={dateInput(customer.customer_acquired_at)} /></dd><dt>来源</dt><dd><Value value={customer.source} /></dd><dt>客户名</dt><dd><Value value={customer.contact_name} /></dd><dt>公司名</dt><dd><Value value={customer.company_name} /></dd><dt>职位</dt><dd><Value value={customer.position} /></dd><dt>国家</dt><dd><Value value={customer.country} /></dd></dl></Section>
       <Section title="联系方式"><dl className="mt-3 grid gap-x-5 gap-y-3 sm:grid-cols-2"><dt>WhatsApp</dt><dd><Value value={customer.whatsapp} /></dd><dt>邮箱</dt><dd className="break-all"><Value value={customer.email} /></dd><dt>电话</dt><dd><Value value={customer.phone} /></dd></dl></Section>
       <Section title="业务与评分"><dl className="mt-3 grid gap-x-5 gap-y-3 sm:grid-cols-2"><dt>客户类型</dt><dd><Value value={customer.customer_type} /></dd><dt>兴趣产品</dt><dd><Value value={customer.interested_product} /></dd><dt>客户等级</dt><dd><Value value={customer.customer_level_value} /></dd><dt>客户体量</dt><dd><Value value={customer.customer_size} /></dd><dt>客户总分</dt><dd><Value value={customer.customer_total_score} /></dd><dt>跟进阶段</dt><dd><Value value={customer.followup_stage} /></dd></dl></Section>
-      <Section title="跟进状态"><dl className="mt-3 grid gap-x-5 gap-y-3 sm:grid-cols-2"><dt>自动阶段判断</dt><dd><Value value={customer.automatic_stage_judgement} /></dd><dt>最近跟进日期</dt><dd><Value value={dateInput(customer.latest_followup_date)} /></dd><dt>是否回复</dt><dd><Value value={customer.response_status} /></dd><dt>是否需要跟进</dt><dd><Value value={customer.followup_requirement} /></dd></dl></Section>
+      <Section title="跟进状态"><dl className="mt-3 grid gap-x-5 gap-y-3 sm:grid-cols-2"><dt>自动阶段判断</dt><dd><Value value={customer.automatic_stage_judgement} /></dd><dt>最近跟进日期</dt><dd><Value value={dateInput(customer.latest_followup_date)} /></dd></dl></Section>
     </div>
     <Section title="备注"><p className="mt-3 whitespace-pre-wrap text-sm"><Value value={customer.notes} /></p></Section>
   </div>;

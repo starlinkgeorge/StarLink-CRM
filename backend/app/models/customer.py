@@ -2,7 +2,8 @@ import enum
 from datetime import date, datetime
 from typing import Optional
 
-from sqlalchemy import Column, Date, DateTime, Enum, ForeignKey, Integer, String, Table, Text
+from sqlalchemy import Column, Date, DateTime, Enum, ForeignKey, Integer, String, Table, Text, case, literal
+from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -67,7 +68,12 @@ class Customer(TimestampMixin, Base):
     customer_size: Mapped[Optional[int]] = mapped_column(Integer)
     customer_total_score: Mapped[Optional[int]] = mapped_column(Integer)
     followup_stage: Mapped[Optional[str]] = mapped_column(String(120), index=True)
-    automatic_stage_judgement: Mapped[Optional[str]] = mapped_column(String(120))
+    # The persisted value is preserved for archive compatibility.  The public
+    # hybrid property below overlays the live cold-customer judgement whenever
+    # the latest follow-up is more than 30 China-business days old.
+    automatic_stage_judgement_value: Mapped[Optional[str]] = mapped_column(
+        "automatic_stage_judgement", String(120)
+    )
     latest_followup_date: Mapped[Optional[date]] = mapped_column(Date, index=True)
     response_status: Mapped[Optional[str]] = mapped_column(String(80))
     followup_requirement: Mapped[Optional[str]] = mapped_column(String(80), index=True)
@@ -138,6 +144,37 @@ class Customer(TimestampMixin, Base):
         order_by="(FollowUp.followup_date.desc(), FollowUp.created_at.desc(), FollowUp.id.desc())",
     )
     quotations: Mapped[list["Quotation"]] = relationship(back_populates="customer")
+
+    @hybrid_property
+    def automatic_stage_judgement(self) -> Optional[str]:
+        from app.services.customer_followup_stage_service import (
+            calculate_automatic_stage_judgement,
+        )
+
+        return calculate_automatic_stage_judgement(
+            self.latest_followup_date,
+            self.automatic_stage_judgement_value,
+        )
+
+    @automatic_stage_judgement.setter
+    def automatic_stage_judgement(self, value: Optional[str]) -> None:
+        self.automatic_stage_judgement_value = value
+
+    @automatic_stage_judgement.expression
+    def automatic_stage_judgement(cls):
+        from app.services.customer_followup_stage_service import (
+            COLD_CUSTOMER_STAGE,
+            cold_customer_cutoff_date,
+        )
+
+        return case(
+            (
+                (cls.latest_followup_date.is_not(None))
+                & (cls.latest_followup_date < cold_customer_cutoff_date()),
+                literal(COLD_CUSTOMER_STAGE),
+            ),
+            else_=cls.automatic_stage_judgement_value,
+        )
 
     @property
     def followup_reminder_status(self) -> CustomerFollowUpReminderStatus:

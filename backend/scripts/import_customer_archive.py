@@ -299,6 +299,8 @@ def archive_key(workbook_path: Path, sheet_name: str, row_number: int) -> str:
 
 def customer_fields(record: ArchiveRecord) -> dict[str, Any]:
     """Map every workbook column to its customer table counterpart."""
+    from app.services.customer_followup_stage_service import normalize_manual_followup_stage
+
     values = record.values
     return {
         "company_name": values["公司名"],
@@ -316,7 +318,7 @@ def customer_fields(record: ArchiveRecord) -> dict[str, Any]:
         "customer_level_value": values["客户等级"],
         "customer_size": values["客户体量"],
         "customer_total_score": values["客户总分"],
-        "followup_stage": values["跟进阶段"],
+        "followup_stage": normalize_manual_followup_stage(values["跟进阶段"]),
         "automatic_stage_judgement": values["自动阶段判断"],
         "latest_followup_date": values["最近跟进日期"],
         "response_status": values["是否回复"],
@@ -331,6 +333,8 @@ def legacy_status_for(stage: str | None):
     return {
         "新开发未回复": CustomerStatus.LEAD,
         "新开发已回复": CustomerStatus.CONTACTED,
+        "新客户未回复": CustomerStatus.LEAD,
+        "沟通中": CustomerStatus.CONTACTED,
         "已报价": CustomerStatus.QUOTATION,
         "谈判中": CustomerStatus.NEGOTIATION,
         "已成交": CustomerStatus.WON,

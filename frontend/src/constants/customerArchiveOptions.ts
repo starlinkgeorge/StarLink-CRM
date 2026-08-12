@@ -9,6 +9,5 @@ export const customerArchiveOptions = {
   interestedProduct: ["家具", "蒙氏", "木制玩具", "皮克勒", "学习塔", "其它"],
   customerLevelValue: [1, 2, 3, 4],
   customerSize: [1, 2, 3, 4],
-  followupStage: ["新开发未回复", "新开发已回复", "已报价", "已采购样品", "已成交", "已复购", "冷客户"],
-  responseStatus: ["是", "否"],
+  followupStage: ["新客户未回复", "沟通中", "已报价", "已成交样品", "已成交", "已复购"],
 } as const;

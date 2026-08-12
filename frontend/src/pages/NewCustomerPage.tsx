@@ -34,8 +34,7 @@ export function NewCustomerPage() {
         phone: optionalText(form.phone), whatsapp: optionalText(form.whatsapp), customer_acquired_at: optionalText(form.customer_acquired_at),
         position: optionalText(form.position), notes: optionalText(form.notes), customer_type: optionalText(form.customer_type),
         source: optionalText(form.source), interested_product: optionalText(form.interested_product), followup_stage: optionalText(form.followup_stage),
-        automatic_stage_judgement: optionalText(form.automatic_stage_judgement), latest_followup_date: optionalText(form.latest_followup_date),
-        response_status: optionalText(form.response_status), followup_requirement: optionalText(form.followup_requirement),
+        latest_followup_date: optionalText(form.latest_followup_date),
       };
       const customer = await createCustomer(payload);
       navigate(`/customers/${customer.id}`);
@@ -64,10 +63,7 @@ export function NewCustomerPage() {
         <label className="text-sm font-medium">客户体量<select {...number("customer_size")} className="mt-1 w-full rounded border px-3 py-2"><option value="" />{customerArchiveOptions.customerSize.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
         <label className="text-sm font-medium">客户总分<input type="number" min="0" {...number("customer_total_score")} className="mt-1 w-full rounded border px-3 py-2" /></label>
         <label className="text-sm font-medium">跟进阶段<select {...text("followup_stage")} className="mt-1 w-full rounded border px-3 py-2"><option value="" />{customerArchiveOptions.followupStage.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
-        <label className="text-sm font-medium">自动阶段判断<input {...text("automatic_stage_judgement")} className="mt-1 w-full rounded border px-3 py-2" /></label>
         <label className="text-sm font-medium">最近跟进日期<input type="date" {...text("latest_followup_date")} className="mt-1 w-full rounded border px-3 py-2" /></label>
-        <label className="text-sm font-medium">是否回复<select {...text("response_status")} className="mt-1 w-full rounded border px-3 py-2"><option value="" />{customerArchiveOptions.responseStatus.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
-        <label className="text-sm font-medium">是否需要跟进<input {...text("followup_requirement")} className="mt-1 w-full rounded border px-3 py-2" /></label>
         <label className="text-sm font-medium md:col-span-2 xl:col-span-3">备注<textarea {...text("notes")} className="mt-1 min-h-28 w-full rounded border px-3 py-2" /></label>
       </div>
       {error && <p className="mt-4 text-sm text-rose-600">{error}</p>}

@@ -13,6 +13,8 @@ from enum import StrEnum
 from typing import TYPE_CHECKING
 from zoneinfo import ZoneInfo
 
+from app.services.customer_followup_stage_service import normalize_manual_followup_stage
+
 if TYPE_CHECKING:
     from app.models.customer import Customer
     from app.models.user import User
@@ -29,13 +31,12 @@ FOLLOWUP_REMINDER_APPLICABLE_FROM = date(2026, 8, 12)
 # These values are the user's approved V1 cadence.  Do not silently fall back
 # to a guessed cadence for an unconfigured or legacy follow-up stage.
 FOLLOWUP_STAGE_INTERVAL_DAYS: dict[str, int] = {
-    "新开发未回复": 2,
-    "新开发已回复": 1,
+    "新客户未回复": 2,
+    "沟通中": 1,
     "已报价": 3,
-    "已采购样品": 3,
+    "已成交样品": 3,
     "已成交": 7,
     "已复购": 30,
-    "冷客户": 30,
 }
 
 
@@ -88,7 +89,7 @@ def calculate_followup_reminder(
             priority=6,
         )
 
-    normalized_stage = (followup_stage or "").strip()
+    normalized_stage = normalize_manual_followup_stage(followup_stage) or ""
     interval_days = FOLLOWUP_STAGE_INTERVAL_DAYS.get(normalized_stage)
     if interval_days is None:
         return FollowupReminder(

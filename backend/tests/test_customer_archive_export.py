@@ -25,14 +25,14 @@ def test_customer_archive_export_is_a_real_safe_xlsx() -> None:
     worksheet = workbook["客户档案表"]
 
     assert tuple(cell.value for cell in worksheet[1]) == ARCHIVE_HEADERS
-    assert worksheet.auto_filter.ref == "A1:AB1"
+    assert worksheet.auto_filter.ref == "A1:Z1"
     assert worksheet["A2"].value == "Amy"
     assert worksheet["D2"].value.date() == date(2026, 8, 12)
     assert worksheet["F2"].value == "00123456789"
     assert worksheet["F2"].number_format == "@"
     assert worksheet["H2"].value == "01234567890"
     assert worksheet["H2"].number_format == "@"
-    assert worksheet["T2"].value == "'=This must remain text in Excel"
+    assert worksheet["R2"].value == "'=This must remain text in Excel"
 
 
 def test_customer_archive_export_normalizes_timezone_aware_values() -> None:
@@ -53,8 +53,8 @@ def test_customer_archive_export_normalizes_timezone_aware_values() -> None:
     # UTC 18:45 is 02:45 on the following China business date.
     assert worksheet["D2"].value.date() == date(2026, 8, 13)
     assert worksheet["Q2"].value.date() == date(2026, 8, 13)
-    assert worksheet["AA2"].value == datetime(2026, 8, 13, 2, 45)
-    assert worksheet["AA2"].value.tzinfo is None
+    assert worksheet["Y2"].value == datetime(2026, 8, 13, 2, 45)
+    assert worksheet["Y2"].value.tzinfo is None
     assert worksheet["F2"].value == "00123456789"
     assert worksheet["F2"].number_format == "@"
     assert worksheet["H2"].value == "01234567890"

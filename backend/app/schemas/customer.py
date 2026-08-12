@@ -1,11 +1,26 @@
 from datetime import date, datetime
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models.customer import CustomerFollowUpReminderStatus, CustomerLevel, CustomerStatus
 from app.schemas.contact import ContactRead
 from app.schemas.followup import FollowUpRead
+from app.services.customer_followup_stage_service import (
+    MANUAL_FOLLOWUP_STAGES,
+    normalize_manual_followup_stage,
+)
+
+
+def _validated_manual_followup_stage(value: str | None) -> str | None:
+    """Accept new stages and safely normalize the three known legacy values."""
+    normalized = normalize_manual_followup_stage(value)
+    if normalized is None:
+        return None
+    if normalized not in MANUAL_FOLLOWUP_STAGES:
+        allowed = "、".join(MANUAL_FOLLOWUP_STAGES)
+        raise ValueError(f"跟进阶段只能是：{allowed}")
+    return normalized
 
 
 class CustomerFields(BaseModel):
@@ -30,14 +45,17 @@ class CustomerFields(BaseModel):
     followup_stage: Optional[str] = Field(default=None, max_length=120)
     automatic_stage_judgement: Optional[str] = Field(default=None, max_length=120)
     latest_followup_date: Optional[date] = None
-    response_status: Optional[str] = Field(default=None, max_length=80)
-    followup_requirement: Optional[str] = Field(default=None, max_length=80)
     category_id: Optional[int] = Field(default=None, gt=0)
     customer_score: Optional[int] = Field(default=None, ge=0, le=100)
     level: CustomerLevel = CustomerLevel.C
     status: CustomerStatus = CustomerStatus.LEAD
     sales_stage: CustomerStatus = CustomerStatus.LEAD
     owner_id: Optional[int] = Field(default=None, gt=0)
+
+    @field_validator("followup_stage")
+    @classmethod
+    def validate_followup_stage(cls, value: str | None) -> str | None:
+        return _validated_manual_followup_stage(value)
 
 
 class CustomerCreate(CustomerFields):
@@ -66,14 +84,17 @@ class CustomerUpdate(BaseModel):
     followup_stage: Optional[str] = Field(default=None, max_length=120)
     automatic_stage_judgement: Optional[str] = Field(default=None, max_length=120)
     latest_followup_date: Optional[date] = None
-    response_status: Optional[str] = Field(default=None, max_length=80)
-    followup_requirement: Optional[str] = Field(default=None, max_length=80)
     category_id: Optional[int] = Field(default=None, gt=0)
     customer_score: Optional[int] = Field(default=None, ge=0, le=100)
     level: Optional[CustomerLevel] = None
     status: Optional[CustomerStatus] = None
     sales_stage: Optional[CustomerStatus] = None
     owner_id: Optional[int] = Field(default=None, gt=0)
+
+    @field_validator("followup_stage")
+    @classmethod
+    def validate_followup_stage(cls, value: str | None) -> str | None:
+        return _validated_manual_followup_stage(value)
 
 
 class CustomerCategoryRead(BaseModel):

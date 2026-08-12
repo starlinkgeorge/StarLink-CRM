@@ -26,8 +26,7 @@ def list_customers(
     customer_type: str | None = None, interested_product: str | None = None,
     sales_stage: CustomerStatus | None = None, category_id: int | None = None,
     score_min: int | None = None, score_max: int | None = None,
-    followup_stage: str | None = None, response_status: str | None = None,
-    followup_requirement: str | None = None, customer_level_value: int | None = None,
+    followup_stage: str | None = None, customer_level_value: int | None = None,
     customer_name: str | None = None, company_name: str | None = None,
     position: str | None = None, whatsapp: str | None = None, email: str | None = None,
     phone: str | None = None, notes: str | None = None,
@@ -77,12 +76,6 @@ def list_customers(
     followup_stage_term = followup_stage.strip() if followup_stage else ""
     if followup_stage_term:
         filters.append(Customer.followup_stage.ilike(f"%{followup_stage_term}%"))
-    response_status_term = response_status.strip() if response_status else ""
-    if response_status_term:
-        filters.append(Customer.response_status.ilike(f"%{response_status_term}%"))
-    followup_requirement_term = followup_requirement.strip() if followup_requirement else ""
-    if followup_requirement_term:
-        filters.append(Customer.followup_requirement.ilike(f"%{followup_requirement_term}%"))
     if customer_level_value is not None:
         filters.append(Customer.customer_level_value == customer_level_value)
     if customer_size is not None:

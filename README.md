@@ -304,15 +304,14 @@ The backend image installs its explicit runtime dependency list from `backend/re
 | 兴趣产品 | 家具、蒙氏、木制玩具、皮克勒、学习塔、其它 |
 | 客户等级 | 1、2、3、4 |
 | 客户体量 | 1、2、3、4 |
-| 跟进阶段 | 新开发未回复、新开发已回复、已报价、已采购样品、已成交、已复购、冷客户 |
-| 是否回复 | 是、否 |
+| 跟进阶段 | 新客户未回复、沟通中、已报价、已成交样品、已成交、已复购 |
 
 | Excel 字段 | CRM 字段 |
 | --- | --- |
 | 获得客户时间、来源、客户名、公司名、职位、备注、国家 | `customer_acquired_at`、`source`、`contact_name`、`company_name`、`position`、`notes`、`country` |
 | 客户类型、兴趣产品、WhatsApp、邮箱、电话 | `customer_type`、`interested_product`、`whatsapp`、`email`、`phone` |
 | 客户等级、客户体量、客户总分 | `customer_level_value`、`customer_size`、`customer_total_score` |
-| 跟进阶段、自动阶段判断、最近跟进日期、是否回复、是否需要跟进 | `followup_stage`、`automatic_stage_judgement`、`latest_followup_date`、`response_status`、`followup_requirement` |
+| 跟进阶段、自动阶段判断、最近跟进日期 | `followup_stage`、`automatic_stage_judgement`、`latest_followup_date` |
 
 先进行无数据库的只读预检：
 
@@ -359,11 +358,14 @@ records and records without that archive date remain available for normal CRM
 and manual follow-up work, but are excluded from V1 reminder dates, reminders,
 the reminder queue, and its Dashboard statistics. Eligible records calculate a
 live follow-up queue from `latest_followup_date` and `followup_stage`. The
-approved cadence is: new development/no reply 2 days, new development/replied
-1 day, quotation and sample purchase 3 days, won 7 days, and repurchase or
-cold customer 30 days.  The system always uses the China (`Asia/Shanghai`)
-business date, so Vercel's UTC runtime cannot move a reminder to the wrong
-calendar day.
+approved cadence is: 新客户未回复 2 days, 沟通中 1 day, 已报价 and 已成交样品
+3 days, 已成交 7 days, and 已复购 30 days. The system always uses the China
+(`Asia/Shanghai`) business date, so Vercel's UTC runtime cannot move a
+reminder to the wrong calendar day. `冷客户` is no longer a manually selectable
+follow-up stage: when `latest_followup_date` is more than 30 days before the
+China business date, it dynamically overrides the displayed
+`automatic_stage_judgement`. Exactly 30 days is not cold, and no date does not
+become cold automatically.
 
 Suggested dates and reminder statuses are deliberately calculated at read
 time; they are not stored in the database. An eligible customer with no latest
@@ -371,6 +373,9 @@ follow-up is shown as **尚未跟进** and included in the action queue. Creatin
 editing a follow-up record updates `customers.latest_followup_date` to the
 record's follow-up date, which immediately starts the next cadence cycle.
 Legacy manual `next_followup_date` values remain untouched for compatibility.
+The historical `response_status` and `followup_requirement` database columns
+are retained for compatibility only; the customer archive no longer displays,
+filters, edits, or exports them.
 
 ```text
 StarLink-CRM/

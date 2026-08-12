@@ -34,6 +34,7 @@ def get_customer_center(
     return CustomerCenter.model_validate(
         {
             **customer.__dict__,
+            "automatic_stage_judgement": customer.automatic_stage_judgement,
             "suggested_followup_date": customer.suggested_followup_date,
             "calculated_followup_reminder_status": customer.calculated_followup_reminder_status,
             "calculated_followup_reminder_label": customer.calculated_followup_reminder_label,

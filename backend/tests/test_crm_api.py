@@ -360,6 +360,60 @@ def test_customer_followup_reminder_v1_recalculates_after_a_new_followup(
     assert reminder["followup_reminder"]["status"] == "upcoming"
 
 
+def test_customer_followup_stage_api_normalizes_legacy_values_and_keeps_cold_automatic(
+    client: TestClient,
+) -> None:
+    from app.services.followup_reminder_service import shanghai_today
+
+    admin_token = login(client, "admin@example.com", "AdminPass123!")
+    today = shanghai_today()
+    legacy_stage = client.post(
+        "/api/v1/customers",
+        json={
+            "company_name": "Legacy Stage Compatibility Customer",
+            "followup_stage": "新开发已回复",
+            "response_status": "是",
+            "followup_requirement": "需要跟进",
+        },
+        headers=admin_token,
+    )
+    assert legacy_stage.status_code == 201
+    assert legacy_stage.json()["followup_stage"] == "沟通中"
+    assert "response_status" not in legacy_stage.json()
+    assert "followup_requirement" not in legacy_stage.json()
+
+    cold = client.post(
+        "/api/v1/customers",
+        json={
+            "company_name": "Automatic Cold Customer",
+            "latest_followup_date": (today - timedelta(days=31)).isoformat(),
+            "automatic_stage_judgement": "原有自动阶段",
+        },
+        headers=admin_token,
+    )
+    assert cold.status_code == 201
+    assert cold.json()["automatic_stage_judgement"] == "冷客户"
+
+    exactly_thirty_days = client.post(
+        "/api/v1/customers",
+        json={
+            "company_name": "Thirty Day Customer",
+            "latest_followup_date": (today - timedelta(days=30)).isoformat(),
+            "automatic_stage_judgement": "原有自动阶段",
+        },
+        headers=admin_token,
+    )
+    assert exactly_thirty_days.status_code == 201
+    assert exactly_thirty_days.json()["automatic_stage_judgement"] == "原有自动阶段"
+
+    manual_cold = client.post(
+        "/api/v1/customers",
+        json={"company_name": "No Manual Cold Customer", "followup_stage": "冷客户"},
+        headers=admin_token,
+    )
+    assert manual_cold.status_code == 422
+
+
 def test_followup_reminders_exclude_legacy_and_unknown_acquisition_dates(
     client: TestClient,
 ) -> None:

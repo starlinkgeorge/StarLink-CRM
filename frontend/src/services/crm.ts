@@ -9,7 +9,6 @@ export type CustomerCreatePayload = {
   interested_product?: string; level?: Customer["level"]; status?: Customer["status"];
   customer_level_value?: number; customer_size?: number; customer_total_score?: number;
   followup_stage?: string; automatic_stage_judgement?: string; latest_followup_date?: string;
-  response_status?: string; followup_requirement?: string;
   sales_stage?: Customer["sales_stage"]; category_id?: number; customer_score?: number;
 };
 
@@ -20,7 +19,7 @@ export const getCustomerFollowupReminders = async (status?: CalculatedFollowupRe
 export type CustomerFilters = {
   limit: number; offset: number; q?: string; status?: string; level?: string; country?: string;
   customer_type?: string; source?: string; interested_product?: string; sales_stage?: string;
-  followup_stage?: string; response_status?: string; followup_requirement?: string;
+  followup_stage?: string;
   customer_level_value?: number;
   customer_name?: string; company_name?: string; position?: string; whatsapp?: string;
   email?: string; phone?: string; notes?: string;
