@@ -293,6 +293,8 @@ The backend image installs its explicit runtime dependency list from `backend/re
 
 “客户管理”以 Excel 工作表 **客户档案表** 的 20 个字段为业务标准。`0019_customer_archive_fields` 只新增可空字段和索引，不会删除 `customers`、改写客户 ID，或破坏 contacts、opportunities、quotations、inquiries、followups 的 `customer_id` 关联。已有 CRM 的销售阶段只会被映射到新的“跟进阶段”展示字段；原有枚举字段仍保留给旧页面和 Dashboard 使用。
 
+客户管理列表以每页 10 位客户显示档案表的核心字段；表格顶部的横向滚动条与数据表同步，便于在页首查看所有列。列表同时提供页码、总页数和跳页输入框。`GET /api/v1/customers` 未传 `limit` 时默认返回 10 位客户；其他模块仍可显式传入所需的安全页大小。
+
 | Excel 字段 | CRM 字段 |
 | --- | --- |
 | 获得客户时间、来源、客户名、公司名、职位、备注、国家 | `customer_acquired_at`、`source`、`contact_name`、`company_name`、`position`、`notes`、`country` |

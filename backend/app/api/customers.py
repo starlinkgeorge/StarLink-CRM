@@ -56,7 +56,7 @@ def _parse_sales_stage_filter(value: str | None) -> CustomerStatus | None:
 
 @router.get("", response_model=CustomerPage)
 def list_customers(
-    limit: int = Query(default=20, ge=1, le=100),
+    limit: int = Query(default=10, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     q: str | None = Query(default=None, max_length=255),
     status_filter: str | None = Query(default=None, alias="status", max_length=50),

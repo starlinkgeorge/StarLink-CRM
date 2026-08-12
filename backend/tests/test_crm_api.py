@@ -106,6 +106,10 @@ def test_customer_lifecycle_with_contacts_and_followups(client: TestClient) -> N
     assert unfiltered.status_code == 200
     assert unfiltered.json()["total"] == 1
 
+    default_page = client.get("/api/v1/customers", headers=sales_token)
+    assert default_page.status_code == 200
+    assert default_page.json()["limit"] == 10
+
     invalid_filter = client.get(
         "/api/v1/customers", params={"status": "NotAStatus"}, headers=sales_token
     )
