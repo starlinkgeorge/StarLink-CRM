@@ -9,6 +9,10 @@ from app.models.inquiry import Inquiry, InquiryStatus
 from app.models.lead import Opportunity, OpportunityReminderStatus, OpportunitySalesStage
 from app.models.user import User, UserRole
 from app.services.access_service import customer_scope
+from app.services.followup_reminder_service import (
+    list_customer_followup_reminders,
+    shanghai_today,
+)
 
 
 def _serialize_followup(followup: FollowUp, customer_name: str) -> dict:
@@ -34,9 +38,15 @@ def get_dashboard_stats(session: Session, user: User) -> dict:
         )
         or 0
     )
+    # Keep the legacy dashboard counters on their existing server-date
+    # behaviour.  The new follow-up reminders alone use the China business
+    # day, including when the API runs in Vercel's UTC environment.
     today = date.today()
+    followup_today = shanghai_today()
     week_start = today - timedelta(days=today.weekday())
     week_end = week_start + timedelta(days=7)
+    followup_week_start = followup_today - timedelta(days=followup_today.weekday())
+    followup_week_end = followup_week_start + timedelta(days=7)
     new_customers_today = session.scalar(
         select(func.count())
         .select_from(Customer)
@@ -59,7 +69,9 @@ def get_dashboard_stats(session: Session, user: User) -> dict:
     ).all()
     due_followups = session.scalar(
         select(func.count()).select_from(FollowUp).join(Customer).where(
-            *filters, FollowUp.next_followup_date.is_not(None), FollowUp.next_followup_date <= today
+            *filters,
+            FollowUp.next_followup_date.is_not(None),
+            FollowUp.next_followup_date <= followup_today,
         )
     ) or 0
     week_followup_count = session.scalar(
@@ -77,19 +89,19 @@ def get_dashboard_stats(session: Session, user: User) -> dict:
     # week for backwards-compatible dashboard consumers.
     today_due_customer_count = session.scalar(
         select(func.count()).select_from(Customer).where(
-            *filters, Customer.next_followup_date == today
+            *filters, Customer.next_followup_date == followup_today
         )
     ) or 0
     overdue_customer_count = session.scalar(
         select(func.count()).select_from(Customer).where(
-            *filters, Customer.next_followup_date < today
+            *filters, Customer.next_followup_date < followup_today
         )
     ) or 0
     week_followup_task_count = session.scalar(
         select(func.count()).select_from(Customer).where(
             *filters,
-            Customer.next_followup_date >= week_start,
-            Customer.next_followup_date < week_end,
+            Customer.next_followup_date >= followup_week_start,
+            Customer.next_followup_date < followup_week_end,
         )
     ) or 0
     pipeline_rows = session.execute(
@@ -118,19 +130,19 @@ def get_dashboard_stats(session: Session, user: User) -> dict:
         .where(
             FollowUp.id.in_(select(latest_followup_ids.c.id)),
             FollowUp.next_followup_date.is_not(None),
-            FollowUp.next_followup_date <= today,
+            FollowUp.next_followup_date <= followup_today,
         )
         .order_by(FollowUp.next_followup_date.asc(), FollowUp.id.desc())
     ).all()
     today_reminders = [
         (followup, name)
         for followup, name in current_reminders
-        if followup.next_followup_date == today
+        if followup.next_followup_date == followup_today
     ]
     overdue_reminders = [
         (followup, name)
         for followup, name in current_reminders
-        if followup.next_followup_date < today
+        if followup.next_followup_date < followup_today
     ]
     opportunity_filters = []
     if user.role is UserRole.SALES:
@@ -186,6 +198,7 @@ def get_dashboard_stats(session: Session, user: User) -> dict:
                 "last_activity_at": opportunity.last_activity_at,
             }
         )
+    followup_reminder_summary, _ = list_customer_followup_reminders(session, user)
     return {
         "customer_count": customer_count,
         "followup_count": followup_count,
@@ -238,4 +251,8 @@ def get_dashboard_stats(session: Session, user: User) -> dict:
         "quote_followup_overdue_count": quote_followup_overdue_count,
         "inactive_opportunity_count": inactive_opportunity_count,
         "opportunity_reminders": opportunity_reminders[:10],
+        "followup_reminder_overdue_count": followup_reminder_summary["overdue_count"],
+        "followup_reminder_today_count": followup_reminder_summary["today_count"],
+        "followup_reminder_upcoming_count": followup_reminder_summary["upcoming_count"],
+        "followup_reminder_unfollowed_count": followup_reminder_summary["unfollowed_count"],
     }

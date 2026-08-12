@@ -79,3 +79,7 @@ class DashboardStats(BaseModel):
     quote_followup_overdue_count: int
     inactive_opportunity_count: int
     opportunity_reminders: list[OpportunityReminder]
+    followup_reminder_overdue_count: int
+    followup_reminder_today_count: int
+    followup_reminder_upcoming_count: int
+    followup_reminder_unfollowed_count: int

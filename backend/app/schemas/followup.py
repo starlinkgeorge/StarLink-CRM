@@ -4,6 +4,7 @@ from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.followup import FollowUpType
+from app.services.followup_reminder_service import shanghai_today
 
 
 class FollowUpCreate(BaseModel):
@@ -11,7 +12,7 @@ class FollowUpCreate(BaseModel):
     user_id: int | None = Field(default=None, gt=0)
     opportunity_id: int | None = Field(default=None, gt=0)
     type: FollowUpType
-    followup_date: date = Field(default_factory=date.today)
+    followup_date: date = Field(default_factory=shanghai_today)
     content: str = Field(min_length=1, max_length=5000)
     next_followup_date: Optional[date] = None
 

@@ -98,6 +98,9 @@ class CustomerRead(CustomerFields):
     next_followup_date: Optional[date] = None
     last_followup_at: Optional[datetime] = None
     followup_reminder_status: CustomerFollowUpReminderStatus = CustomerFollowUpReminderStatus.NONE
+    suggested_followup_date: Optional[date] = None
+    calculated_followup_reminder_status: str = "unfollowed"
+    calculated_followup_reminder_label: str = "尚未跟进"
     category: Optional["CustomerCategoryRead"] = None
     created_at: datetime
     updated_at: datetime

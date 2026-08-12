@@ -5,6 +5,7 @@ import { CustomerDetailPage } from "./pages/CustomerDetailPage";
 import { CustomerClassificationPage } from "./pages/CustomerClassificationPage";
 import { CustomerArchivePage } from "./pages/CustomerArchivePage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { FollowupRemindersPage } from "./pages/FollowupRemindersPage";
 import { InquiryDetailPage } from "./pages/InquiryDetailPage";
 import { InquiriesPage } from "./pages/InquiriesPage";
 import { LeadDetailPage } from "./pages/LeadDetailPage";
@@ -26,6 +27,7 @@ export function App() {
     <Route path="/login" element={<LoginPage />} />
     <Route element={<ProtectedRoute />}><Route element={<AppLayout />}>
       <Route path="/" element={<DashboardPage />} />
+      <Route path="/followup-reminders" element={<FollowupRemindersPage />} />
       <Route path="/leads" element={<LeadsPage />} /><Route path="/leads/:id" element={<LeadDetailPage />} />
       <Route path="/inquiries" element={<InquiriesPage />} /><Route path="/inquiries/:id" element={<InquiryDetailPage />} />
       <Route path="/customers" element={<CustomerArchivePage />} /><Route path="/customers/new" element={<NewCustomerPage />} /><Route path="/customers/:id" element={<CustomerDetailPage />} />

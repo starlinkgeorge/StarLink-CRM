@@ -7,6 +7,7 @@ const navItems = [
   ["/inquiries", "Alibaba 询盘"],
   ["/leads", "询盘池（旧）"],
   ["/customers", "客户管理"],
+  ["/followup-reminders", "跟进提醒"],
   ["/opportunities", "商机管理"],
   ["/pipeline", "销售漏斗"],
   ["/products", "产品库"],

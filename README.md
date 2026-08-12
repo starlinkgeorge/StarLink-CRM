@@ -351,6 +351,23 @@ keeps the export compatible with Excel without changing stored data. The
 export is read-only: it does not alter customers or their commercial
 relationships.
 
+## Customer follow-up reminders V1
+
+The **Follow-up reminders** page calculates a live follow-up queue from each
+customer archive record's `latest_followup_date` and `followup_stage`.  The
+approved cadence is: new development/no reply 2 days, new development/replied
+1 day, quotation and sample purchase 3 days, won 7 days, and repurchase or
+cold customer 30 days.  The system always uses the China (`Asia/Shanghai`)
+business date, so Vercel's UTC runtime cannot move a reminder to the wrong
+calendar day.
+
+Suggested dates and reminder statuses are deliberately calculated at read
+time; they are not stored in the database.  A customer with no latest
+follow-up is shown as **尚未跟进** and included in the action queue.  Creating
+or editing a follow-up record updates `customers.latest_followup_date` to the
+record's follow-up date, which immediately starts the next cadence cycle.
+Legacy manual `next_followup_date` values remain untouched for compatibility.
+
 ```text
 StarLink-CRM/
 ├── frontend/       # React + TypeScript application

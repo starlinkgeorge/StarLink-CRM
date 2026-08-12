@@ -5,6 +5,7 @@ import { salesStageLabels } from "../constants/opportunitySalesStages";
 import { getDashboardStats } from "../services/crm";
 import { useAuth } from "../store/auth";
 import type {
+  CalculatedFollowupReminderStatus,
   DashboardStats,
   FollowUpReminder,
   OpportunityReminder,
@@ -102,13 +103,14 @@ export function DashboardPage() {
     };
   }, []);
 
-  const cards = [
-    ["今日待跟进客户", stats?.today_due_customer_count, "text-amber-700"],
-    ["逾期跟进客户", stats?.overdue_customer_count, "text-rose-700"],
-    ["本周跟进任务", stats?.week_followup_task_count, "text-blue-700"],
-    ["报价待跟进商机", stats?.quote_followup_overdue_count, "text-rose-700"],
-    ["长期无活动商机", stats?.inactive_opportunity_count, "text-violet-700"],
-    ["客户总数", stats?.customer_count, "text-slate-800"],
+  const cards: Array<[string, number | undefined, string, CalculatedFollowupReminderStatus | undefined]> = [
+    ["已逾期", stats?.followup_reminder_overdue_count, "text-rose-700", "overdue"],
+    ["今天需要跟进", stats?.followup_reminder_today_count, "text-orange-700", "today"],
+    ["未来3天", stats?.followup_reminder_upcoming_count, "text-amber-700", "upcoming"],
+    ["尚未跟进", stats?.followup_reminder_unfollowed_count, "text-violet-700", "unfollowed"],
+    ["报价待跟进商机", stats?.quote_followup_overdue_count, "text-rose-700", undefined],
+    ["长期无活动商机", stats?.inactive_opportunity_count, "text-violet-700", undefined],
+    ["客户总数", stats?.customer_count, "text-slate-800", undefined],
   ];
   const maxStageCount = Math.max(
     1,
@@ -128,13 +130,14 @@ export function DashboardPage() {
       </div>
       {error && <p className="mt-4 text-sm text-rose-600">{error}</p>}
 
-      <section className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
-        {cards.map(([title, value, color]) => (
-          <article key={String(title)} className="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-            <p className="text-sm text-slate-500">{title}</p>
-            <p className={`mt-2 text-3xl font-bold ${color}`}>{value ?? "—"}</p>
-          </article>
-        ))}
+      <section className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {cards.map(([title, value, color, reminderFilter]) => {
+          const content = <><p className="text-sm text-slate-500">{title}</p><p className={`mt-2 text-3xl font-bold ${color}`}>{value ?? "—"}</p></>;
+          const className = "rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200";
+          return reminderFilter ? (
+            <Link key={title} to={`/followup-reminders?status=${reminderFilter}`} className={`${className} transition hover:-translate-y-0.5 hover:shadow-md`}>{content}</Link>
+          ) : <article key={title} className={className}>{content}</article>;
+        })}
       </section>
 
       <section className="mt-6 grid gap-5 xl:grid-cols-5">
@@ -164,7 +167,7 @@ export function DashboardPage() {
         </article>
 
         <article className="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200 xl:col-span-2">
-          <div className="flex items-center justify-between"><h3 className="font-bold">客户跟进提醒</h3><Link to="/customers" className="text-sm text-blue-700">客户列表</Link></div>
+          <div className="flex items-center justify-between"><h3 className="font-bold">客户跟进提醒</h3><Link to="/followup-reminders" className="text-sm text-blue-700">打开提醒中心</Link></div>
           <h4 className="mt-4 text-sm font-semibold text-rose-700">逾期未跟进</h4>
           <div className="mt-2"><FollowUpReminderList items={stats?.overdue_followups ?? []} emptyText="暂无逾期客户。" /></div>
           <h4 className="mt-5 text-sm font-semibold text-amber-700">今日待跟进</h4>

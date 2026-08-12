@@ -257,10 +257,12 @@ def test_user_email_must_be_unique(client: TestClient) -> None:
 def test_dashboard_separates_today_and_overdue_customer_reminders(
     client: TestClient,
 ) -> None:
+    from app.services.followup_reminder_service import shanghai_today
+
     admin_token = login(client, "admin@example.com", "AdminPass123!")
     users = client.get("/api/v1/users", headers=admin_token)
     admin_id = users.json()[0]["id"]
-    today = date.today()
+    today = shanghai_today()
 
     customers = {}
     for company_name in ("Today Customer", "Overdue Customer", "Future Customer"):
@@ -307,6 +309,54 @@ def test_dashboard_separates_today_and_overdue_customer_reminders(
     assert payload["today_followups"][0]["reminder_status"] == "today"
     assert payload["overdue_followups"][0]["reminder_status"] == "overdue"
     assert payload["due_followups"] == 3
+
+
+def test_customer_followup_reminder_v1_recalculates_after_a_new_followup(
+    client: TestClient,
+) -> None:
+    from app.services.followup_reminder_service import shanghai_today
+
+    admin_token = login(client, "admin@example.com", "AdminPass123!")
+    admin_id = client.get("/api/v1/users", headers=admin_token).json()[0]["id"]
+    today = shanghai_today()
+    previous_followup_date = today - timedelta(days=2)
+    customer = client.post(
+        "/api/v1/customers",
+        json={
+            "company_name": "Cadence Customer",
+            "followup_stage": "已报价",
+            "latest_followup_date": previous_followup_date.isoformat(),
+        },
+        headers=admin_token,
+    )
+    assert customer.status_code == 201
+    assert customer.json()["suggested_followup_date"] == (
+        previous_followup_date + timedelta(days=3)
+    ).isoformat()
+
+    created_followup = client.post(
+        "/api/v1/followups",
+        json={
+            "customer_id": customer.json()["id"],
+            "user_id": admin_id,
+            "type": "Email",
+            "followup_date": today.isoformat(),
+            "content": "Quotation follow-up was sent.",
+        },
+        headers=admin_token,
+    )
+    assert created_followup.status_code == 201
+
+    detail = client.get(f"/api/v1/customers/{customer.json()['id']}", headers=admin_token)
+    assert detail.status_code == 200
+    assert detail.json()["latest_followup_date"] == today.isoformat()
+    assert detail.json()["suggested_followup_date"] == (today + timedelta(days=3)).isoformat()
+
+    reminders = client.get("/api/v1/followup-reminders?status=upcoming", headers=admin_token)
+    assert reminders.status_code == 200
+    reminder = next(item for item in reminders.json()["items"] if item["id"] == customer.json()["id"])
+    assert reminder["suggested_followup_date"] == (today + timedelta(days=3)).isoformat()
+    assert reminder["followup_reminder"]["status"] == "upcoming"
 
 
 def test_alibaba_followup_channel_is_supported_and_visible_in_timeline(client: TestClient) -> None:

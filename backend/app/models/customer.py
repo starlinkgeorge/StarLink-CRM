@@ -143,11 +143,42 @@ class Customer(TimestampMixin, Base):
     def followup_reminder_status(self) -> CustomerFollowUpReminderStatus:
         if self.next_followup_date is None:
             return CustomerFollowUpReminderStatus.NONE
-        if self.next_followup_date < date.today():
+        from app.services.followup_reminder_service import shanghai_today
+
+        today = shanghai_today()
+        if self.next_followup_date < today:
             return CustomerFollowUpReminderStatus.OVERDUE
-        if self.next_followup_date == date.today():
+        if self.next_followup_date == today:
             return CustomerFollowUpReminderStatus.TODAY
         return CustomerFollowUpReminderStatus.SCHEDULED
+
+    @property
+    def suggested_followup_date(self) -> Optional[date]:
+        """V1 cadence-derived date, calculated from the customer archive fields."""
+        # A function-local import prevents the model/service import graph from
+        # becoming circular during SQLAlchemy model registration.
+        from app.services.followup_reminder_service import calculate_followup_reminder
+
+        return calculate_followup_reminder(
+            self.latest_followup_date, self.followup_stage
+        ).suggested_followup_date
+
+    @property
+    def calculated_followup_reminder_status(self) -> str:
+        """Live V1 status; unlike legacy next_followup_date it is never stored."""
+        from app.services.followup_reminder_service import calculate_followup_reminder
+
+        return calculate_followup_reminder(
+            self.latest_followup_date, self.followup_stage
+        ).status.value
+
+    @property
+    def calculated_followup_reminder_label(self) -> str:
+        from app.services.followup_reminder_service import calculate_followup_reminder
+
+        return calculate_followup_reminder(
+            self.latest_followup_date, self.followup_stage
+        ).label
 
 
 class Contact(CreatedAtMixin, Base):

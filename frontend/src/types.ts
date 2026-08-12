@@ -7,6 +7,7 @@ export type OpportunitySalesStage = "New Lead" | "Contacted" | "Requirement Conf
 export type OpportunityDealStage = "New Inquiry" | "Contacted" | "Quoted" | "Negotiating" | "Won" | "Lost";
 export type OpportunityReminderStatus = "None" | "Quote Follow-up Due" | "Inactive";
 export type CustomerFollowUpReminderStatus = "None" | "Scheduled" | "Today" | "Overdue";
+export type CalculatedFollowupReminderStatus = "overdue" | "today" | "upcoming" | "not_needed" | "unfollowed" | "stage_unset";
 export interface Lead {
   id: number; public_id: string; company_name: string; contact_name: string;
   country: string | null; email: string | null; phone: string | null; whatsapp: string | null;
@@ -92,6 +93,9 @@ export interface Customer {
   customer_score: number; score_updated_at: string | null;
   next_followup_date: string | null; last_followup_at: string | null;
   followup_reminder_status: CustomerFollowUpReminderStatus;
+  suggested_followup_date: string | null;
+  calculated_followup_reminder_status: CalculatedFollowupReminderStatus;
+  calculated_followup_reminder_label: string;
   level: "A" | "B" | "C"; status: CustomerStatus; sales_stage: CustomerStatus;
   owner_id: number | null;
   created_at: string; updated_at: string;
@@ -159,6 +163,27 @@ export interface DashboardStats {
   opportunity_pipeline: { sales_stage: OpportunitySalesStage; count: number }[];
   quote_followup_overdue_count: number; inactive_opportunity_count: number;
   opportunity_reminders: OpportunityReminder[];
+  followup_reminder_overdue_count: number;
+  followup_reminder_today_count: number;
+  followup_reminder_upcoming_count: number;
+  followup_reminder_unfollowed_count: number;
+}
+export interface CustomerFollowupReminderState {
+  status: CalculatedFollowupReminderStatus; label: string;
+  suggested_followup_date: string | null; overdue_days: number | null; days_until_due: number | null;
+}
+export interface CustomerFollowupReminder {
+  id: number; customer_name: string | null; company_name: string; country: string | null;
+  customer_level_value: number | null; customer_total_score: number | null;
+  followup_stage: string | null; latest_followup_date: string | null;
+  suggested_followup_date: string | null; followup_reminder: CustomerFollowupReminderState;
+  whatsapp: string | null; email: string | null;
+}
+export interface CustomerFollowupReminderSummary {
+  overdue_count: number; today_count: number; upcoming_count: number; unfollowed_count: number;
+}
+export interface CustomerFollowupReminderPage {
+  summary: CustomerFollowupReminderSummary; items: CustomerFollowupReminder[];
 }
 export interface FollowUpReminder {
   id: number; customer_id: number; customer_name: string; type: string; content: string;

@@ -1,5 +1,5 @@
 import api from "./api";
-import type { AlibabaInquiryResult, AlibabaIntegrationStatus, Customer, CustomerActivity, CustomerCategory, CustomerCenter, CustomerDetail, CustomerPage, CustomerScoreHistory, DashboardStats, FollowUp, FollowUpAttachment, Inquiry, InquiryConversion, InquiryPage, InquiryStatus, Lead, LeadConversion, LeadDetail, LeadPage, LeadStatus, OpportunityDealPipeline, OpportunityDealStage, OpportunityDetail, OpportunityListItem, OpportunityPage, OpportunityPipeline, OpportunitySalesStage, OpportunityStage, Product, ProductCategory, ProductPage, QuotationDetail, QuotationPage, QuotationStatus, Tag } from "../types";
+import type { AlibabaInquiryResult, AlibabaIntegrationStatus, CalculatedFollowupReminderStatus, Customer, CustomerActivity, CustomerCategory, CustomerCenter, CustomerDetail, CustomerFollowupReminderPage, CustomerPage, CustomerScoreHistory, DashboardStats, FollowUp, FollowUpAttachment, Inquiry, InquiryConversion, InquiryPage, InquiryStatus, Lead, LeadConversion, LeadDetail, LeadPage, LeadStatus, OpportunityDealPipeline, OpportunityDealStage, OpportunityDetail, OpportunityListItem, OpportunityPage, OpportunityPipeline, OpportunitySalesStage, OpportunityStage, Product, ProductCategory, ProductPage, QuotationDetail, QuotationPage, QuotationStatus, Tag } from "../types";
 
 export type CustomerCreatePayload = {
   company_name: string; contact_name?: string; country?: string; email?: string; phone?: string;
@@ -14,6 +14,9 @@ export type CustomerCreatePayload = {
 };
 
 export const getDashboardStats = async () => (await api.get<DashboardStats>("/dashboard/stats")).data;
+export const getCustomerFollowupReminders = async (status?: CalculatedFollowupReminderStatus) => (
+  await api.get<CustomerFollowupReminderPage>("/followup-reminders", { params: status ? { status } : undefined })
+).data;
 export type CustomerFilters = {
   limit: number; offset: number; q?: string; status?: string; level?: string; country?: string;
   customer_type?: string; source?: string; interested_product?: string; sales_stage?: string;

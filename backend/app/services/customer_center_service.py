@@ -34,6 +34,9 @@ def get_customer_center(
     return CustomerCenter.model_validate(
         {
             **customer.__dict__,
+            "suggested_followup_date": customer.suggested_followup_date,
+            "calculated_followup_reminder_status": customer.calculated_followup_reminder_status,
+            "calculated_followup_reminder_label": customer.calculated_followup_reminder_label,
             "opportunities": opportunities,
             "quotations": quotations,
             "activities": customer_activity_service.list_customer_timeline(session, customer),

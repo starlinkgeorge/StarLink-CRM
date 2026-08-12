@@ -41,7 +41,9 @@ def _validate_opportunity(
         raise ConflictError("The opportunity does not belong to this customer.")
 
 
-def _refresh_customer_reminder(session: Session, customer_id: int) -> None:
+def _refresh_customer_reminder(
+    session: Session, customer_id: int, *, sync_latest_followup_date: bool = False
+) -> None:
     """Persist the latest follow-up's reminder on the customer summary row."""
     customer = session.get(Customer, customer_id)
     if customer is None:
@@ -56,6 +58,12 @@ def _refresh_customer_reminder(session: Session, customer_id: int) -> None:
     customer.last_followup_at = (
         (latest.updated_at or latest.created_at) if latest else None
     )
+    # The archive field is the source for the V1 cadence reminder.  When a
+    # user records or edits a follow-up, it becomes the latest actual contact
+    # date and immediately drives a newly calculated reminder.  Deletion does
+    # not overwrite an imported archive date that may pre-date CRM history.
+    if sync_latest_followup_date and latest is not None:
+        customer.latest_followup_date = latest.followup_date
 
 
 def _sync_opportunity_followup_activity(
@@ -105,7 +113,9 @@ def create_followup(session: Session, payload: FollowUpCreate) -> FollowUp:
     followup = FollowUp(**payload.model_dump())
     session.add(followup)
     session.flush()
-    _refresh_customer_reminder(session, followup.customer_id)
+    _refresh_customer_reminder(
+        session, followup.customer_id, sync_latest_followup_date=True
+    )
     _sync_opportunity_followup_activity(
         session, followup.opportunity_id, touch_activity=True
     )
@@ -125,7 +135,9 @@ def update_followup(session: Session, followup_id: int, payload: FollowUpUpdate)
     for field, value in changes.items():
         setattr(followup, field, value)
     session.flush()
-    _refresh_customer_reminder(session, followup.customer_id)
+    _refresh_customer_reminder(
+        session, followup.customer_id, sync_latest_followup_date=True
+    )
     _sync_opportunity_followup_activity(session, previous_opportunity_id)
     _sync_opportunity_followup_activity(
         session, followup.opportunity_id, touch_activity=bool(changes)

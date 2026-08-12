@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { StatusBadge } from "../components/StatusBadge";
 import { CustomerArchiveProfile } from "../components/CustomerArchiveProfile";
+import { FollowupReminderBadge } from "../components/FollowupReminderBadge";
 import {
   assignTag,
   createFollowup,
@@ -40,9 +41,11 @@ const quotationStatusText: Record<QuotationStatus, string> = {
 };
 
 function localDateString() {
-  const now = new Date();
-  const localTime = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
-  return localTime.toISOString().slice(0, 10);
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(new Date());
+  const part = (type: string) => parts.find((item) => item.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
 }
 
 function ReminderBadge({ followupDate }: { followupDate: string }) {
@@ -140,8 +143,8 @@ export function CustomerDetailPage() {
   }, [load]);
 
   const editable = user?.role !== "Viewer";
-  // V10 returns the server-calculated current reminder.  It avoids relying on
-  // the page's visible-history ordering and remains correct after edits/deletes.
+  // V1 derives its cadence from the archive's follow-up date and stage.
+  // The legacy manual next_followup_date remains visible in historical records.
   const currentReminder = customer?.next_followup_date;
 
   async function addFollowup(event: FormEvent) {
@@ -325,10 +328,14 @@ export function CustomerDetailPage() {
       <section className="mt-5 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h3 className="text-sm font-semibold">当前跟进提醒</h3>
-            <p className="mt-1 text-sm text-slate-500">以客户最新一条跟进记录设置的日期为准</p>
+            <h3 className="text-sm font-semibold">跟进提醒</h3>
+            <p className="mt-1 text-sm text-slate-500">按最近跟进日期和跟进阶段自动计算（中国时间）</p>
           </div>
-          {currentReminder ? <ReminderBadge followupDate={currentReminder} /> : <span className="text-sm text-slate-500">暂无待跟进提醒</span>}
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {customer.suggested_followup_date && <span className="text-sm text-slate-600">建议：{customer.suggested_followup_date}</span>}
+            <FollowupReminderBadge status={customer.calculated_followup_reminder_status} label={customer.calculated_followup_reminder_label} />
+            {currentReminder && <span className="text-xs text-slate-400">手工计划：{currentReminder}</span>}
+          </div>
         </div>
       </section>
 

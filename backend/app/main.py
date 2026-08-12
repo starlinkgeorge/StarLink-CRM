@@ -8,6 +8,7 @@ from app.api import (
     customers,
     dashboard,
     followups,
+    followup_reminders,
     inquiries,
     integrations,
     leads,
@@ -44,6 +45,7 @@ app.include_router(customer_categories.router, prefix=settings["api_prefix"])
 app.include_router(tags.router, prefix=settings["api_prefix"])
 app.include_router(contacts.router, prefix=settings["api_prefix"])
 app.include_router(followups.router, prefix=settings["api_prefix"])
+app.include_router(followup_reminders.router, prefix=settings["api_prefix"])
 app.include_router(inquiries.router, prefix=settings["api_prefix"])
 app.include_router(leads.router, prefix=settings["api_prefix"])
 app.include_router(integrations.router, prefix=settings["api_prefix"])
