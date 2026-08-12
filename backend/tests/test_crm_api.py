@@ -324,6 +324,7 @@ def test_customer_followup_reminder_v1_recalculates_after_a_new_followup(
         "/api/v1/customers",
         json={
             "company_name": "Cadence Customer",
+            "customer_acquired_at": "2026-08-12",
             "followup_stage": "已报价",
             "latest_followup_date": previous_followup_date.isoformat(),
         },
@@ -357,6 +358,55 @@ def test_customer_followup_reminder_v1_recalculates_after_a_new_followup(
     reminder = next(item for item in reminders.json()["items"] if item["id"] == customer.json()["id"])
     assert reminder["suggested_followup_date"] == (today + timedelta(days=3)).isoformat()
     assert reminder["followup_reminder"]["status"] == "upcoming"
+
+
+def test_followup_reminders_exclude_legacy_and_unknown_acquisition_dates(
+    client: TestClient,
+) -> None:
+    admin_token = login(client, "admin@example.com", "AdminPass123!")
+    legacy = client.post(
+        "/api/v1/customers",
+        json={
+            "company_name": "Legacy Reminder Customer",
+            "customer_acquired_at": "2026-08-11",
+            "followup_stage": "已报价",
+            "latest_followup_date": "2026-08-10",
+        },
+        headers=admin_token,
+    )
+    unknown = client.post(
+        "/api/v1/customers",
+        json={
+            "company_name": "Unknown Acquisition Customer",
+            "followup_stage": "已报价",
+            "latest_followup_date": "2026-08-10",
+        },
+        headers=admin_token,
+    )
+    assert legacy.status_code == 201
+    assert unknown.status_code == 201
+
+    for customer in (legacy.json(), unknown.json()):
+        assert customer["suggested_followup_date"] is None
+        assert customer["calculated_followup_reminder_status"] == "not_applicable"
+        assert customer["calculated_followup_reminder_label"] == "不适用"
+
+    reminders = client.get("/api/v1/followup-reminders", headers=admin_token)
+    assert reminders.status_code == 200
+    assert reminders.json()["items"] == []
+    assert reminders.json()["summary"] == {
+        "overdue_count": 0,
+        "today_count": 0,
+        "upcoming_count": 0,
+        "unfollowed_count": 0,
+    }
+
+    dashboard = client.get("/api/v1/dashboard/stats", headers=admin_token)
+    assert dashboard.status_code == 200
+    assert dashboard.json()["followup_reminder_overdue_count"] == 0
+    assert dashboard.json()["followup_reminder_today_count"] == 0
+    assert dashboard.json()["followup_reminder_upcoming_count"] == 0
+    assert dashboard.json()["followup_reminder_unfollowed_count"] == 0
 
 
 def test_alibaba_followup_channel_is_supported_and_visible_in_timeline(client: TestClient) -> None:

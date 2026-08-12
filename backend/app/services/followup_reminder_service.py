@@ -21,6 +21,11 @@ if TYPE_CHECKING:
 
 CHINA_TIMEZONE = ZoneInfo("Asia/Shanghai")
 
+# V1 only applies to customers acquired from this business date onward.  This
+# uses the archive acquisition date rather than the CRM record/import time, so
+# importing historical records cannot create a false reminder backlog.
+FOLLOWUP_REMINDER_APPLICABLE_FROM = date(2026, 8, 12)
+
 # These values are the user's approved V1 cadence.  Do not silently fall back
 # to a guessed cadence for an unconfigured or legacy follow-up stage.
 FOLLOWUP_STAGE_INTERVAL_DAYS: dict[str, int] = {
@@ -41,6 +46,7 @@ class FollowupReminderStatus(StrEnum):
     NOT_NEEDED = "not_needed"
     UNFOLLOWED = "unfollowed"
     STAGE_UNSET = "stage_unset"
+    NOT_APPLICABLE = "not_applicable"
 
 
 @dataclass(frozen=True)
@@ -131,6 +137,36 @@ def calculate_followup_reminder(
     )
 
 
+def is_followup_reminder_applicable(customer_acquired_at: date | None) -> bool:
+    """Whether a customer is in scope for the V1 reminder programme."""
+    return (
+        customer_acquired_at is not None
+        and customer_acquired_at >= FOLLOWUP_REMINDER_APPLICABLE_FROM
+    )
+
+
+def calculate_customer_followup_reminder(
+    customer_acquired_at: date | None,
+    latest_followup_date: date | None,
+    followup_stage: str | None,
+    *,
+    today: date | None = None,
+) -> FollowupReminder:
+    """Apply V1 eligibility before calculating the cadence-derived reminder."""
+    if not is_followup_reminder_applicable(customer_acquired_at):
+        return FollowupReminder(
+            status=FollowupReminderStatus.NOT_APPLICABLE,
+            label="不适用",
+            suggested_followup_date=None,
+            priority=9,
+        )
+    return calculate_followup_reminder(
+        latest_followup_date,
+        followup_stage,
+        today=today,
+    )
+
+
 def _sort_key(item: dict[str, object]) -> tuple[int, int, str, int]:
     reminder = item["followup_reminder"]
     assert isinstance(reminder, dict)
@@ -145,7 +181,8 @@ def _sort_key(item: dict[str, object]) -> tuple[int, int, str, int]:
 
 
 def _serialize_customer(customer: Customer, *, today: date) -> dict[str, object]:
-    reminder = calculate_followup_reminder(
+    reminder = calculate_customer_followup_reminder(
+        customer.customer_acquired_at,
         customer.latest_followup_date,
         customer.followup_stage,
         today=today,
@@ -173,7 +210,7 @@ def list_customer_followup_reminders(
     status_filter: FollowupReminderStatus | None = None,
     today: date | None = None,
 ) -> tuple[dict[str, int], list[dict[str, object]]]:
-    """Return all accessible customers, ranked by the V1 reminder urgency."""
+    """Return eligible accessible customers, ranked by V1 reminder urgency."""
     from sqlalchemy import select
 
     from app.models.customer import Customer
@@ -181,7 +218,9 @@ def list_customer_followup_reminders(
 
     current_day = today or shanghai_today()
     scope = customer_scope(user)
-    statement = select(Customer)
+    statement = select(Customer).where(
+        Customer.customer_acquired_at >= FOLLOWUP_REMINDER_APPLICABLE_FROM
+    )
     if scope is not None:
         statement = statement.where(scope)
     rows = [_serialize_customer(customer, today=current_day) for customer in session.scalars(statement)]

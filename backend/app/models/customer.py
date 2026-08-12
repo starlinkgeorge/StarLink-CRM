@@ -157,27 +157,33 @@ class Customer(TimestampMixin, Base):
         """V1 cadence-derived date, calculated from the customer archive fields."""
         # A function-local import prevents the model/service import graph from
         # becoming circular during SQLAlchemy model registration.
-        from app.services.followup_reminder_service import calculate_followup_reminder
+        from app.services.followup_reminder_service import calculate_customer_followup_reminder
 
-        return calculate_followup_reminder(
-            self.latest_followup_date, self.followup_stage
+        return calculate_customer_followup_reminder(
+            self.customer_acquired_at,
+            self.latest_followup_date,
+            self.followup_stage,
         ).suggested_followup_date
 
     @property
     def calculated_followup_reminder_status(self) -> str:
         """Live V1 status; unlike legacy next_followup_date it is never stored."""
-        from app.services.followup_reminder_service import calculate_followup_reminder
+        from app.services.followup_reminder_service import calculate_customer_followup_reminder
 
-        return calculate_followup_reminder(
-            self.latest_followup_date, self.followup_stage
+        return calculate_customer_followup_reminder(
+            self.customer_acquired_at,
+            self.latest_followup_date,
+            self.followup_stage,
         ).status.value
 
     @property
     def calculated_followup_reminder_label(self) -> str:
-        from app.services.followup_reminder_service import calculate_followup_reminder
+        from app.services.followup_reminder_service import calculate_customer_followup_reminder
 
-        return calculate_followup_reminder(
-            self.latest_followup_date, self.followup_stage
+        return calculate_customer_followup_reminder(
+            self.customer_acquired_at,
+            self.latest_followup_date,
+            self.followup_stage,
         ).label
 
 

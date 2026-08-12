@@ -7,7 +7,7 @@ export type OpportunitySalesStage = "New Lead" | "Contacted" | "Requirement Conf
 export type OpportunityDealStage = "New Inquiry" | "Contacted" | "Quoted" | "Negotiating" | "Won" | "Lost";
 export type OpportunityReminderStatus = "None" | "Quote Follow-up Due" | "Inactive";
 export type CustomerFollowUpReminderStatus = "None" | "Scheduled" | "Today" | "Overdue";
-export type CalculatedFollowupReminderStatus = "overdue" | "today" | "upcoming" | "not_needed" | "unfollowed" | "stage_unset";
+export type CalculatedFollowupReminderStatus = "overdue" | "today" | "upcoming" | "not_needed" | "unfollowed" | "stage_unset" | "not_applicable";
 export interface Lead {
   id: number; public_id: string; company_name: string; contact_name: string;
   country: string | null; email: string | null; phone: string | null; whatsapp: string | null;

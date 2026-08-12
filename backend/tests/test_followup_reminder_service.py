@@ -2,7 +2,9 @@ from datetime import date, datetime, timezone
 
 from app.services.followup_reminder_service import (
     FollowupReminderStatus,
+    calculate_customer_followup_reminder,
     calculate_followup_reminder,
+    is_followup_reminder_applicable,
     shanghai_today,
 )
 
@@ -36,6 +38,42 @@ def test_missing_latest_followup_is_actionable() -> None:
     assert reminder.status is FollowupReminderStatus.UNFOLLOWED
     assert reminder.label == "尚未跟进"
     assert reminder.suggested_followup_date is None
+
+
+def test_archive_acquisition_date_controls_reminder_eligibility() -> None:
+    before_cutoff = calculate_customer_followup_reminder(
+        date(2026, 8, 11),
+        date(2026, 8, 10),
+        "已报价",
+        today=date(2026, 8, 12),
+    )
+    missing_date = calculate_customer_followup_reminder(
+        None,
+        None,
+        "已报价",
+        today=date(2026, 8, 12),
+    )
+
+    assert not is_followup_reminder_applicable(date(2026, 8, 11))
+    assert not is_followup_reminder_applicable(None)
+    assert before_cutoff.status is FollowupReminderStatus.NOT_APPLICABLE
+    assert before_cutoff.label == "不适用"
+    assert before_cutoff.suggested_followup_date is None
+    assert missing_date.status is FollowupReminderStatus.NOT_APPLICABLE
+    assert missing_date.label == "不适用"
+
+
+def test_cutoff_date_is_eligible_and_missing_followup_is_actionable() -> None:
+    reminder = calculate_customer_followup_reminder(
+        date(2026, 8, 12),
+        None,
+        "已报价",
+        today=date(2026, 8, 12),
+    )
+
+    assert is_followup_reminder_applicable(date(2026, 8, 12))
+    assert reminder.status is FollowupReminderStatus.UNFOLLOWED
+    assert reminder.label == "尚未跟进"
 
 
 def test_today_uses_asia_shanghai_not_utc_calendar_day() -> None:
