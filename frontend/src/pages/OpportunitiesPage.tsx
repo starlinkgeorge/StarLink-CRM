@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 
 import {
   createOpportunity,
+  deleteOpportunity,
   getCustomers,
   getOpportunities,
   type OpportunityPayload,
@@ -23,6 +24,7 @@ const PAGE_SIZE = 20;
 
 export function OpportunitiesPage() {
   const { user } = useAuth();
+  const canDelete = user?.role === "Admin";
   const [data, setData] = useState<OpportunityPage | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [offset, setOffset] = useState(0);
@@ -39,6 +41,7 @@ export function OpportunitiesPage() {
   });
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [deletingOpportunityId, setDeletingOpportunityId] = useState<number | null>(null);
 
   const load = useCallback(
     async (currentOffset = offset, filters = active) => {
@@ -94,6 +97,25 @@ export function OpportunitiesPage() {
       setError("无法创建商机，请检查客户和必填字段。");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function removeOpportunity(opportunityId: number, opportunityName: string) {
+    const confirmed = window.confirm(
+      `确定要删除商机“${opportunityName}”吗？商机产品和阶段记录会被删除，此操作不可恢复；客户、报价、跟进记录和询盘不会被删除。`,
+    );
+    if (!confirmed) return;
+    setDeletingOpportunityId(opportunityId);
+    try {
+      await deleteOpportunity(opportunityId);
+      setError("");
+      const nextOffset = data?.items.length === 1 && offset > 0 ? offset - PAGE_SIZE : offset;
+      if (nextOffset !== offset) setOffset(nextOffset);
+      else await load(nextOffset);
+    } catch {
+      setError("无法删除商机。请确认当前账户拥有管理员权限后重试。");
+    } finally {
+      setDeletingOpportunityId(null);
     }
   }
 
@@ -251,6 +273,7 @@ export function OpportunitiesPage() {
                 <th className="px-5 py-3">概率</th>
                 <th className="px-5 py-3">预计成交</th>
                 <th className="px-5 py-3">负责人</th>
+                {canDelete && <th className="px-5 py-3">操作</th>}
               </tr>
             </thead>
             <tbody>
@@ -270,10 +293,22 @@ export function OpportunitiesPage() {
                   <td className="px-5 py-4">{item.probability}%</td>
                   <td className="px-5 py-4">{item.expected_close_date ?? "—"}</td>
                   <td className="px-5 py-4">{item.owner_name ?? "—"}</td>
+                  {canDelete && (
+                    <td className="px-5 py-4">
+                      <button
+                        type="button"
+                        disabled={deletingOpportunityId === item.id}
+                        onClick={() => void removeOpportunity(item.id, item.name)}
+                        className="text-rose-600 disabled:opacity-50"
+                      >
+                        {deletingOpportunityId === item.id ? "删除中..." : "删除"}
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
               {data?.items.length === 0 && (
-                <tr><td colSpan={8} className="px-5 py-12 text-center text-slate-500">暂无商机</td></tr>
+                <tr><td colSpan={canDelete ? 9 : 8} className="px-5 py-12 text-center text-slate-500">暂无商机</td></tr>
               )}
             </tbody>
           </table>

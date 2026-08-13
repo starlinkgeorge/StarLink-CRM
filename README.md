@@ -122,7 +122,7 @@ Roles: `Admin` manages all records and users; `Sales` reads and manages only cus
 | Customer classification | `GET /customer-categories`, `POST /customer-categories`, `PUT /customer-categories/{id}`, `GET /customers?category_id={id}&score_min=50&score_max=100` |
 | Leads | `GET /leads`, `POST /leads`, `GET /leads/{id}`, `POST /leads/{id}/convert` |
 | Inquiries | `GET /inquiries`, `POST /inquiries`, `GET /inquiries/{id}`, `PUT /inquiries/{id}`, `POST /inquiries/{id}/convert` |
-| Opportunities | `GET /opportunities?deal_stage={stage}`, `GET /opportunities/pipeline` (V7 compatibility), `GET /opportunities/deal-pipeline` (V9), `POST /opportunities`, `GET /opportunities/{id}`, `PUT /opportunities/{id}`, `PUT /opportunities/{id}/products` |
+| Opportunities | `GET /opportunities?deal_stage={stage}`, `GET /opportunities/pipeline` (V7 compatibility), `GET /opportunities/deal-pipeline` (V9), `POST /opportunities`, `GET /opportunities/{id}`, `PUT /opportunities/{id}`, `DELETE /opportunities/{id}` (Admin-only; retains related quotations, follow-ups, and inquiries), `PUT /opportunities/{id}/products` |
 | Product categories | `GET /product-categories`, `POST /product-categories`, `PUT /product-categories/{id}` |
 | Products | `GET /products`, `POST /products`, `GET /products/{id}`, `PUT /products/{id}`, `DELETE /products/{id}` |
 | Quotations | `GET /quotations?customer_id={id}`, `POST /quotations`, `GET /quotations/{id}`, `PUT /quotations/{id}`, `DELETE /quotations/{id}` (Admin-only; removes quotation versions/items only), `POST /quotations/{id}/versions`, `POST /quotations/{id}/pdf`, `GET /quotations/{id}/pdf`, `GET /quotations/{id}/excel`, `POST /quotations/{id}/send` |

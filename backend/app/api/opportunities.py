@@ -124,6 +124,20 @@ def get_opportunity(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(error)) from error
 
 
+@router.delete("/{opportunity_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_opportunity(
+    opportunity_id: int,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    try:
+        opportunity_service.delete_opportunity(session, opportunity_id, current_user)
+    except NotFoundError as error:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+    except ForbiddenError as error:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(error)) from error
+
+
 @router.put("/{opportunity_id}", response_model=OpportunityDetail)
 def update_opportunity(
     opportunity_id: int,

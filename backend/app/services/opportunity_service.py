@@ -136,6 +136,11 @@ def _ensure_manage_access(user: User, opportunity: Opportunity) -> None:
     _ensure_read_access(user, opportunity)
 
 
+def _ensure_delete_access(user: User) -> None:
+    if user.role is not UserRole.ADMIN:
+        raise ForbiddenError("Only Admin accounts can delete opportunities.")
+
+
 def _validate_owner(session: Session, owner_id: int | None) -> None:
     if owner_id is not None and session.get(User, owner_id) is None:
         raise NotFoundError("Opportunity owner not found.")
@@ -644,6 +649,23 @@ def update_opportunity(
         opportunity.last_activity_at = datetime.now(timezone.utc)
     session.commit()
     return get_opportunity_detail(session, opportunity.id, editor)
+
+
+def delete_opportunity(session: Session, opportunity_id: int, user: User) -> None:
+    """Remove an opportunity without deleting the related commercial records.
+
+    The database cascades the opportunity's own product lines and stage histories.
+    Foreign keys on quotations, follow-ups, and inquiries use ``SET NULL``, so
+    deleting an erroneous sales project keeps those original records available.
+    """
+    _ensure_delete_access(user)
+    opportunity = get_opportunity(session, opportunity_id)
+    try:
+        session.delete(opportunity)
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
 
 
 def get_sales_pipeline(session: Session, user: User) -> OpportunityPipeline:

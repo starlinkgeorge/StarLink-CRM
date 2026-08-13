@@ -812,6 +812,110 @@ def test_sales_opportunity_scope_and_viewer_read_only(client: TestClient) -> Non
     ).status_code == 403
 
 
+def test_admin_can_delete_opportunity_without_deleting_related_records(
+    client: TestClient,
+) -> None:
+    """Deleting a sales project retains its customer, quote, product, and follow-up."""
+    admin_token = login(client, "admin@example.com", "AdminPass123!")
+    admin_id = client.get("/api/v1/users", headers=admin_token).json()[0]["id"]
+    customer = client.post(
+        "/api/v1/customers",
+        json={"company_name": "Opportunity Deletion School", "contact_name": "Buyer"},
+        headers=admin_token,
+    )
+    assert customer.status_code == 201
+    product = client.post(
+        "/api/v1/products",
+        json={
+            "sku": "DELETE-OPPORTUNITY-001",
+            "name": "Opportunity Deletion Table",
+            "reference_price": "50.00",
+            "currency_code": "USD",
+        },
+        headers=admin_token,
+    )
+    assert product.status_code == 201
+    opportunity = client.post(
+        "/api/v1/opportunities",
+        json={
+            "customer_id": customer.json()["id"],
+            "name": "Opportunity Deletion Project",
+        },
+        headers=admin_token,
+    )
+    assert opportunity.status_code == 201
+    opportunity_id = opportunity.json()["id"]
+    quotation = client.post(
+        "/api/v1/quotations",
+        json={
+            "opportunity_id": opportunity_id,
+            "items": [
+                {
+                    "product_id": product.json()["id"],
+                    "unit_price": "50.00",
+                    "quantity": "1",
+                }
+            ],
+        },
+        headers=admin_token,
+    )
+    assert quotation.status_code == 201
+    followup = client.post(
+        "/api/v1/followups",
+        json={
+            "customer_id": customer.json()["id"],
+            "user_id": admin_id,
+            "opportunity_id": opportunity_id,
+            "type": "Email",
+            "content": "Follow up retained after removing the sales project.",
+        },
+        headers=admin_token,
+    )
+    assert followup.status_code == 201
+
+    viewer = client.post(
+        "/api/v1/users",
+        json={
+            "name": "Opportunity Deletion Viewer",
+            "email": "opportunity-delete-viewer@example.com",
+            "password": "ViewerPass123!",
+            "role": "Viewer",
+        },
+        headers=admin_token,
+    )
+    assert viewer.status_code == 201
+    viewer_token = login(client, "opportunity-delete-viewer@example.com", "ViewerPass123!")
+    assert client.delete(
+        f"/api/v1/opportunities/{opportunity_id}", headers=viewer_token
+    ).status_code == 403
+
+    assert client.delete(
+        f"/api/v1/opportunities/{opportunity_id}", headers=admin_token
+    ).status_code == 204
+    assert client.get(
+        f"/api/v1/opportunities/{opportunity_id}", headers=admin_token
+    ).status_code == 404
+    assert client.get(
+        f"/api/v1/customers/{customer.json()['id']}", headers=admin_token
+    ).status_code == 200
+    assert client.get(
+        f"/api/v1/products/{product.json()['id']}", headers=admin_token
+    ).status_code == 200
+    retained_quotation = client.get(
+        f"/api/v1/quotations/{quotation.json()['id']}", headers=admin_token
+    )
+    assert retained_quotation.status_code == 200
+    assert retained_quotation.json()["opportunity_id"] is None
+    retained_followup = client.get(
+        "/api/v1/followups",
+        params={"customer_id": customer.json()["id"]},
+        headers=admin_token,
+    )
+    assert retained_followup.status_code == 200
+    assert retained_followup.json()[0]["id"] == followup.json()["id"]
+    assert retained_followup.json()[0]["opportunity_id"] is None
+
+
 def test_viewer_cannot_create_or_convert_lead(client: TestClient) -> None:
     admin_token = login(client, "admin@example.com", "AdminPass123!")
     viewer = client.post(

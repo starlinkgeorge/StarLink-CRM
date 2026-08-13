@@ -111,6 +111,7 @@ export const getOpportunityPipeline = async () => (await api.get<OpportunityPipe
 export const getOpportunityDealPipeline = async () => (await api.get<OpportunityDealPipeline>("/opportunities/deal-pipeline")).data;
 export const createOpportunity = async (data: OpportunityPayload) => (await api.post<OpportunityListItem>("/opportunities", data)).data;
 export const updateOpportunity = async (id: number, data: Partial<Omit<OpportunityPayload, "customer_id">>) => (await api.put<OpportunityDetail>(`/opportunities/${id}`, data)).data;
+export const deleteOpportunity = async (id: number) => { await api.delete(`/opportunities/${id}`); };
 
 export type ProductImagePayload = { image_url: string; is_primary?: boolean; sort_order?: number };
 export type ProductPayload = {
