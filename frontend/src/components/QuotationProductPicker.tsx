@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useMemo, useState, type KeyboardEvent } from "react";
 
 import { searchQuotationProducts } from "../services/crm";
 import type { Product } from "../types";
@@ -40,8 +40,7 @@ export function QuotationProductPicker({
     [checkedIds, selectedIds],
   );
 
-  async function search(event?: FormEvent) {
-    event?.preventDefault();
+  async function search() {
     const value = query.trim();
     if (!value) {
       setResults([]);
@@ -95,22 +94,29 @@ export function QuotationProductPicker({
         {searched && !loading && <span className="text-sm text-slate-500">找到 {total} 个匹配产品</span>}
       </div>
 
-      <form onSubmit={(event) => void search(event)} className="mt-4 flex gap-2">
+      <div className="mt-4 flex gap-2">
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
+          onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              void search();
+            }
+          }}
           disabled={disabled || loading}
           placeholder="例如：SL-P-001 SL-P-026 或 Pink Tower Brown Stair"
           className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 outline-none ring-blue-500 focus:ring-2 disabled:bg-slate-100"
         />
         <button
-          type="submit"
+          type="button"
+          onClick={() => void search()}
           disabled={disabled || loading || !query.trim()}
           className="rounded-lg bg-blue-700 px-4 py-2 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
         >
           {loading ? "搜索中…" : "搜索"}
         </button>
-      </form>
+      </div>
 
       <div className="mt-4 rounded-lg border border-slate-200 bg-white">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-3 py-2">
