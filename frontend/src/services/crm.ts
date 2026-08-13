@@ -123,6 +123,9 @@ export type ProductFilters = { limit: number; offset: number; q?: string; catego
 export const getProductCategories = async () => (await api.get<ProductCategory[]>("/product-categories")).data;
 export const createProductCategory = async (data: { name: string; parent_id?: number; sort_order?: number }) => (await api.post<ProductCategory>("/product-categories", data)).data;
 export const getProducts = async (params: ProductFilters) => (await api.get<ProductPage>("/products", { params })).data;
+export const searchQuotationProducts = async (q: string) => (
+  await api.get<ProductPage>("/products/quotation-search", { params: { q, limit: 50 } })
+).data;
 export const getProduct = async (id: string) => (await api.get<Product>(`/products/${id}`)).data;
 export const createProduct = async (data: ProductPayload) => (await api.post<Product>("/products", data)).data;
 export const updateProduct = async (id: number, data: Partial<ProductPayload>) => (await api.put<Product>(`/products/${id}`, data)).data;

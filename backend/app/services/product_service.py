@@ -1,3 +1,5 @@
+import re
+
 from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, selectinload
@@ -12,6 +14,57 @@ from app.schemas.product import (
     ProductUpdate,
 )
 from app.services.errors import ConflictError, ForbiddenError, NotFoundError
+
+
+MAX_QUOTATION_SEARCH_TERMS = 12
+
+
+def _quotation_search_terms(query: str) -> tuple[list[str], list[str]]:
+    """Build searchable phrases without treating every word as a product.
+
+    A user can paste multiple SKUs separated by spaces, but product names also
+    contain spaces.  We therefore search exact individual SKU tokens first and
+    generate consecutive name phrases (up to four words) for catalogue fields.
+    For example, ``Pink Tower Brown Stair`` can match both two-word product
+    names while a single-name query such as ``Pink Tower`` remains intact.
+    """
+    tokens = [
+        token.strip()
+        for token in re.split(r"[\s,]+", query.strip())
+        if token.strip()
+    ][:MAX_QUOTATION_SEARCH_TERMS]
+    if not tokens:
+        return [], []
+
+    phrases: list[str] = []
+    for width in range(min(4, len(tokens)), 0, -1):
+        for start in range(len(tokens) - width + 1):
+            phrase = " ".join(tokens[start : start + width])
+            if phrase not in phrases:
+                phrases.append(phrase)
+    return tokens, phrases
+
+
+def _quotation_product_rank(
+    product: Product, sku_tokens: list[str], phrases: list[str]
+) -> tuple[int, int, str, int]:
+    """Put exact SKUs first, then prefer the longest catalogue phrase match."""
+    sku = product.sku.casefold()
+    if sku in {token.casefold() for token in sku_tokens}:
+        return (0, 0, product.name.casefold(), product.id)
+
+    values = [
+        product.name or "",
+        product.material or "",
+        product.description or "",
+        product.category.name if product.category else "",
+    ]
+    longest_match = 0
+    for phrase in phrases:
+        normalized = phrase.casefold()
+        if any(normalized in value.casefold() for value in values):
+            longest_match = max(longest_match, len(phrase.split()))
+    return (1, -longest_match, product.name.casefold(), product.id)
 
 
 def _ensure_write_access(user: User) -> None:
@@ -114,6 +167,45 @@ def list_products(
     )
     total = session.scalar(select(func.count()).select_from(Product).where(*filters)) or 0
     return [_product_read(product) for product in session.scalars(statement)], total
+
+
+def search_quotation_products(
+    session: Session, query: str, limit: int
+) -> tuple[list[ProductRead], int]:
+    """Search the existing active catalogue for a multi-product quotation.
+
+    This endpoint is intentionally read-only.  Individual SKU tokens receive
+    exact-match priority; name/category/material/description phrase matches
+    supplement them.  Results are deduplicated before the bounded response is
+    returned, so pasting models cannot create duplicate result rows.
+    """
+    sku_tokens, phrases = _quotation_search_terms(query)
+    if not sku_tokens:
+        return [], 0
+
+    exact_sku_filters = [Product.sku.ilike(token) for token in sku_tokens]
+    phrase_filters = []
+    for phrase in phrases:
+        term = f"%{phrase}%"
+        phrase_filters.extend(
+            [
+                Product.name.ilike(term),
+                Product.material.ilike(term),
+                Product.description.ilike(term),
+                ProductCategory.name.ilike(term),
+            ]
+        )
+
+    statement = (
+        select(Product)
+        .outerjoin(ProductCategory, Product.category_id == ProductCategory.id)
+        .where(Product.is_active.is_(True), or_(*exact_sku_filters, *phrase_filters))
+        .options(joinedload(Product.category), selectinload(Product.images))
+    )
+    products = list(session.scalars(statement).unique())
+    products.sort(key=lambda product: _quotation_product_rank(product, sku_tokens, phrases))
+    total = len(products)
+    return [_product_read(product) for product in products[:limit]], total
 
 
 def get_product(session: Session, product_id: int) -> Product:

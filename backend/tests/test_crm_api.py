@@ -1146,6 +1146,57 @@ def test_admin_can_delete_an_unlinked_product(client: TestClient) -> None:
     ).status_code == 404
 
 
+def test_quotation_catalog_search_handles_skus_and_name_phrases(
+    client: TestClient,
+) -> None:
+    admin_token = login(client, "admin@example.com", "AdminPass123!")
+    pink_tower = client.post(
+        "/api/v1/products",
+        json={
+            "sku": "SL-P-001",
+            "name": "Pink Tower",
+            "reference_price": "48.50",
+        },
+        headers=admin_token,
+    )
+    brown_stair = client.post(
+        "/api/v1/products",
+        json={
+            "sku": "SL-P-026",
+            "name": "Brown Stair",
+            "reference_price": "52.00",
+        },
+        headers=admin_token,
+    )
+    assert pink_tower.status_code == 201
+    assert brown_stair.status_code == 201
+
+    # Pasted SKU models are exact matches and are ranked before text matches.
+    sku_search = client.get(
+        "/api/v1/products/quotation-search",
+        params={"q": "SL-P-026   SL-P-001"},
+        headers=admin_token,
+    )
+    assert sku_search.status_code == 200
+    assert {item["sku"] for item in sku_search.json()["items"]} == {
+        "SL-P-001",
+        "SL-P-026",
+    }
+
+    # Product names containing spaces remain useful phrases rather than being
+    # reduced to unrelated single-word catalogue matches.
+    name_search = client.get(
+        "/api/v1/products/quotation-search",
+        params={"q": "Pink Tower Brown Stair"},
+        headers=admin_token,
+    )
+    assert name_search.status_code == 200
+    assert {item["name"] for item in name_search.json()["items"]} == {
+        "Pink Tower",
+        "Brown Stair",
+    }
+
+
 def test_viewer_has_read_only_product_access(client: TestClient) -> None:
     admin_token = login(client, "admin@example.com", "AdminPass123!")
     viewer = client.post(
@@ -1255,8 +1306,21 @@ def test_customer_quotation_creates_or_safely_reuses_opportunity(client: TestCli
         headers=admin_token,
     )
     assert product.status_code == 201
+    second_product = client.post(
+        "/api/v1/products",
+        json={
+            "sku": "AUTO-QUOTE-002",
+            "name": "Auto Quote Chair",
+            "unit": "piece",
+            "reference_price": "20.00",
+            "currency_code": "USD",
+        },
+        headers=admin_token,
+    )
+    assert second_product.status_code == 201
     customer_id = customer.json()["id"]
     product_id = product.json()["id"]
+    second_product_id = second_product.json()["id"]
 
     invalid = client.post(
         "/api/v1/quotations",
@@ -1275,7 +1339,10 @@ def test_customer_quotation_creates_or_safely_reuses_opportunity(client: TestCli
         "customer_id": customer_id,
         "currency": "USD",
         "shipping_cost": "10.00",
-        "items": [{"product_id": product_id, "unit_price": "100.00", "quantity": "2"}],
+        "items": [
+            {"product_id": product_id, "unit_price": "100.00", "quantity": "2"},
+            {"product_id": second_product_id, "unit_price": "20.00", "quantity": "3"},
+        ],
     }
     first = client.post("/api/v1/quotations", json=create_payload, headers=admin_token)
     assert first.status_code == 201
@@ -1283,7 +1350,7 @@ def test_customer_quotation_creates_or_safely_reuses_opportunity(client: TestCli
     first_opportunity_id = first_quote["opportunity_id"]
     assert first_opportunity_id is not None
     assert first_quote["customer_id"] == customer_id
-    assert first_quote["selected_version"]["total_amount"] == "210.00"
+    assert first_quote["selected_version"]["total_amount"] == "270.00"
 
     opportunity = client.get(
         f"/api/v1/opportunities/{first_opportunity_id}", headers=admin_token
@@ -1294,9 +1361,10 @@ def test_customer_quotation_creates_or_safely_reuses_opportunity(client: TestCli
     assert opportunity.json()["deal_stage"] == "Quoted"
     # The existing stage-to-probability rule takes precedence over a second rule.
     assert opportunity.json()["probability"] == 60
-    assert opportunity.json()["amount"] == "210.00"
+    assert opportunity.json()["amount"] == "270.00"
     assert [(item["product_id"], item["quantity"], item["target_price"]) for item in opportunity.json()["products"]] == [
-        (product_id, "2.00", "100.00")
+        (product_id, "2.00", "100.00"),
+        (second_product_id, "3.00", "20.00"),
     ]
     assert [item["id"] for item in opportunity.json()["quotations"]] == [first_quote["id"]]
 
@@ -1309,7 +1377,7 @@ def test_customer_quotation_creates_or_safely_reuses_opportunity(client: TestCli
     updated_opportunity = client.get(
         f"/api/v1/opportunities/{first_opportunity_id}", headers=admin_token
     ).json()
-    assert updated_opportunity["amount"] == "225.00"
+    assert updated_opportunity["amount"] == "285.00"
     assert {item["id"] for item in updated_opportunity["quotations"]} == {
         first_quote["id"],
         second.json()["id"],

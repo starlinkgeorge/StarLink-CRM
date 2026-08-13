@@ -79,6 +79,18 @@ def list_products(
     return ProductPage(items=items, total=total, limit=limit, offset=offset)
 
 
+@router.get("/quotation-search", response_model=ProductPage)
+def search_products_for_quotation(
+    q: str = Query(min_length=1, max_length=500),
+    limit: int = Query(default=50, ge=1, le=50),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> ProductPage:
+    """Return bounded, ranked active catalogue results for quotation lines."""
+    items, total = product_service.search_quotation_products(session, q, limit)
+    return ProductPage(items=items, total=total, limit=limit, offset=0)
+
+
 @router.post("", response_model=ProductRead, status_code=status.HTTP_201_CREATED)
 def create_product(
     payload: ProductCreate,

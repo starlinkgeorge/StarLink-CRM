@@ -231,6 +231,16 @@ To add a group of catalogue items, enter up to 50 SKU models separated by
 spaces, commas, or line breaks, then use **Add all results**. Existing quotation
 lines are never duplicated.
 
+Customer-originated quotations use the same live product catalogue and now
+include a dedicated multi-product picker. Search by exact SKU, product name,
+category, material, or description; pasted SKU models can be separated by
+spaces or commas. Product-name words are also evaluated as consecutive phrases
+so names such as `Pink Tower` and `Brown Stair` remain searchable in one
+request. Results are capped at 50 products, can be selected in bulk, and never
+add a product ID that is already on the quotation. Each selected line retains
+its own editable unit price and quantity before the existing quotation,
+opportunity-sync, PDF, and Excel workflows run.
+
 Apply `0017_v10_sales_followup_reminders` and the additive repair migration
 `0018_repair_v10_opportunity_reminder_schema` on databases that may have a
 stale Alembic stamp. The repair only adds missing V10 reminder columns and
