@@ -10,8 +10,6 @@ import { BusinessAnalyticsPage } from "./pages/BusinessAnalyticsPage";
 import { FollowupRemindersPage } from "./pages/FollowupRemindersPage";
 import { InquiryDetailPage } from "./pages/InquiryDetailPage";
 import { InquiriesPage } from "./pages/InquiriesPage";
-import { LeadDetailPage } from "./pages/LeadDetailPage";
-import { LeadsPage } from "./pages/LeadsPage";
 import { LoginPage } from "./pages/LoginPage";
 import { NewCustomerPage } from "./pages/NewCustomerPage";
 import { OpportunitiesPage } from "./pages/OpportunitiesPage";
@@ -31,7 +29,6 @@ export function App() {
       <Route path="/" element={<DashboardPage />} />
       <Route path="/analytics" element={<BusinessAnalyticsPage />} />
       <Route path="/followup-reminders" element={<FollowupRemindersPage />} />
-      <Route path="/leads" element={<LeadsPage />} /><Route path="/leads/:id" element={<LeadDetailPage />} />
       <Route path="/inquiries" element={<InquiriesPage />} /><Route path="/inquiries/:id" element={<InquiryDetailPage />} />
       <Route path="/customers" element={<CustomerArchivePage />} /><Route path="/customers/new" element={<NewCustomerPage />} /><Route path="/customers/:customerId/quotations/new" element={<CustomerQuotationCreatePage />} /><Route path="/customers/:id" element={<CustomerDetailPage />} />
       <Route path="/customer-classification" element={<CustomerClassificationPage />} />

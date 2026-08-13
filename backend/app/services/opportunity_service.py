@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.models.customer import Customer
 from app.models.followup import FollowUp
-from app.models.lead import (
+from app.models.opportunity import (
     Opportunity,
     OpportunityDealStage,
     OpportunityDealStageHistory,

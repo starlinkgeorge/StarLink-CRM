@@ -1,5 +1,5 @@
 import api from "./api";
-import type { AlibabaInquiryResult, AlibabaIntegrationStatus, AnalyticsPeriod, BusinessAnalyticsOverview, CalculatedFollowupReminderStatus, Customer, CustomerActivity, CustomerCategory, CustomerCenter, CustomerDetail, CustomerFollowupReminderPage, CustomerPage, CustomerScoreHistory, DashboardStats, FollowUp, FollowUpAttachment, Inquiry, InquiryConversion, InquiryPage, InquiryStatus, Lead, LeadConversion, LeadDetail, LeadPage, LeadStatus, OpportunityDealPipeline, OpportunityDealStage, OpportunityDetail, OpportunityListItem, OpportunityPage, OpportunityPipeline, OpportunitySalesStage, OpportunityStage, Product, ProductCategory, ProductPage, QuotationDetail, QuotationPage, QuotationStatus, Tag } from "../types";
+import type { AlibabaInquiryResult, AlibabaIntegrationStatus, AnalyticsPeriod, BusinessAnalyticsOverview, CalculatedFollowupReminderStatus, Customer, CustomerActivity, CustomerCategory, CustomerCenter, CustomerDetail, CustomerFollowupReminderPage, CustomerPage, CustomerScoreHistory, DashboardStats, FollowUp, FollowUpAttachment, Inquiry, InquiryConversion, InquiryPage, InquiryStatus, OpportunityDealPipeline, OpportunityDealStage, OpportunityDetail, OpportunityListItem, OpportunityPage, OpportunityPipeline, OpportunitySalesStage, OpportunityStage, Product, ProductCategory, ProductPage, QuotationDetail, QuotationPage, QuotationStatus, Tag } from "../types";
 
 export type CustomerCreatePayload = {
   company_name: string; contact_name?: string; country?: string; email?: string; phone?: string;
@@ -66,17 +66,6 @@ export const getCustomerCategories = async (activeOnly = false) => (await api.ge
 export const createCustomerCategory = async (data: { name: string; description?: string; color?: string; sort_order?: number; is_active?: boolean }) => (await api.post<CustomerCategory>("/customer-categories", data)).data;
 export const updateCustomerCategory = async (id: number, data: Partial<{ name: string; description: string; color: string; sort_order: number; is_active: boolean }>) => (await api.put<CustomerCategory>(`/customer-categories/${id}`, data)).data;
 export const updateTag = async (id: number, data: Partial<{ name: string; description: string; color: string; is_active: boolean }>) => (await api.put<Tag>(`/tags/${id}`, data)).data;
-
-export type LeadCreatePayload = {
-  company_name: string; contact_name: string; country?: string; email?: string; phone?: string;
-  whatsapp?: string; source?: string; inquiry_content?: string; interested_product?: string;
-  status?: LeadStatus;
-};
-export type LeadFilters = { limit: number; offset: number; q?: string; status?: string; source?: string };
-export const getLeads = async (params: LeadFilters) => (await api.get<LeadPage>("/leads", { params })).data;
-export const getLead = async (id: string) => (await api.get<LeadDetail>(`/leads/${id}`)).data;
-export const createLead = async (data: LeadCreatePayload) => (await api.post<Lead>("/leads", data)).data;
-export const convertLead = async (id: number) => (await api.post<LeadConversion>(`/leads/${id}/convert`)).data;
 
 export type InquiryPayload = {
   company_name: string; contact_name: string; country?: string; email?: string; phone?: string;

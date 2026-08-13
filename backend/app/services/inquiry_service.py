@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.models.customer import Contact, Customer, CustomerStatus
 from app.models.inquiry import Inquiry, InquiryStatus
-from app.models.lead import (
+from app.models.opportunity import (
     Opportunity,
     OpportunityDealStage,
     OpportunityDealStageHistory,

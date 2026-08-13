@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.models.lead import (
+from app.models.opportunity import (
     OpportunityDealStage,
     OpportunityReminderStatus,
     OpportunitySalesStage,
@@ -68,7 +68,6 @@ class OpportunityRead(BaseModel):
     id: int
     public_id: UUID
     customer_id: int
-    source_lead_id: int | None
     owner_id: int | None
     name: str
     interested_product: str | None

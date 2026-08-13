@@ -43,13 +43,9 @@ Sales activity records: `id`, `customer_id`, `user_id`, `type`, `content`, `next
 
 Immutable sales-stage audit records: `id`, `customer_id`, nullable `old_status`, required `new_status`, nullable `changed_by_id`, and `created_at`. A row is added only when `status`/`sales_stage` actually changes. Customer creation and follow-up activities remain in their source tables and are combined with these rows by the read-only timeline API.
 
-### `leads`
-
-Inbound trade inquiries before customer qualification: `id`, UUID `public_id`, `company_name`, `contact_name`, `country`, `email`, `phone`, `whatsapp`, `source`, `inquiry_content`, `interested_product`, `status`, `created_at`, and `updated_at`. Status values are `New`, `Contacted`, `Qualified`, `Converted`, and `Lost`.
-
 ### `inquiries`
 
-V8 external marketplace inquiries, independent from the existing `leads` table: `id`, UUID `public_id`, nullable `customer_id`, nullable unique `converted_opportunity_id`, `company_name`, `contact_name`, `country`, `email`, `phone`, `whatsapp`, `source`, `source_platform`, `interested_product`, `inquiry_content`, `status`, `created_at`, and `updated_at`.
+V8 external marketplace inquiries: `id`, UUID `public_id`, nullable `customer_id`, nullable unique `converted_opportunity_id`, `company_name`, `contact_name`, `country`, `email`, `phone`, `whatsapp`, `source`, `source_platform`, `interested_product`, `inquiry_content`, `status`, `created_at`, and `updated_at`.
 
 - `source` records the acquisition channel (for example `Alibaba`); `source_platform` identifies the external system or marketplace (for example `Alibaba International`). Both are required for new inquiries and default to `Alibaba`.
 - `inquiry_content` preserves the original incoming message. It is required even when an inquiry is entered manually, making the payload suitable for a future Alibaba API adapter.
@@ -58,7 +54,7 @@ V8 external marketplace inquiries, independent from the existing `leads` table: 
 
 ### `opportunities`
 
-The sales-opportunity record: `id`, UUID `public_id`, `customer_id`, nullable unique `source_lead_id`, nullable `owner_id`, `name`, `interested_product`, `inquiry_content`, `amount`, three-letter `currency`, `expected_close_date`, legacy `stage`, V7 `sales_stage`, `probability`, `next_action`, `created_at`, and `updated_at`. `source_lead_id` provides conversion traceability and prevents the same Lead from creating duplicate opportunities. Monetary values use `NUMERIC(14,2)` and are aggregated by currency.
+The sales-opportunity record: `id`, UUID `public_id`, `customer_id`, nullable `owner_id`, `name`, `interested_product`, `inquiry_content`, `amount`, three-letter `currency`, `expected_close_date`, legacy `stage`, V7 `sales_stage`, `probability`, `next_action`, `created_at`, and `updated_at`. Monetary values use `NUMERIC(14,2)` and are aggregated by currency.
 
 - `amount` is the estimated opportunity amount; `expected_close_date` is the estimated close date.
 - `probability` is a constrained integer from 0 through 100.
@@ -115,7 +111,6 @@ users 1 ──< customer_status_history (changed_by_id; SET NULL on user deletio
 customers 1 ──< contacts (deleted with customer)
 customers 1 ──< followups (deleted with customer)
 customers 1 ──< customer_status_history (deleted with customer)
-leads 1 ── 0..1 opportunities (source_lead_id; SET NULL on Lead deletion)
 customers 1 ──< inquiries (customer_id; SET NULL on Customer deletion)
 inquiries 1 ── 0..1 opportunities (converted_opportunity_id; SET NULL on Opportunity deletion)
 customers 1 ──< opportunities (deleted with customer)

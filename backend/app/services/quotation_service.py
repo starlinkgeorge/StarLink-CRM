@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.config import get_settings
 from app.models.customer import Customer
-from app.models.lead import Opportunity
+from app.models.opportunity import Opportunity
 from app.models.product import Product
 from app.models.quotation import (
     Quotation,

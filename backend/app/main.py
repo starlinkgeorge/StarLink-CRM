@@ -12,7 +12,6 @@ from app.api import (
     followup_reminders,
     inquiries,
     integrations,
-    leads,
     opportunities,
     products,
     quotations,
@@ -49,7 +48,6 @@ app.include_router(contacts.router, prefix=settings["api_prefix"])
 app.include_router(followups.router, prefix=settings["api_prefix"])
 app.include_router(followup_reminders.router, prefix=settings["api_prefix"])
 app.include_router(inquiries.router, prefix=settings["api_prefix"])
-app.include_router(leads.router, prefix=settings["api_prefix"])
 app.include_router(integrations.router, prefix=settings["api_prefix"])
 app.include_router(opportunities.router, prefix=settings["api_prefix"])
 app.include_router(products.category_router, prefix=settings["api_prefix"])

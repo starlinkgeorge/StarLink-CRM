@@ -1,9 +1,7 @@
 from typing import Literal
-from uuid import UUID
-
 from pydantic import BaseModel, Field, field_validator
 
-from app.schemas.lead import LeadRead
+from app.schemas.customer import CustomerRead
 
 
 class AlibabaInquiryCreate(BaseModel):
@@ -42,10 +40,9 @@ class AlibabaInquiryCreate(BaseModel):
 
 
 class AlibabaInquiryResult(BaseModel):
-    lead_id: int
-    lead_public_id: UUID
+    customer_id: int
     created: bool
-    lead: LeadRead
+    customer: CustomerRead
 
 
 class AlibabaIntegrationStatus(BaseModel):

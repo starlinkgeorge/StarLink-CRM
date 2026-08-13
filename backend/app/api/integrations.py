@@ -30,14 +30,13 @@ def receive_alibaba_inquiry(
     current_user: User = Depends(get_current_user),
 ) -> AlibabaInquiryResult:
     try:
-        lead, created = alibaba_integration_service.receive_inquiry(
+        customer, created = alibaba_integration_service.receive_inquiry(
             session, payload, current_user
         )
         return AlibabaInquiryResult(
-            lead_id=lead.id,
-            lead_public_id=lead.public_id,
+            customer_id=customer.id,
             created=created,
-            lead=lead,
+            customer=customer,
         )
     except ForbiddenError as error:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(error)) from error

@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from app.models.lead import OpportunityReminderStatus, OpportunitySalesStage
+from app.models.opportunity import OpportunityReminderStatus, OpportunitySalesStage
 
 
 class PipelineItem(BaseModel):

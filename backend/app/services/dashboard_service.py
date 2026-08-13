@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.models.customer import Customer, CustomerStatus
 from app.models.followup import FollowUp
 from app.models.inquiry import Inquiry, InquiryStatus
-from app.models.lead import Opportunity, OpportunityReminderStatus, OpportunitySalesStage
+from app.models.opportunity import Opportunity, OpportunityReminderStatus, OpportunitySalesStage
 from app.models.user import User, UserRole
 from app.services.access_service import customer_scope
 from app.services.followup_reminder_service import (

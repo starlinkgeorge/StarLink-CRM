@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.models.customer import Customer
 from app.models.followup import FollowUp, FollowUpAttachment
-from app.models.lead import Opportunity
+from app.models.opportunity import Opportunity
 from app.models.user import User
 from app.schemas.followup import FollowUpCreate, FollowUpUpdate
 from app.services.errors import ConflictError, NotFoundError

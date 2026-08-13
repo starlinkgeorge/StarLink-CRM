@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 
 from app.models.customer import Customer
 from app.models.followup import FollowUp
-from app.models.lead import Opportunity, OpportunityDealStage, OpportunityDealStageHistory
+from app.models.opportunity import Opportunity, OpportunityDealStage, OpportunityDealStageHistory
 from app.models.quotation import Quotation, QuotationItem, QuotationVersion
 from app.models.user import User, UserRole
 from app.schemas.analytics import AnalyticsPeriod

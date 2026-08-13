@@ -1,6 +1,5 @@
 export type UserRole = "Admin" | "Sales" | "Viewer";
 
-export type LeadStatus = "New" | "Contacted" | "Qualified" | "Converted" | "Lost";
 export type InquiryStatus = "New" | "Processing" | "Converted" | "Closed";
 export type OpportunityStage = "Lead" | "Qualified" | "Proposal" | "Negotiation" | "Won" | "Lost";
 export type OpportunitySalesStage = "New Lead" | "Contacted" | "Requirement Confirmed" | "Quotation Sent" | "Negotiation" | "Won" | "Lost";
@@ -8,17 +7,6 @@ export type OpportunityDealStage = "New Inquiry" | "Contacted" | "Quoted" | "Neg
 export type OpportunityReminderStatus = "None" | "Quote Follow-up Due" | "Inactive";
 export type CustomerFollowUpReminderStatus = "None" | "Scheduled" | "Today" | "Overdue";
 export type CalculatedFollowupReminderStatus = "overdue" | "today" | "upcoming" | "not_needed" | "unfollowed" | "stage_unset" | "not_applicable";
-export interface Lead {
-  id: number; public_id: string; company_name: string; contact_name: string;
-  country: string | null; email: string | null; phone: string | null; whatsapp: string | null;
-  source: string | null; inquiry_content: string | null; interested_product: string | null;
-  status: LeadStatus; created_at: string; updated_at: string;
-}
-export interface LeadDetail extends Lead {
-  converted_customer_id: number | null;
-  converted_opportunity_id: number | null;
-}
-export interface LeadPage { items: Lead[]; total: number; limit: number; offset: number; }
 export interface Inquiry {
   id: number; public_id: string; customer_id: number | null; converted_opportunity_id: number | null;
   company_name: string; contact_name: string; country: string | null; email: string | null;
@@ -29,7 +17,7 @@ export interface Inquiry {
 export interface InquiryPage { items: Inquiry[]; total: number; limit: number; offset: number; }
 export interface InquiryConversion { inquiry: Inquiry; customer: Customer; contact: Contact; opportunity: Opportunity; }
 export interface Opportunity {
-  id: number; public_id: string; customer_id: number; source_lead_id: number | null;
+  id: number; public_id: string; customer_id: number;
   owner_id: number | null; name: string; interested_product: string | null;
   inquiry_content: string | null; amount: string | null; currency: string;
   expected_close_date: string | null; stage: OpportunityStage;
@@ -68,14 +56,11 @@ export interface OpportunityDealPipelineColumn {
   deal_stage: OpportunityDealStage; count: number; opportunities: OpportunityListItem[];
 }
 export interface OpportunityDealPipeline { columns: OpportunityDealPipelineColumn[]; }
-export interface LeadConversion {
-  lead: Lead; customer: Customer; contact: Contact; opportunity: Opportunity;
-}
 export interface AlibabaIntegrationStatus {
   provider: "Alibaba"; connected: boolean; mode: "simulation";
 }
 export interface AlibabaInquiryResult {
-  lead_id: number; lead_public_id: string; created: boolean; lead: Lead;
+  customer_id: number; created: boolean; customer: Customer;
 }
 
 export interface User { id: number; name: string; email: string; role: UserRole; created_at: string; updated_at: string; }
