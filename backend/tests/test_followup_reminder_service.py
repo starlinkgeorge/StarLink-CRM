@@ -3,7 +3,7 @@ from datetime import date, datetime, timezone
 import pytest
 from pydantic import ValidationError
 
-from app.schemas.customer import CustomerCreate, CustomerUpdate
+from app.schemas.customer import CustomerCreate, CustomerRead, CustomerUpdate
 from app.services.followup_reminder_service import (
     FollowupReminderStatus,
     calculate_customer_followup_reminder,
@@ -116,3 +116,29 @@ def test_customer_schema_normalizes_known_legacy_stages_and_rejects_cold_custome
     assert updated.followup_stage == "已成交样品"
     with pytest.raises(ValidationError):
         CustomerUpdate(followup_stage="冷客户")
+
+
+def test_customer_read_schema_preserves_unknown_historical_stage() -> None:
+    payload = CustomerRead.model_validate(
+        {
+            "id": 42,
+            "company_name": "Historical Stage Company",
+            "customer_score": 0,
+            "level": "C",
+            "status": "Lead",
+            "sales_stage": "Lead",
+            "followup_stage": "已发目录",
+            "created_at": datetime(2026, 8, 13),
+            "updated_at": datetime(2026, 8, 13),
+        }
+    )
+
+    assert payload.followup_stage == "已发目录"
+
+
+def test_unknown_historical_stage_does_not_break_reminder_calculation() -> None:
+    reminder = calculate_followup_reminder(
+        date(2026, 8, 10), "已发目录", today=date(2026, 8, 13)
+    )
+
+    assert reminder.status is FollowupReminderStatus.STAGE_UNSET

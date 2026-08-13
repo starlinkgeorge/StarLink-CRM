@@ -110,10 +110,41 @@ class CustomerCategoryRead(BaseModel):
     updated_at: datetime
 
 
-class CustomerRead(CustomerFields):
+class CustomerRead(BaseModel):
+    """Customer data returned from the archive, including historical stage text.
+
+    Customer archive data predates the current six-stage workflow.  Response
+    models must therefore preserve a historical ``followup_stage`` string
+    instead of reusing the stricter create/update validation model.
+    """
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    company_name: str
+    contact_name: Optional[str] = None
+    country: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    whatsapp: Optional[str] = None
+    website: Optional[str] = None
+    customer_acquired_at: Optional[date] = None
+    position: Optional[str] = None
+    notes: Optional[str] = None
+    customer_type: Optional[str] = None
+    source: Optional[str] = None
+    source_platform: Optional[str] = None
+    original_inquiry: Optional[str] = None
+    interested_product: Optional[str] = None
+    customer_level_value: Optional[int] = None
+    customer_size: Optional[int] = None
+    customer_total_score: Optional[int] = None
+    # Reading must remain compatible with every historical archive value.
+    # New writes continue to be validated by CustomerCreate/CustomerUpdate.
+    followup_stage: Optional[str] = None
+    automatic_stage_judgement: Optional[str] = None
+    latest_followup_date: Optional[date] = None
+    category_id: Optional[int] = None
     customer_score: int
     score_updated_at: Optional[datetime] = None
     next_followup_date: Optional[date] = None
@@ -123,6 +154,10 @@ class CustomerRead(CustomerFields):
     calculated_followup_reminder_status: str = "unfollowed"
     calculated_followup_reminder_label: str = "尚未跟进"
     category: Optional["CustomerCategoryRead"] = None
+    level: CustomerLevel
+    status: CustomerStatus
+    sales_stage: CustomerStatus
+    owner_id: Optional[int] = None
     created_at: datetime
     updated_at: datetime
 

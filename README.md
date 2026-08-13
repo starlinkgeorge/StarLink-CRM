@@ -377,6 +377,12 @@ The historical `response_status` and `followup_requirement` database columns
 are retained for compatibility only; the customer archive no longer displays,
 filters, edits, or exports them.
 
+Customer responses preserve historical `followup_stage` text so an older
+archive value (for example, `已发目录`) cannot make the customer list fail.
+The six approved stages are enforced only when creating or editing a customer;
+editing an older customer presents only those six choices and changes the
+stage only when the user saves a new selection.
+
 ```text
 StarLink-CRM/
 ├── frontend/       # React + TypeScript application

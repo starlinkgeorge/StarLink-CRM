@@ -19,6 +19,7 @@ def test_customer_archive_export_is_a_real_safe_xlsx() -> None:
         whatsapp="00123456789",
         phone="01234567890",
         notes="=This must remain text in Excel",
+        followup_stage="已发目录",
     )
 
     workbook = load_workbook(BytesIO(build_customer_archive_export([customer])))
@@ -32,6 +33,7 @@ def test_customer_archive_export_is_a_real_safe_xlsx() -> None:
     assert worksheet["F2"].number_format == "@"
     assert worksheet["H2"].value == "01234567890"
     assert worksheet["H2"].number_format == "@"
+    assert worksheet["O2"].value == "已发目录"
     assert worksheet["R2"].value == "'=This must remain text in Excel"
 
 
