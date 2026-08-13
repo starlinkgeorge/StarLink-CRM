@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import {
   createOpportunity,
@@ -24,13 +24,14 @@ const PAGE_SIZE = 20;
 
 export function OpportunitiesPage() {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const canDelete = user?.role === "Admin";
   const [data, setData] = useState<OpportunityPage | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [offset, setOffset] = useState(0);
   const [query, setQuery] = useState("");
-  const [dealStage, setDealStage] = useState("");
-  const [active, setActive] = useState({ q: "", deal_stage: "" });
+  const [dealStage, setDealStage] = useState(() => searchParams.get("deal_stage") ?? "");
+  const [active, setActive] = useState(() => ({ q: "", deal_stage: searchParams.get("deal_stage") ?? "" }));
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState<OpportunityPayload>({
     customer_id: 0,

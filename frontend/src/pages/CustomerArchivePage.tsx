@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type UIEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import { customerArchiveOptions } from "../constants/customerArchiveOptions";
 import { FollowupReminderBadge } from "../components/FollowupReminderBadge";
@@ -27,6 +27,15 @@ const blank: Filters = {
   followup_stage: "", automatic_stage_judgement: "", latest_followup_from: "", latest_followup_to: "",
   notes: "",
 };
+
+function filtersFromSearchParams(params: URLSearchParams): Filters {
+  return {
+    ...blank,
+    country: params.get("country") ?? "",
+    customer_acquired_from: params.get("customer_acquired_from") ?? "",
+    customer_acquired_to: params.get("customer_acquired_to") ?? "",
+  };
+}
 
 const dash = (value: string | number | null | undefined) => value === null || value === undefined || value === "" ? "—" : value;
 const dateOnly = (value: string | null | undefined) => value ? value.slice(0, 10) : "—";
@@ -75,8 +84,9 @@ function ArchiveInput({ label, value, onChange, type = "text", placeholder, min 
 
 export function CustomerArchivePage() {
   const { user } = useAuth();
-  const [filters, setFilters] = useState<Filters>(blank);
-  const [active, setActive] = useState<Filters>(blank);
+  const [searchParams] = useSearchParams();
+  const [filters, setFilters] = useState<Filters>(() => filtersFromSearchParams(searchParams));
+  const [active, setActive] = useState<Filters>(() => filtersFromSearchParams(searchParams));
   const [offset, setOffset] = useState(0);
   const [data, setData] = useState<CustomerPage | null>(null);
   const [error, setError] = useState("");

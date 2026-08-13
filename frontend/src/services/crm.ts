@@ -1,5 +1,5 @@
 import api from "./api";
-import type { AlibabaInquiryResult, AlibabaIntegrationStatus, CalculatedFollowupReminderStatus, Customer, CustomerActivity, CustomerCategory, CustomerCenter, CustomerDetail, CustomerFollowupReminderPage, CustomerPage, CustomerScoreHistory, DashboardStats, FollowUp, FollowUpAttachment, Inquiry, InquiryConversion, InquiryPage, InquiryStatus, Lead, LeadConversion, LeadDetail, LeadPage, LeadStatus, OpportunityDealPipeline, OpportunityDealStage, OpportunityDetail, OpportunityListItem, OpportunityPage, OpportunityPipeline, OpportunitySalesStage, OpportunityStage, Product, ProductCategory, ProductPage, QuotationDetail, QuotationPage, QuotationStatus, Tag } from "../types";
+import type { AlibabaInquiryResult, AlibabaIntegrationStatus, AnalyticsPeriod, BusinessAnalyticsOverview, CalculatedFollowupReminderStatus, Customer, CustomerActivity, CustomerCategory, CustomerCenter, CustomerDetail, CustomerFollowupReminderPage, CustomerPage, CustomerScoreHistory, DashboardStats, FollowUp, FollowUpAttachment, Inquiry, InquiryConversion, InquiryPage, InquiryStatus, Lead, LeadConversion, LeadDetail, LeadPage, LeadStatus, OpportunityDealPipeline, OpportunityDealStage, OpportunityDetail, OpportunityListItem, OpportunityPage, OpportunityPipeline, OpportunitySalesStage, OpportunityStage, Product, ProductCategory, ProductPage, QuotationDetail, QuotationPage, QuotationStatus, Tag } from "../types";
 
 export type CustomerCreatePayload = {
   company_name: string; contact_name?: string; country?: string; email?: string; phone?: string;
@@ -13,6 +13,9 @@ export type CustomerCreatePayload = {
 };
 
 export const getDashboardStats = async () => (await api.get<DashboardStats>("/dashboard/stats")).data;
+export const getBusinessAnalytics = async (params: { period: AnalyticsPeriod; start_date?: string; end_date?: string }) => (
+  await api.get<BusinessAnalyticsOverview>("/analytics/overview", { params })
+).data;
 export const getCustomerFollowupReminders = async (status?: CalculatedFollowupReminderStatus) => (
   await api.get<CustomerFollowupReminderPage>("/followup-reminders", { params: status ? { status } : undefined })
 ).data;

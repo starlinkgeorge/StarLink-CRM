@@ -167,6 +167,40 @@ export interface DashboardStats {
   followup_reminder_upcoming_count: number;
   followup_reminder_unfollowed_count: number;
 }
+export type AnalyticsPeriod = "today" | "week" | "month" | "year" | "custom";
+export interface AnalyticsCurrencyAmount { currency: string; amount: string; }
+export interface AnalyticsDateRange {
+  start_date: string; end_date: string; comparison_start_date: string;
+  comparison_end_date: string; label: string;
+}
+export interface AnalyticsKpis {
+  new_customer_count: number; new_customer_change_percent: number | null;
+  quotation_count: number; quotation_count_change_percent: number | null;
+  quotation_amounts: AnalyticsCurrencyAmount[]; previous_quotation_amounts: AnalyticsCurrencyAmount[];
+  won_opportunity_count: number; won_opportunity_change_percent: number | null;
+  won_amounts: AnalyticsCurrencyAmount[]; previous_won_amounts: AnalyticsCurrencyAmount[];
+  quoted_opportunity_count: number; quote_to_win_rate: number | null;
+}
+export interface AnalyticsTrendPoint {
+  bucket: string; new_customer_count: number; quotation_count: number; won_opportunity_count: number;
+}
+export interface AnalyticsBreakdownItem { value: string; count: number; percentage: number; }
+export interface AnalyticsQuotedProductItem {
+  sku: string; product_name: string; quotation_count: number; total_quantity: string;
+  quotation_amounts: AnalyticsCurrencyAmount[];
+}
+export interface AnalyticsFunnelItem { stage: string; count: number; }
+export interface AnalyticsFollowupSummary {
+  created_followup_count: number; overdue_count: number; today_count: number;
+  upcoming_count: number; unfollowed_count: number;
+}
+export interface BusinessAnalyticsOverview {
+  period: AnalyticsPeriod; date_range: AnalyticsDateRange; kpis: AnalyticsKpis;
+  trend: AnalyticsTrendPoint[]; source_analysis: AnalyticsBreakdownItem[];
+  country_analysis: AnalyticsBreakdownItem[]; interested_product_analysis: AnalyticsBreakdownItem[];
+  customer_type_analysis: AnalyticsBreakdownItem[]; quoted_products: AnalyticsQuotedProductItem[];
+  sales_funnel: AnalyticsFunnelItem[]; followup_summary: AnalyticsFollowupSummary;
+}
 export interface CustomerFollowupReminderState {
   status: CalculatedFollowupReminderStatus; label: string;
   suggested_followup_date: string | null; overdue_days: number | null; days_until_due: number | null;

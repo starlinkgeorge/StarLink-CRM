@@ -130,6 +130,7 @@ Roles: `Admin` manages all records and users; `Sales` reads and manages only cus
 | Contacts | `POST /contacts`, `GET /contacts/{id}`, `PUT /contacts/{id}` |
 | Follow-ups | `POST /followups`, `GET /followups?customer_id={id}`, `PUT /followups/{id}`, `DELETE /followups/{id}`, `POST /followups/{id}/attachments`, `GET /followups/{id}/attachments/{attachment_id}`, `DELETE /followups/{id}/attachments/{attachment_id}` |
 | Dashboard | `GET /dashboard/stats` |
+| Business analytics | `GET /analytics/overview?period=today|week|month|year|custom&start_date=YYYY-MM-DD&end_date=YYYY-MM-DD` |
 | Tags | `GET /tags`, `POST /tags`, `PUT /tags/{id}`, `DELETE /tags/{id}` (soft deactivate), `POST /customers/{id}/tags/{tag_id}`, `DELETE /customers/{id}/tags/{tag_id}` |
 
 The customer `q` parameter searches company name, primary contact name, country, and email. Empty or whitespace-only query and filter values are ignored, so the initial list request returns all visible customers. Customer creation accepts `customer_type`, `source`, `interested_product`, and `sales_stage`. The V3-facing `sales_stage` is synchronized with the legacy `status` field so existing V2.2 dashboard statistics remain compatible. Customer lists support `customer_type`, `interested_product`, `sales_stage`, `source`, `status`, `level`, `country`, and `tag_id` filters; the legacy `status` parameter remains available for existing clients. Customer details include related contacts, tags, and follow-ups. The customer timeline endpoint combines customer creation, follow-ups, and persisted sales-stage changes in newest-first order. Existing follow-up endpoints continue to read and write `followups` without payload changes.
@@ -392,6 +393,21 @@ archive value (for example, `已发目录`) cannot make the customer list fail.
 The six approved stages are enforced only when creating or editing a customer;
 editing an older customer presents only those six choices and changes the
 stage only when the user saves a new selection.
+
+## Business analytics
+
+The **经营分析** page is read-only and defaults to the current month. It supports
+today, week, month, year, and inclusive custom-date ranges using the
+`Asia/Shanghai` business date. New-customer indicators use the archive field
+`customers.customer_acquired_at` only—never CRM creation or import timestamps.
+Quotation counts and amounts use each quotation's current version exactly once;
+amounts are grouped by currency rather than being converted or added together.
+Won amount uses a won opportunity's latest quotation `total_amount` when the
+database has no separate actual-revenue field. The page also provides aggregated
+trends, source/country/product/customer-type analysis, the compatible customer
+follow-up-stage funnel, and the existing follow-up reminder summary. Admin sees
+all accessible data, Sales sees only records it owns, and Viewer has read-only
+access. No analytics snapshot table or migration is needed.
 
 ```text
 StarLink-CRM/

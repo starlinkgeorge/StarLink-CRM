@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import (
+    analytics,
     auth,
     contacts,
     customer_categories,
@@ -39,6 +40,7 @@ app.add_middleware(
 
 app.include_router(users.router, prefix=settings["api_prefix"])
 app.include_router(auth.router, prefix=settings["api_prefix"])
+app.include_router(analytics.router, prefix=settings["api_prefix"])
 app.include_router(dashboard.router, prefix=settings["api_prefix"])
 app.include_router(customers.router, prefix=settings["api_prefix"])
 app.include_router(customer_categories.router, prefix=settings["api_prefix"])

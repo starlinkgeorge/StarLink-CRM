@@ -6,6 +6,7 @@ import { CustomerQuotationCreatePage } from "./pages/CustomerQuotationCreatePage
 import { CustomerClassificationPage } from "./pages/CustomerClassificationPage";
 import { CustomerArchivePage } from "./pages/CustomerArchivePage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { BusinessAnalyticsPage } from "./pages/BusinessAnalyticsPage";
 import { FollowupRemindersPage } from "./pages/FollowupRemindersPage";
 import { InquiryDetailPage } from "./pages/InquiryDetailPage";
 import { InquiriesPage } from "./pages/InquiriesPage";
@@ -28,6 +29,7 @@ export function App() {
     <Route path="/login" element={<LoginPage />} />
     <Route element={<ProtectedRoute />}><Route element={<AppLayout />}>
       <Route path="/" element={<DashboardPage />} />
+      <Route path="/analytics" element={<BusinessAnalyticsPage />} />
       <Route path="/followup-reminders" element={<FollowupRemindersPage />} />
       <Route path="/leads" element={<LeadsPage />} /><Route path="/leads/:id" element={<LeadDetailPage />} />
       <Route path="/inquiries" element={<InquiriesPage />} /><Route path="/inquiries/:id" element={<InquiryDetailPage />} />
