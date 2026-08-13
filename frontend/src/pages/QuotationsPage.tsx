@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 
-import { getQuotations } from "../services/crm";
+import { deleteQuotation, getQuotations } from "../services/crm";
+import { useAuth } from "../store/auth";
 import type { QuotationPage, QuotationStatus } from "../types";
 
 const PAGE_SIZE = 20;
@@ -15,6 +16,8 @@ const labels: Record<QuotationStatus, string> = {
 };
 
 export function QuotationsPage() {
+  const { user } = useAuth();
+  const canDelete = user?.role === "Admin";
   const [data, setData] = useState<QuotationPage | null>(null);
   const [offset, setOffset] = useState(0);
   const [query, setQuery] = useState("");
@@ -24,6 +27,7 @@ export function QuotationsPage() {
     status: "",
   });
   const [error, setError] = useState("");
+  const [deletingQuotationId, setDeletingQuotationId] = useState<number | null>(null);
 
   const load = useCallback(
     async (currentOffset = offset, active = filters) => {
@@ -52,6 +56,25 @@ export function QuotationsPage() {
     event.preventDefault();
     setOffset(0);
     setFilters({ q: query, status });
+  }
+
+  async function removeQuotation(quotationId: number, quotationNumber: string) {
+    const confirmed = window.confirm(
+      `确定要删除报价“${quotationNumber}”吗？报价版本和明细会被删除，此操作不可恢复；客户、产品和商机不会被删除。`,
+    );
+    if (!confirmed) return;
+    setDeletingQuotationId(quotationId);
+    try {
+      await deleteQuotation(quotationId);
+      setError("");
+      const nextOffset = data?.items.length === 1 && offset > 0 ? offset - PAGE_SIZE : offset;
+      if (nextOffset !== offset) setOffset(nextOffset);
+      else await load(nextOffset);
+    } catch {
+      setError("无法删除报价。请确认当前账户拥有管理员权限后重试。");
+    } finally {
+      setDeletingQuotationId(null);
+    }
   }
 
   return (
@@ -100,6 +123,7 @@ export function QuotationsPage() {
               <th className="px-4 py-3">金额</th>
               <th className="px-4 py-3">状态</th>
               <th className="px-4 py-3">更新时间</th>
+              {canDelete && <th className="px-4 py-3">操作</th>}
             </tr>
           </thead>
           <tbody>
@@ -144,11 +168,23 @@ export function QuotationsPage() {
                 <td className="px-4 py-3 text-slate-500">
                   {new Date(item.updated_at).toLocaleString()}
                 </td>
+                {canDelete && (
+                  <td className="px-4 py-3">
+                    <button
+                      type="button"
+                      disabled={deletingQuotationId === item.id}
+                      onClick={() => void removeQuotation(item.id, item.quotation_number)}
+                      className="text-rose-600 disabled:opacity-50"
+                    >
+                      {deletingQuotationId === item.id ? "删除中..." : "删除"}
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
             {data?.items.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-10 text-center text-slate-500">
+                <td colSpan={canDelete ? 7 : 6} className="px-4 py-10 text-center text-slate-500">
                   暂无报价。请从商机详情创建第一份报价。
                 </td>
               </tr>

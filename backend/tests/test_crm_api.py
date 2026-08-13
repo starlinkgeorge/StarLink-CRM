@@ -1632,6 +1632,93 @@ def test_quotation_versioning_pdf_and_immutable_sent_snapshot(client: TestClient
     ).status_code == 409
 
 
+def test_admin_can_delete_quotation_without_deleting_sales_records(client: TestClient) -> None:
+    """Deleting a quotation removes its snapshots, not the underlying sales records."""
+    admin_token = login(client, "admin@example.com", "AdminPass123!")
+    customer = client.post(
+        "/api/v1/customers",
+        json={"company_name": "Deletion Safety School", "contact_name": "Buyer"},
+        headers=admin_token,
+    )
+    assert customer.status_code == 201
+    product = client.post(
+        "/api/v1/products",
+        json={
+            "sku": "DELETE-QUOTE-001",
+            "name": "Deletion Safety Chair",
+            "reference_price": "25.00",
+            "currency_code": "USD",
+        },
+        headers=admin_token,
+    )
+    assert product.status_code == 201
+    opportunity = client.post(
+        "/api/v1/opportunities",
+        json={
+            "customer_id": customer.json()["id"],
+            "name": "Deletion Safety Project",
+            "currency": "USD",
+        },
+        headers=admin_token,
+    )
+    assert opportunity.status_code == 201
+    quotation = client.post(
+        "/api/v1/quotations",
+        json={
+            "opportunity_id": opportunity.json()["id"],
+            "items": [
+                {
+                    "product_id": product.json()["id"],
+                    "unit_price": "25.00",
+                    "quantity": "2",
+                }
+            ],
+        },
+        headers=admin_token,
+    )
+    assert quotation.status_code == 201
+    quotation_id = quotation.json()["id"]
+
+    viewer = client.post(
+        "/api/v1/users",
+        json={
+            "name": "Quotation Deletion Viewer",
+            "email": "quotation-delete-viewer@example.com",
+            "password": "ViewerPass123!",
+            "role": "Viewer",
+        },
+        headers=admin_token,
+    )
+    assert viewer.status_code == 201
+    viewer_token = login(client, "quotation-delete-viewer@example.com", "ViewerPass123!")
+    assert client.delete(
+        f"/api/v1/quotations/{quotation_id}", headers=viewer_token
+    ).status_code == 403
+
+    assert client.delete(
+        f"/api/v1/quotations/{quotation_id}", headers=admin_token
+    ).status_code == 204
+    assert client.get(
+        f"/api/v1/quotations/{quotation_id}", headers=admin_token
+    ).status_code == 404
+    assert client.get(
+        f"/api/v1/customers/{customer.json()['id']}", headers=admin_token
+    ).status_code == 200
+    assert client.get(
+        f"/api/v1/opportunities/{opportunity.json()['id']}", headers=admin_token
+    ).status_code == 200
+    assert client.get(
+        f"/api/v1/products/{product.json()['id']}", headers=admin_token
+    ).status_code == 200
+    listing = client.get(
+        "/api/v1/quotations",
+        params={"customer_id": customer.json()["id"]},
+        headers=admin_token,
+    )
+    assert listing.status_code == 200
+    assert listing.json()["total"] == 0
+
+
 def test_v7_sales_pipeline_keeps_legacy_stage_compatible(client: TestClient) -> None:
     admin_token = login(client, "admin@example.com", "AdminPass123!")
     customer = client.post(

@@ -133,6 +133,18 @@ def get_quotation(
         _raise_service_error(error)
 
 
+@router.delete("/{quotation_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_quotation(
+    quotation_id: int,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    try:
+        quotation_service.delete_quotation(session, quotation_id, current_user)
+    except (NotFoundError, ForbiddenError) as error:
+        _raise_service_error(error)
+
+
 @router.put("/{quotation_id}", response_model=QuotationDetail)
 def update_quotation(
     quotation_id: int,

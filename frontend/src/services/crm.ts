@@ -141,6 +141,7 @@ export type QuotationUpdatePayload = Omit<QuotationCreatePayload, "opportunity_i
 export const getQuotations = async (params: { limit: number; offset: number; q?: string; status?: QuotationStatus | ""; customer_id?: number }) => (await api.get<QuotationPage>("/quotations", { params })).data;
 export const createQuotation = async (data: QuotationCreatePayload) => (await api.post<QuotationDetail>("/quotations", data)).data;
 export const getQuotation = async (id: string | number, version_no?: number) => (await api.get<QuotationDetail>(`/quotations/${id}`, { params: { version_no } })).data;
+export const deleteQuotation = async (id: number) => { await api.delete(`/quotations/${id}`); };
 export const updateQuotation = async (id: number, data: QuotationUpdatePayload) => (await api.put<QuotationDetail>(`/quotations/${id}`, data)).data;
 export const createQuotationVersion = async (id: number) => (await api.post<QuotationDetail>(`/quotations/${id}/versions`)).data;
 export const generateQuotationPdf = async (id: number, version_no?: number) => (await api.post<QuotationDetail>(`/quotations/${id}/pdf`, undefined, { params: { version_no } })).data;

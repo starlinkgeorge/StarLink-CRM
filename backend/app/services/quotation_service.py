@@ -88,6 +88,11 @@ def _ensure_write_access(user: User, quotation: Quotation) -> None:
     _ensure_read_access(user, quotation)
 
 
+def _ensure_delete_access(user: User) -> None:
+    if user.role is not UserRole.ADMIN:
+        raise ForbiddenError("Only Admin accounts can delete quotations.")
+
+
 def _load_quotation(session: Session, quotation_id: int) -> Quotation:
     quotation = session.scalar(
         select(Quotation)
@@ -202,6 +207,24 @@ def get_quotation_detail(
     quotation = _load_quotation(session, quotation_id)
     _ensure_read_access(user, quotation)
     return _detail(quotation, version_no)
+
+
+def delete_quotation(session: Session, quotation_id: int, user: User) -> None:
+    """Remove one quotation and its immutable snapshots without deleting sales records.
+
+    The database and ORM cascade quotation versions and their item snapshots.
+    Its customer and optional opportunity are deliberately retained, including
+    the opportunity's product lines, so deleting an erroneous quotation cannot
+    erase the underlying customer or sales project.
+    """
+    _ensure_delete_access(user)
+    quotation = _load_quotation(session, quotation_id)
+    try:
+        session.delete(quotation)
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
 
 
 def _build_items(
