@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AppLayout } from "./components/AppLayout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { CustomerDetailPage } from "./pages/CustomerDetailPage";
+import { CustomerQuotationCreatePage } from "./pages/CustomerQuotationCreatePage";
 import { CustomerClassificationPage } from "./pages/CustomerClassificationPage";
 import { CustomerArchivePage } from "./pages/CustomerArchivePage";
 import { DashboardPage } from "./pages/DashboardPage";
@@ -30,7 +31,7 @@ export function App() {
       <Route path="/followup-reminders" element={<FollowupRemindersPage />} />
       <Route path="/leads" element={<LeadsPage />} /><Route path="/leads/:id" element={<LeadDetailPage />} />
       <Route path="/inquiries" element={<InquiriesPage />} /><Route path="/inquiries/:id" element={<InquiryDetailPage />} />
-      <Route path="/customers" element={<CustomerArchivePage />} /><Route path="/customers/new" element={<NewCustomerPage />} /><Route path="/customers/:id" element={<CustomerDetailPage />} />
+      <Route path="/customers" element={<CustomerArchivePage />} /><Route path="/customers/new" element={<NewCustomerPage />} /><Route path="/customers/:customerId/quotations/new" element={<CustomerQuotationCreatePage />} /><Route path="/customers/:id" element={<CustomerDetailPage />} />
       <Route path="/customer-classification" element={<CustomerClassificationPage />} />
       <Route path="/opportunities" element={<OpportunitiesPage />} /><Route path="/opportunities/:id" element={<OpportunityDetailPage />} />
       <Route path="/pipeline" element={<PipelinePage />} />

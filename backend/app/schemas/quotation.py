@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.models.quotation import QuotationStatus
 
@@ -46,8 +46,19 @@ class QuotationTerms(BaseModel):
 
 
 class QuotationCreate(QuotationTerms):
-    opportunity_id: int = Field(gt=0)
+    opportunity_id: int | None = Field(default=None, gt=0)
+    customer_id: int | None = Field(default=None, gt=0)
     items: list[QuotationItemInput] | None = Field(default=None, min_length=1, max_length=100)
+
+    @model_validator(mode="after")
+    def validate_creation_context(self) -> "QuotationCreate":
+        if self.opportunity_id is None and self.customer_id is None:
+            raise ValueError("必须提供商机或客户以创建报价。")
+        if self.opportunity_id is not None and self.customer_id is not None:
+            raise ValueError("创建报价时只能提供商机或客户之一。")
+        if self.customer_id is not None and not self.items:
+            raise ValueError("从客户创建报价时至少需要选择一个产品。")
+        return self
 
 
 class QuotationUpdate(BaseModel):

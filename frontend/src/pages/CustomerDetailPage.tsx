@@ -21,7 +21,7 @@ import {
   uploadFollowupAttachment,
 } from "../services/crm";
 import { useAuth } from "../store/auth";
-import type { CustomerActivity, CustomerCenter, CustomerScoreHistory, CustomerStatus, FollowUp, FollowUpType, OpportunityListItem, OpportunityStage, QuotationListItem, QuotationStatus, Tag } from "../types";
+import type { CustomerActivity, CustomerCenter, CustomerScoreHistory, CustomerStatus, FollowUp, FollowUpType, OpportunityDealStage, OpportunityListItem, QuotationListItem, QuotationStatus, Tag } from "../types";
 
 const stages: CustomerStatus[] = ["Lead", "Contacted", "Quotation", "Negotiation", "Won", "Lost"];
 const stageText: Record<CustomerStatus, string> = {
@@ -32,9 +32,9 @@ const stageText: Record<CustomerStatus, string> = {
   Won: "已成交",
   Lost: "已流失",
 };
-const opportunityStageText: Record<OpportunityStage, string> = {
-  Lead: "初始商机", Qualified: "已确认", Proposal: "方案/报价",
-  Negotiation: "谈判中", Won: "已成交", Lost: "已丢失",
+const opportunityStageText: Record<OpportunityDealStage, string> = {
+  "New Inquiry": "新询盘", Contacted: "已联系", Quoted: "已报价",
+  Negotiating: "谈判中", Won: "已成交", Lost: "已丢单",
 };
 const quotationStatusText: Record<QuotationStatus, string> = {
   Draft: "草稿", Sent: "已发送", Accepted: "已接受", Rejected: "已拒绝", Expired: "已过期",
@@ -302,6 +302,7 @@ export function CustomerDetailPage() {
           <p className="mt-1 text-slate-600">{customer.contact_name ?? "未设置主联系人"}</p>
         </div>
         <div className="flex items-center gap-2">
+          {editable && <Link to={`/customers/${customer.id}/quotations/new`} className="rounded bg-blue-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-800">创建报价</Link>}
           <StatusBadge status={customer.sales_stage} />
           {editable && (
             <select
@@ -441,9 +442,10 @@ export function CustomerDetailPage() {
         <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {opportunities.map((opportunity) => (
             <Link key={opportunity.id} to={`/opportunities/${opportunity.id}`} className="rounded-lg bg-slate-50 p-4 hover:bg-blue-50">
-              <div className="flex items-start justify-between gap-2"><strong>{opportunity.name}</strong><span className="whitespace-nowrap rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700">{opportunityStageText[opportunity.stage]}</span></div>
+              <div className="flex items-start justify-between gap-2"><strong>{opportunity.name}</strong><span className="whitespace-nowrap rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700">{opportunityStageText[opportunity.deal_stage]}</span></div>
               <p className="mt-2 truncate text-sm text-slate-600">{opportunity.interested_product ?? "未填写产品需求"}</p>
               <p className="mt-2 text-sm font-medium">{opportunity.amount ? `${opportunity.currency} ${Number(opportunity.amount).toLocaleString()}` : "金额未填写"}</p>
+              <p className="mt-1 text-xs text-slate-500">成交概率：{opportunity.probability}% · 创建于 {new Date(opportunity.created_at).toLocaleDateString()}</p>
             </Link>
           ))}
           {!opportunities.length && <p className="text-sm text-slate-500">该客户暂无商机。</p>}
@@ -461,10 +463,10 @@ export function CustomerDetailPage() {
               <div className="flex items-start justify-between gap-2"><Link to={`/quotations/${quotation.id}`} className="font-semibold text-blue-700">{quotation.quotation_number}</Link><span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs">{quotationStatusText[quotation.status]}</span></div>
               <p className="mt-2 text-sm">{quotation.currency} {Number(quotation.total_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
               {quotation.opportunity_id && <Link to={`/opportunities/${quotation.opportunity_id}`} className="mt-2 inline-block text-sm text-blue-700">{quotation.opportunity_name ?? "关联商机"}</Link>}
-              <p className="mt-2 text-xs text-slate-500">更新于 {new Date(quotation.updated_at).toLocaleString()}</p>
+              <p className="mt-2 text-xs text-slate-500">日期：{new Date(quotation.created_at).toLocaleDateString()}</p>
             </article>
           ))}
-          {!quotations.length && <p className="text-sm text-slate-500">暂无报价；可在商机详情中创建第一份报价。</p>}
+          {!quotations.length && <p className="text-sm text-slate-500">暂无报价；可点击页面顶部“创建报价”。</p>}
         </div>
       </section>
 

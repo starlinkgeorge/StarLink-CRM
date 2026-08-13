@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 
 import {
   createQuotationVersion,
@@ -52,6 +52,7 @@ function createDraftLine(product: Product): DraftLine {
 
 export function QuotationDetailPage() {
   const { id } = useParams();
+  const location = useLocation();
   const { user } = useAuth();
   const [quotation, setQuotation] = useState<QuotationDetail | null>(null);
   const [catalog, setCatalog] = useState<Product[]>([]);
@@ -66,6 +67,7 @@ export function QuotationDetailPage() {
   const [shippingCost, setShippingCost] = useState("0");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const creationNotice = (location.state as { notice?: string } | null)?.notice;
   const searchModels = useMemo(
     () => parseProductModels(catalogSearch),
     [catalogSearch],
@@ -398,6 +400,7 @@ export function QuotationDetailPage() {
         </div>
       </div>
 
+      {creationNotice && <p className="mt-4 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{creationNotice}</p>}
       {error && <p className="mt-4 text-sm text-rose-600">{error}</p>}
 
       <section className="mt-6 overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-200">

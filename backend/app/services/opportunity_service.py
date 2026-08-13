@@ -1,6 +1,8 @@
+from collections.abc import Sequence
 from datetime import datetime, timezone
+from decimal import Decimal
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, text
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.models.customer import Customer
@@ -15,7 +17,7 @@ from app.models.lead import (
     OpportunityStageHistory,
 )
 from app.models.product import OpportunityProduct, Product
-from app.models.quotation import Quotation
+from app.models.quotation import Quotation, QuotationItem
 from app.models.user import User, UserRole
 from app.schemas.opportunity import (
     OpportunityCreate,
@@ -137,6 +139,226 @@ def _ensure_manage_access(user: User, opportunity: Opportunity) -> None:
 def _validate_owner(session: Session, owner_id: int | None) -> None:
     if owner_id is not None and session.get(User, owner_id) is None:
         raise NotFoundError("Opportunity owner not found.")
+
+
+def _quotation_product_summary(items: Sequence[QuotationItem]) -> str:
+    """Return a short, deterministic product description for quotation opportunities."""
+    first_name = items[0].product_name_snapshot.strip() if items else "Quotation"
+    if len(items) == 1:
+        return first_name
+    return f"{first_name} + {len(items) - 1} items"
+
+
+def _quotation_opportunity_name(customer: Customer, items: Sequence[QuotationItem]) -> str:
+    """Build a concise name without using fuzzy matching or customer-created text twice."""
+    customer_name = (customer.company_name or customer.contact_name or "Customer").strip()
+    return f"{customer_name} - {_quotation_product_summary(items)}"[:255]
+
+
+def _lock_customer_quotation_linking(session: Session, customer_id: int) -> None:
+    """Prevent two concurrent customer quotations from creating duplicate exact-match opportunities."""
+    if session.get_bind().dialect.name == "postgresql":
+        session.execute(
+            text("SELECT pg_advisory_xact_lock(CAST(:lock_key AS bigint))"),
+            {"lock_key": 1_000_000_000 + customer_id},
+        )
+
+
+def _is_closed_opportunity(opportunity: Opportunity) -> bool:
+    """Recognize all persisted pipeline representations of a closed opportunity."""
+    return (
+        opportunity.stage in {OpportunityStage.WON, OpportunityStage.LOST}
+        or _as_sales_stage(opportunity.sales_stage)
+        in {OpportunitySalesStage.WON, OpportunitySalesStage.LOST}
+        or _as_deal_stage(opportunity.deal_stage)
+        in {OpportunityDealStage.WON, OpportunityDealStage.LOST}
+    )
+
+
+def _find_exact_reusable_quotation_opportunity(
+    session: Session,
+    *,
+    customer_id: int,
+    currency: str,
+    items: Sequence[QuotationItem],
+) -> Opportunity | None:
+    """Reuse only one active opportunity with the exact same products and currency.
+
+    This is intentionally stricter than name matching: two projects that merely have
+    similar text must never be merged by an automatic quotation workflow.
+    """
+    quotation_product_ids = {item.product_id for item in items if item.product_id is not None}
+    candidates = session.scalars(
+        select(Opportunity)
+        .where(
+            Opportunity.customer_id == customer_id,
+            Opportunity.currency == currency,
+        )
+        .options(selectinload(Opportunity.product_items))
+        .order_by(Opportunity.updated_at.desc(), Opportunity.id.desc())
+    ).all()
+    exact_matches = [
+        opportunity
+        for opportunity in candidates
+        if not _is_closed_opportunity(opportunity)
+        and {item.product_id for item in opportunity.product_items} == quotation_product_ids
+    ]
+    # If two projects meet the mechanical rule, the system cannot safely infer which
+    # procurement project the user means. Create a new opportunity instead.
+    return exact_matches[0] if len(exact_matches) == 1 else None
+
+
+def _replace_products_from_quotation(
+    session: Session, opportunity: Opportunity, items: Sequence[QuotationItem]
+) -> None:
+    opportunity.product_items.clear()
+    session.flush()
+    opportunity.product_items.extend(
+        OpportunityProduct(
+            product_id=item.product_id,
+            quantity=item.quantity,
+            target_price=item.unit_price,
+        )
+        for item in items
+        if item.product_id is not None
+    )
+
+
+def _advance_reused_opportunity_to_quoted(
+    session: Session, opportunity: Opportunity, editor: User
+) -> None:
+    """Advance early pipeline stages to quoted, never move a later stage backwards."""
+    current_deal_stage = _as_deal_stage(opportunity.deal_stage)
+    deal_rank = {
+        OpportunityDealStage.NEW_INQUIRY: 0,
+        OpportunityDealStage.CONTACTED: 1,
+        OpportunityDealStage.QUOTED: 2,
+        OpportunityDealStage.NEGOTIATING: 3,
+        OpportunityDealStage.WON: 4,
+        OpportunityDealStage.LOST: 4,
+    }
+    if deal_rank[current_deal_stage] >= deal_rank[OpportunityDealStage.QUOTED]:
+        return
+
+    previous_sales_stage = _as_sales_stage(opportunity.sales_stage)
+    previous_legacy_stage = opportunity.stage
+    next_sales_stage = OpportunitySalesStage.QUOTATION_SENT
+    next_deal_stage = OpportunityDealStage.QUOTED
+    next_legacy_stage = SALES_STAGE_TO_LEGACY_STAGE[next_sales_stage]
+    opportunity.sales_stage = next_sales_stage.value
+    opportunity.deal_stage = next_deal_stage.value
+    opportunity.stage = next_legacy_stage
+    opportunity.probability = DEFAULT_PROBABILITY_BY_SALES_STAGE[next_sales_stage]
+    session.add(
+        OpportunityStageHistory(
+            opportunity_id=opportunity.id,
+            old_stage=previous_legacy_stage,
+            new_stage=next_legacy_stage,
+            changed_by_id=editor.id,
+        )
+    )
+    session.add(
+        OpportunitySalesStageHistory(
+            opportunity_id=opportunity.id,
+            old_sales_stage=previous_sales_stage.value,
+            new_sales_stage=next_sales_stage.value,
+            changed_by_id=editor.id,
+        )
+    )
+    session.add(
+        OpportunityDealStageHistory(
+            opportunity_id=opportunity.id,
+            old_deal_stage=current_deal_stage.value,
+            new_deal_stage=next_deal_stage.value,
+            changed_by_id=editor.id,
+        )
+    )
+
+
+def create_or_link_quotation_opportunity(
+    session: Session,
+    *,
+    customer: Customer,
+    items: Sequence[QuotationItem],
+    total_amount: Decimal,
+    currency: str,
+    creator: User,
+) -> tuple[Opportunity, bool]:
+    """Create or safely reuse an opportunity for a customer-originated quotation.
+
+    The caller owns the transaction and commits the quotation plus this opportunity
+    together. The boolean indicates whether a new opportunity was created.
+    """
+    access_service.ensure_customer_manage_access(creator, customer)
+    _lock_customer_quotation_linking(session, customer.id)
+    opportunity = _find_exact_reusable_quotation_opportunity(
+        session,
+        customer_id=customer.id,
+        currency=currency,
+        items=items,
+    )
+    now = datetime.now(timezone.utc)
+    # A Sales user cannot later manage another owner's opportunity.  In that
+    # case a new, correctly owned opportunity is safer than silently creating
+    # a quote under a project they cannot access.
+    if (
+        opportunity is not None
+        and creator.role is UserRole.SALES
+        and opportunity.owner_id != creator.id
+    ):
+        opportunity = None
+
+    if opportunity is not None:
+        _advance_reused_opportunity_to_quoted(session, opportunity, creator)
+        opportunity.amount = total_amount
+        opportunity.currency = currency
+        opportunity.last_activity_at = now
+        _replace_products_from_quotation(session, opportunity, items)
+        return opportunity, False
+
+    quoted_sales_stage = OpportunitySalesStage.QUOTATION_SENT
+    quoted_deal_stage = OpportunityDealStage.QUOTED
+    opportunity = Opportunity(
+        customer_id=customer.id,
+        owner_id=creator.id,
+        name=_quotation_opportunity_name(customer, items),
+        interested_product=_quotation_product_summary(items),
+        amount=total_amount,
+        currency=currency,
+        sales_stage=quoted_sales_stage.value,
+        deal_stage=quoted_deal_stage.value,
+        stage=SALES_STAGE_TO_LEGACY_STAGE[quoted_sales_stage],
+        probability=DEFAULT_PROBABILITY_BY_SALES_STAGE[quoted_sales_stage],
+        last_activity_at=now,
+    )
+    session.add(opportunity)
+    session.flush()
+    _replace_products_from_quotation(session, opportunity, items)
+    session.add(
+        OpportunityStageHistory(
+            opportunity_id=opportunity.id,
+            old_stage=None,
+            new_stage=opportunity.stage,
+            changed_by_id=creator.id,
+        )
+    )
+    session.add(
+        OpportunitySalesStageHistory(
+            opportunity_id=opportunity.id,
+            old_sales_stage=None,
+            new_sales_stage=opportunity.sales_stage,
+            changed_by_id=creator.id,
+        )
+    )
+    session.add(
+        OpportunityDealStageHistory(
+            opportunity_id=opportunity.id,
+            old_deal_stage=None,
+            new_deal_stage=opportunity.deal_stage,
+            changed_by_id=creator.id,
+        )
+    )
+    return opportunity, True
 
 
 def _list_item(opportunity: Opportunity) -> OpportunityListItem:

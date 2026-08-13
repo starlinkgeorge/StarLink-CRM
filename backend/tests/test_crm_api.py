@@ -1234,6 +1234,117 @@ def test_sales_cannot_access_another_users_customer(client: TestClient) -> None:
     assert blocked_center.status_code == 403
 
 
+def test_customer_quotation_creates_or_safely_reuses_opportunity(client: TestClient) -> None:
+    """Customer-first quotes create one coherent sales record without fuzzy merging."""
+    admin_token = login(client, "admin@example.com", "AdminPass123!")
+    customer = client.post(
+        "/api/v1/customers",
+        json={"company_name": "Customer Quote School", "contact_name": "Buyer"},
+        headers=admin_token,
+    )
+    assert customer.status_code == 201
+    product = client.post(
+        "/api/v1/products",
+        json={
+            "sku": "AUTO-QUOTE-001",
+            "name": "Auto Quote Table",
+            "unit": "piece",
+            "reference_price": "100.00",
+            "currency_code": "USD",
+        },
+        headers=admin_token,
+    )
+    assert product.status_code == 201
+    customer_id = customer.json()["id"]
+    product_id = product.json()["id"]
+
+    invalid = client.post(
+        "/api/v1/quotations",
+        json={
+            "customer_id": customer_id,
+            "items": [{"product_id": 999999, "unit_price": "1", "quantity": "1"}],
+        },
+        headers=admin_token,
+    )
+    assert invalid.status_code == 404
+    assert client.get(
+        "/api/v1/opportunities", params={"customer_id": customer_id}, headers=admin_token
+    ).json()["total"] == 0
+
+    create_payload = {
+        "customer_id": customer_id,
+        "currency": "USD",
+        "shipping_cost": "10.00",
+        "items": [{"product_id": product_id, "unit_price": "100.00", "quantity": "2"}],
+    }
+    first = client.post("/api/v1/quotations", json=create_payload, headers=admin_token)
+    assert first.status_code == 201
+    first_quote = first.json()
+    first_opportunity_id = first_quote["opportunity_id"]
+    assert first_opportunity_id is not None
+    assert first_quote["customer_id"] == customer_id
+    assert first_quote["selected_version"]["total_amount"] == "210.00"
+
+    opportunity = client.get(
+        f"/api/v1/opportunities/{first_opportunity_id}", headers=admin_token
+    )
+    assert opportunity.status_code == 200
+    assert opportunity.json()["customer_id"] == customer_id
+    assert opportunity.json()["sales_stage"] == "Quotation Sent"
+    assert opportunity.json()["deal_stage"] == "Quoted"
+    # The existing stage-to-probability rule takes precedence over a second rule.
+    assert opportunity.json()["probability"] == 60
+    assert opportunity.json()["amount"] == "210.00"
+    assert [(item["product_id"], item["quantity"], item["target_price"]) for item in opportunity.json()["products"]] == [
+        (product_id, "2.00", "100.00")
+    ]
+    assert [item["id"] for item in opportunity.json()["quotations"]] == [first_quote["id"]]
+
+    # Same customer + exact product set + same currency has one unclosed candidate,
+    # so the later quote is a revision of the same sales project, not a duplicate.
+    second_payload = {**create_payload, "shipping_cost": "25.00"}
+    second = client.post("/api/v1/quotations", json=second_payload, headers=admin_token)
+    assert second.status_code == 201
+    assert second.json()["opportunity_id"] == first_opportunity_id
+    updated_opportunity = client.get(
+        f"/api/v1/opportunities/{first_opportunity_id}", headers=admin_token
+    ).json()
+    assert updated_opportunity["amount"] == "225.00"
+    assert {item["id"] for item in updated_opportunity["quotations"]} == {
+        first_quote["id"],
+        second.json()["id"],
+    }
+
+    closed = client.put(
+        f"/api/v1/opportunities/{first_opportunity_id}",
+        json={"deal_stage": "Won"},
+        headers=admin_token,
+    )
+    assert closed.status_code == 200
+    third = client.post("/api/v1/quotations", json=create_payload, headers=admin_token)
+    assert third.status_code == 201
+    assert third.json()["opportunity_id"] != first_opportunity_id
+
+    # The legacy opportunity-first flow remains authoritative and cannot create an
+    # additional opportunity just because the quotation also has products.
+    manual = client.post(
+        "/api/v1/opportunities",
+        json={"customer_id": customer_id, "name": "Manual opportunity"},
+        headers=admin_token,
+    )
+    assert manual.status_code == 201
+    manual_quote = client.post(
+        "/api/v1/quotations",
+        json={
+            "opportunity_id": manual.json()["id"],
+            "items": [{"product_id": product_id, "unit_price": "90.00", "quantity": "1"}],
+        },
+        headers=admin_token,
+    )
+    assert manual_quote.status_code == 201
+    assert manual_quote.json()["opportunity_id"] == manual.json()["id"]
+
+
 def test_quotation_versioning_pdf_and_immutable_sent_snapshot(client: TestClient) -> None:
     admin_token = login(client, "admin@example.com", "AdminPass123!")
     product = client.post(

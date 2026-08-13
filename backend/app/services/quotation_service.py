@@ -258,37 +258,67 @@ def create_quotation(
 ) -> QuotationDetail:
     if creator.role is UserRole.VIEWER:
         raise ForbiddenError("Viewer accounts have read-only access.")
-    opportunity = opportunity_service.get_opportunity(session, payload.opportunity_id)
-    if creator.role is UserRole.SALES and opportunity.owner_id != creator.id:
-        raise ForbiddenError("You may only quote opportunities assigned to you.")
-    item_inputs = payload.items or _opportunity_inputs(opportunity)
-    if not item_inputs:
-        raise ConflictError("Add products to the opportunity before creating a quotation.")
-    items, subtotal = _build_items(session, item_inputs)
-    quotation = Quotation(
-        quotation_number=f"TEMP-{uuid4().hex}",
-        customer_id=opportunity.customer_id,
-        opportunity_id=opportunity.id,
-        status=QuotationStatus.DRAFT,
-        current_version=1,
-    )
-    session.add(quotation)
-    session.flush()
-    quotation.quotation_number = _next_quotation_number(session)
-    session.flush()
-    version = QuotationVersion(
-        version_no=1,
-        currency=payload.currency,
-        payment_term=payload.payment_term,
-        delivery_time=payload.delivery_time,
-        validity_days=payload.validity_days,
-        shipping_cost=payload.shipping_cost,
-        subtotal=subtotal,
-        total_amount=(subtotal + payload.shipping_cost).quantize(MONEY),
-        items=items,
-    )
-    quotation.versions.append(version)
-    session.commit()
+    try:
+        if payload.opportunity_id is not None:
+            # Keep the existing opportunity-first workflow unchanged. An explicitly
+            # supplied relationship is authoritative and must never create a second
+            # opportunity.
+            opportunity = opportunity_service.get_opportunity(session, payload.opportunity_id)
+            if creator.role is UserRole.SALES and opportunity.owner_id != creator.id:
+                raise ForbiddenError("You may only quote opportunities assigned to you.")
+            customer = opportunity.customer
+            item_inputs = payload.items or _opportunity_inputs(opportunity)
+            if not item_inputs:
+                raise ConflictError("Add products to the opportunity before creating a quotation.")
+            items, subtotal = _build_items(session, item_inputs)
+        else:
+            # The customer-first workflow validates products before it creates any
+            # opportunity. This makes an invalid quotation unable to leave an empty
+            # sales record behind.
+            customer = session.get(Customer, payload.customer_id)
+            if customer is None:
+                raise NotFoundError("Customer not found.")
+            access_service.ensure_customer_manage_access(creator, customer)
+            item_inputs = payload.items or []
+            items, subtotal = _build_items(session, item_inputs)
+            total_amount = (subtotal + payload.shipping_cost).quantize(MONEY)
+            opportunity, _created = opportunity_service.create_or_link_quotation_opportunity(
+                session,
+                customer=customer,
+                items=items,
+                total_amount=total_amount,
+                currency=payload.currency,
+                creator=creator,
+            )
+
+        quotation = Quotation(
+            quotation_number=f"TEMP-{uuid4().hex}",
+            customer_id=customer.id,
+            opportunity_id=opportunity.id,
+            status=QuotationStatus.DRAFT,
+            current_version=1,
+        )
+        session.add(quotation)
+        session.flush()
+        quotation.quotation_number = _next_quotation_number(session)
+        version = QuotationVersion(
+            version_no=1,
+            currency=payload.currency,
+            payment_term=payload.payment_term,
+            delivery_time=payload.delivery_time,
+            validity_days=payload.validity_days,
+            shipping_cost=payload.shipping_cost,
+            subtotal=subtotal,
+            total_amount=(subtotal + payload.shipping_cost).quantize(MONEY),
+            items=items,
+        )
+        quotation.versions.append(version)
+        # The quotation, its version/items, the opportunity link and its product
+        # lines are all committed together. Any exception rolls every part back.
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
     return _detail(_load_quotation(session, quotation.id))
 
 

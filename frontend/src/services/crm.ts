@@ -131,10 +131,10 @@ export const replaceOpportunityProducts = async (id: number, items: { product_id
 
 export type QuotationItemPayload = { product_id: number; unit_price: string; quantity: string };
 export type QuotationCreatePayload = {
-  opportunity_id: number; currency?: string; payment_term?: string; delivery_time?: string;
+  opportunity_id?: number; customer_id?: number; currency?: string; payment_term?: string; delivery_time?: string;
   validity_days?: number; shipping_cost?: string; items?: QuotationItemPayload[];
 };
-export type QuotationUpdatePayload = Omit<QuotationCreatePayload, "opportunity_id">;
+export type QuotationUpdatePayload = Omit<QuotationCreatePayload, "opportunity_id" | "customer_id">;
 export const getQuotations = async (params: { limit: number; offset: number; q?: string; status?: QuotationStatus | ""; customer_id?: number }) => (await api.get<QuotationPage>("/quotations", { params })).data;
 export const createQuotation = async (data: QuotationCreatePayload) => (await api.post<QuotationDetail>("/quotations", data)).data;
 export const getQuotation = async (id: string | number, version_no?: number) => (await api.get<QuotationDetail>(`/quotations/${id}`, { params: { version_no } })).data;
