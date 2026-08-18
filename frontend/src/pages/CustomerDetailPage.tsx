@@ -1,12 +1,13 @@
 import axios from "axios";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { StatusBadge } from "../components/StatusBadge";
 import { CustomerArchiveProfile } from "../components/CustomerArchiveProfile";
 import { FollowupReminderBadge } from "../components/FollowupReminderBadge";
 import {
   assignTag,
+  createQuotation,
   createFollowup,
   createTag,
   deleteFollowup,
@@ -99,6 +100,7 @@ function ActivityItem({ activity }: { activity: CustomerActivity }) {
 
 export function CustomerDetailPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [customer, setCustomer] = useState<CustomerCenter | null>(null);
   const [timeline, setTimeline] = useState<CustomerActivity[]>([]);
@@ -120,6 +122,7 @@ export function CustomerDetailPage() {
   const [scoreInput, setScoreInput] = useState("");
   const [scoreReason, setScoreReason] = useState("");
   const [saving, setSaving] = useState(false);
+  const [creatingQuotation, setCreatingQuotation] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -287,6 +290,21 @@ export function CustomerDetailPage() {
     }
   }
 
+  async function createCustomerQuotation() {
+    if (!customer || !editable || creatingQuotation) return;
+    setCreatingQuotation(true);
+    setError("");
+    try {
+      const quotation = await createQuotation({ customer_id: customer.id });
+      navigate(`/quotations/${quotation.id}`, {
+        state: { notice: "报价草稿已创建，请在此添加产品并填写付款、交期和运费。" },
+      });
+    } catch {
+      setError("无法创建报价草稿，请确认客户存在且您有管理权限后重试。");
+      setCreatingQuotation(false);
+    }
+  }
+
   if (!customer) return <p className="text-slate-500">{error || "加载中…"}</p>;
   const attachments = customer.followups.flatMap((followup) =>
     followup.attachments.map((attachment) => ({ attachment, followup })),
@@ -302,7 +320,7 @@ export function CustomerDetailPage() {
           <p className="mt-1 text-slate-600">{customer.contact_name ?? "未设置主联系人"}</p>
         </div>
         <div className="flex items-center gap-2">
-          {editable && <Link to={`/quotations/new?customer_id=${customer.id}`} className="rounded bg-blue-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-800">创建报价</Link>}
+          {editable && <button type="button" onClick={() => void createCustomerQuotation()} disabled={creatingQuotation} className="rounded bg-blue-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60">{creatingQuotation ? "正在创建…" : "创建报价"}</button>}
           <StatusBadge status={customer.sales_stage} />
           {editable && (
             <select

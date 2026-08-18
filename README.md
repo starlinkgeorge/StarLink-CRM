@@ -20,7 +20,7 @@ The current release includes:
 - Dashboard statistics backed by PostgreSQL, including total follow-ups and upcoming work
 - Alibaba inquiry simulation, customer management, and opportunity management
 - Product catalog with categories, specifications, prices, URL images, and opportunity product lines
-- StarLink quotation workflow with immutable internal snapshots and PDF generation
+- StarLink quotation workflow with immutable internal snapshots and PDF generation; customer-first creation opens one blank draft directly in the formal quotation editor, where products and commercial terms are entered
 - React + TypeScript + Tailwind frontend
 - Python FastAPI + SQLAlchemy backend
 - PostgreSQL service configuration

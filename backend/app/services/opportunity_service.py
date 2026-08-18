@@ -229,6 +229,27 @@ def _replace_products_from_quotation(
     )
 
 
+def sync_quotation_opportunity(
+    session: Session,
+    *,
+    opportunity: Opportunity,
+    items: Sequence[QuotationItem],
+    total_amount: Decimal,
+    currency: str,
+) -> None:
+    """Make the quotation currently being saved the opportunity's source of truth.
+
+    Equivalent quotations can reuse one active opportunity. The most recently
+    saved quotation is therefore authoritative for its amount and product lines;
+    this deliberately preserves the sales stage, so a later-stage opportunity is
+    never moved backwards while commercial details are adjusted.
+    """
+    opportunity.amount = total_amount
+    opportunity.currency = currency
+    opportunity.last_activity_at = datetime.now(timezone.utc)
+    _replace_products_from_quotation(session, opportunity, items)
+
+
 def _advance_reused_opportunity_to_quoted(
     session: Session, opportunity: Opportunity, editor: User
 ) -> None:
@@ -315,10 +336,13 @@ def create_or_link_quotation_opportunity(
 
     if opportunity is not None:
         _advance_reused_opportunity_to_quoted(session, opportunity, creator)
-        opportunity.amount = total_amount
-        opportunity.currency = currency
-        opportunity.last_activity_at = now
-        _replace_products_from_quotation(session, opportunity, items)
+        sync_quotation_opportunity(
+            session,
+            opportunity=opportunity,
+            items=items,
+            total_amount=total_amount,
+            currency=currency,
+        )
         return opportunity, False
 
     quoted_sales_stage = OpportunitySalesStage.QUOTATION_SENT

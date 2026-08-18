@@ -24,10 +24,7 @@ import { AuthProvider } from "./store/auth";
 
 function LegacyCustomerQuotationCreateRedirect() {
   const { customerId } = useParams();
-  const target = customerId
-    ? `/quotations/new?customer_id=${encodeURIComponent(customerId)}`
-    : "/quotations/new";
-  return <Navigate to={target} replace />;
+  return <Navigate to={customerId ? `/customers/${customerId}` : "/quotations/new"} replace />;
 }
 
 export function App() {

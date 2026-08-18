@@ -295,29 +295,31 @@ def create_quotation(
                 raise ConflictError("Add products to the opportunity before creating a quotation.")
             items, subtotal = _build_items(session, item_inputs)
         else:
-            # The customer-first workflow validates products before it creates any
-            # opportunity. This makes an invalid quotation unable to leave an empty
-            # sales record behind.
+            # Customer-first creation may start as an empty draft. The formal
+            # quotation editor owns products and commercial terms, so do not create
+            # an empty opportunity before a product line has actually been saved.
             customer = session.get(Customer, payload.customer_id)
             if customer is None:
                 raise NotFoundError("Customer not found.")
             access_service.ensure_customer_manage_access(creator, customer)
             item_inputs = payload.items or []
             items, subtotal = _build_items(session, item_inputs)
-            total_amount = (subtotal + payload.shipping_cost).quantize(MONEY)
-            opportunity, _created = opportunity_service.create_or_link_quotation_opportunity(
-                session,
-                customer=customer,
-                items=items,
-                total_amount=total_amount,
-                currency=payload.currency,
-                creator=creator,
-            )
+            opportunity = None
+            if items:
+                total_amount = (subtotal + payload.shipping_cost).quantize(MONEY)
+                opportunity, _created = opportunity_service.create_or_link_quotation_opportunity(
+                    session,
+                    customer=customer,
+                    items=items,
+                    total_amount=total_amount,
+                    currency=payload.currency,
+                    creator=creator,
+                )
 
         quotation = Quotation(
             quotation_number=f"TEMP-{uuid4().hex}",
             customer_id=customer.id,
-            opportunity_id=opportunity.id,
+            opportunity_id=opportunity.id if opportunity is not None else None,
             status=QuotationStatus.DRAFT,
             current_version=1,
         )
@@ -364,6 +366,24 @@ def update_quotation(
         current.items = items
         current.subtotal = subtotal
     current.total_amount = (current.subtotal + current.shipping_cost).quantize(MONEY)
+    if quotation.opportunity is None and current.items:
+        opportunity, _created = opportunity_service.create_or_link_quotation_opportunity(
+            session,
+            customer=quotation.customer,
+            items=current.items,
+            total_amount=current.total_amount,
+            currency=current.currency,
+            creator=editor,
+        )
+        quotation.opportunity_id = opportunity.id
+    elif quotation.opportunity is not None and current.items:
+        opportunity_service.sync_quotation_opportunity(
+            session,
+            opportunity=quotation.opportunity,
+            items=current.items,
+            total_amount=current.total_amount,
+            currency=current.currency,
+        )
     current.pdf_url = None
     session.commit()
     return _detail(_load_quotation(session, quotation.id))

@@ -56,8 +56,6 @@ class QuotationCreate(QuotationTerms):
             raise ValueError("必须提供商机或客户以创建报价。")
         if self.opportunity_id is not None and self.customer_id is not None:
             raise ValueError("创建报价时只能提供商机或客户之一。")
-        if self.customer_id is not None and not self.items:
-            raise ValueError("从客户创建报价时至少需要选择一个产品。")
         return self
 
 
