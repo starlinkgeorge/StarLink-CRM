@@ -133,7 +133,7 @@ export function QuotationProductPicker({
         {!loading && searched && error && <p className="p-6 text-center text-sm text-rose-600">{error}</p>}
         {!loading && searched && !error && !results.length && <p className="p-6 text-center text-sm text-slate-500">未找到匹配产品</p>}
         {!loading && searched && !error && !!results.length && (
-          <div className="max-h-96 overflow-y-auto">
+          <div className="max-h-96 overflow-auto">
             {results.map((product) => {
               const image = primaryImage(product);
               const alreadyAdded = selectedIds.has(product.id);

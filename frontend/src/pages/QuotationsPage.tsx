@@ -81,7 +81,14 @@ export function QuotationsPage() {
     <>
       <div>
         <p className="text-sm text-slate-500">Opportunity → Quotation → PDF</p>
-        <h2 className="text-3xl font-bold">报价管理</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-3xl font-bold">报价管理</h2>
+          {user?.role !== "Viewer" && (
+            <Link to="/quotations/new" className="rounded-lg bg-blue-700 px-4 py-2 font-semibold text-white hover:bg-blue-800">
+              创建报价
+            </Link>
+          )}
+        </div>
       </div>
 
       <form

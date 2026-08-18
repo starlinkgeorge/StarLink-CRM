@@ -302,7 +302,7 @@ export function CustomerDetailPage() {
           <p className="mt-1 text-slate-600">{customer.contact_name ?? "未设置主联系人"}</p>
         </div>
         <div className="flex items-center gap-2">
-          {editable && <Link to={`/customers/${customer.id}/quotations/new`} className="rounded bg-blue-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-800">创建报价</Link>}
+          {editable && <Link to={`/quotations/new?customer_id=${customer.id}`} className="rounded bg-blue-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-800">创建报价</Link>}
           <StatusBadge status={customer.sales_stage} />
           {editable && (
             <select
