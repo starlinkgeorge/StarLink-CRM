@@ -136,6 +136,9 @@ class OpportunityDetail(OpportunityListItem):
     followups: list[FollowUpRead]
     products: list[OpportunityProductRead]
     quotations: list[QuotationListItem]
+    order_id: int | None = None
+    order_no: str | None = None
+    order_auto_created: bool | None = None
 
 
 class OpportunityPage(BaseModel):

@@ -46,6 +46,9 @@ export interface OpportunityDetail extends OpportunityListItem {
   contacts: Contact[]; sales_stage_history: OpportunitySalesStageHistory[];
   deal_stage_history: OpportunityDealStageHistory[]; products: OpportunityProduct[];
   quotations: QuotationListItem[];
+  order_id: number | null;
+  order_no: string | null;
+  order_auto_created: boolean | null;
 }
 export interface OpportunityPage { items: OpportunityListItem[]; total: number; limit: number; offset: number; }
 export interface OpportunityPipelineColumn {

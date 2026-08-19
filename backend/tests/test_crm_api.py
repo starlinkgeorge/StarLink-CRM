@@ -1396,6 +1396,18 @@ def test_customer_quotation_creates_or_safely_reuses_opportunity(client: TestCli
         json={"deal_stage": "Won"},
         headers=admin_token,
     )
+    # Two active quotations are ambiguous for automatic order creation. Keep the
+    # opportunity open until one final quotation remains.
+    assert closed.status_code == 409
+    deleted_revision = client.delete(
+        f"/api/v1/quotations/{second.json()['id']}", headers=admin_token
+    )
+    assert deleted_revision.status_code == 204
+    closed = client.put(
+        f"/api/v1/opportunities/{first_opportunity_id}",
+        json={"deal_stage": "Won"},
+        headers=admin_token,
+    )
     assert closed.status_code == 200
     third = client.post("/api/v1/quotations", json=create_payload, headers=admin_token)
     assert third.status_code == 201

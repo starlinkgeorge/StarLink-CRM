@@ -54,6 +54,8 @@ def _validate_links(session: Session, payload, user: User):
         opportunity=session.get(Opportunity,payload.opportunity_id)
         if not opportunity or opportunity.customer_id!=customer.id: raise ConflictError("Opportunity must belong to the selected customer.")
         if user.role is UserRole.SALES and opportunity.owner_id != user.id: raise ForbiddenError("You may only use your own opportunity.")
+        if session.scalar(select(Order.id).where(Order.opportunity_id == payload.opportunity_id)):
+            raise ConflictError("This opportunity already has an order.")
     if payload.quotation_id:
         quotation=session.get(Quotation,payload.quotation_id)
         if not quotation or quotation.customer_id!=customer.id: raise ConflictError("Quotation must belong to the selected customer.")
@@ -65,16 +67,62 @@ def _validate_links(session: Session, payload, user: User):
         if payload.opportunity_id and quotation.opportunity_id not in (None,payload.opportunity_id): raise ConflictError("Quotation is linked to another opportunity.")
         if session.scalar(select(Order.id).where(Order.quotation_id==payload.quotation_id)): raise ConflictError("This quotation already has an order.")
     return customer
-def create_order(session: Session,payload:OrderCreate,user:User)->OrderRead:
-    if user.role is UserRole.VIEWER: raise ForbiddenError("Viewer accounts have read-only access.")
-    _validate_links(session,payload,user)
-    if session.scalar(select(Order.id).where(Order.order_no==payload.order_no.strip())): raise ConflictError("Order number already exists.")
-    owner_id=user.id if user.role is UserRole.SALES else (payload.owner_id or user.id)
+
+
+def get_order_for_opportunity(session: Session, opportunity_id: int) -> Order | None:
+    """Return an existing order for an opportunity without creating another."""
+    return session.scalar(
+        select(Order)
+        .where(Order.opportunity_id == opportunity_id)
+        .order_by(Order.created_at.asc(), Order.id.asc())
+        .limit(1)
+    )
+
+
+def get_order_for_quotation(session: Session, quotation_id: int) -> Order | None:
+    return session.scalar(select(Order).where(Order.quotation_id == quotation_id))
+
+
+def create_order_in_transaction(session: Session, payload: OrderCreate, user: User) -> Order:
+    """Create an order using existing validation, leaving commit to the caller."""
+    if user.role is UserRole.VIEWER:
+        raise ForbiddenError("Viewer accounts have read-only access.")
+    _validate_links(session, payload, user)
+    if payload.opportunity_id is not None:
+        # Serialise order creation for one opportunity.  PostgreSQL releases
+        # this row lock on commit/rollback; the second concurrent request then
+        # observes the first order and receives a controlled conflict.
+        locked_opportunity = session.scalar(
+            select(Opportunity)
+            .where(Opportunity.id == payload.opportunity_id)
+            .with_for_update()
+        )
+        if locked_opportunity is None:
+            raise NotFoundError("Opportunity not found.")
+        if session.scalar(select(Order.id).where(Order.opportunity_id == payload.opportunity_id)):
+            raise ConflictError("This opportunity already has an order.")
+    if session.scalar(select(Order.id).where(Order.order_no == payload.order_no.strip())):
+        raise ConflictError("Order number already exists.")
+    owner_id = user.id if user.role is UserRole.SALES else (payload.owner_id or user.id)
     if not session.get(User, owner_id):
         raise NotFoundError("Order owner not found.")
-    order=Order(**payload.model_dump(),order_no=payload.order_no.strip(),owner_id=owner_id,created_by_id=user.id)
+    order = Order(
+        **payload.model_dump(),
+        order_no=payload.order_no.strip(),
+        owner_id=owner_id,
+        created_by_id=user.id,
+    )
+    session.add(order)
+    # Surface unique-constraint failures inside the caller's transaction so the
+    # opportunity stage and order can be rolled back together.
+    session.flush()
+    return order
+
+
+def create_order(session: Session,payload:OrderCreate,user:User)->OrderRead:
     try:
-        session.add(order); session.commit(); session.refresh(order)
+        order = create_order_in_transaction(session, payload, user)
+        session.commit(); session.refresh(order)
     except IntegrityError as error:
         session.rollback()
         raise ConflictError("Order number already exists or this quotation already has an order.") from error

@@ -87,3 +87,100 @@ def test_order_permissions_and_quotation_can_only_have_one_order(client: TestCli
     )
     assert scoped_quotation.status_code == 201, scoped_quotation.text
     assert _order(client, sales, own_customer, "SO-QUOTE-SCOPE-1", quotation_id=scoped_quotation.json()["id"]).status_code == 403
+
+
+def _opportunity_quotation(client: TestClient, token: dict, customer_id: int, name: str):
+    product = client.post(
+        "/api/v1/products",
+        json={"sku": f"WON-{name}", "name": f"Won order {name}", "reference_price": "123.45"},
+        headers=token,
+    )
+    assert product.status_code == 201, product.text
+    opportunity = client.post(
+        "/api/v1/opportunities",
+        json={"customer_id": customer_id, "name": f"Won opportunity {name}"},
+        headers=token,
+    )
+    assert opportunity.status_code == 201, opportunity.text
+    quotation = client.post(
+        "/api/v1/quotations",
+        json={
+            "customer_id": customer_id,
+            "opportunity_id": opportunity.json()["id"],
+            "currency": "USD",
+            "items": [{"product_id": product.json()["id"], "unit_price": "123.45", "quantity": "2"}],
+        },
+        headers=token,
+    )
+    assert quotation.status_code == 201, quotation.text
+    return opportunity.json(), quotation.json()
+
+
+def test_winning_opportunity_creates_and_reuses_the_quotation_order(client: TestClient) -> None:
+    admin = login(client, "admin@example.com", "AdminPass123!")
+    customer_id = _customer(client, admin, "Won Order Customer")
+    opportunity, quotation = _opportunity_quotation(client, admin, customer_id, "AUTO")
+
+    won = client.put(
+        f"/api/v1/opportunities/{opportunity['id']}",
+        json={"deal_stage": "Won"},
+        headers=admin,
+    )
+    assert won.status_code == 200, won.text
+    body = won.json()
+    assert body["order_auto_created"] is True
+    assert body["order_no"] == quotation["quotation_number"]
+    assert body["order_id"] is not None
+    order = client.get(f"/api/v1/orders/{body['order_id']}", headers=admin)
+    assert order.status_code == 200, order.text
+    assert order.json()["customer_id"] == customer_id
+    assert order.json()["opportunity_id"] == opportunity["id"]
+    assert order.json()["quotation_id"] == quotation["id"]
+    assert order.json()["currency"] == quotation["currency"]
+    assert Decimal(order.json()["order_amount"]) == Decimal(quotation["total_amount"])
+    # Retain the commercial trail: an order-linked opportunity cannot be deleted.
+    assert client.delete(f"/api/v1/opportunities/{opportunity['id']}", headers=admin).status_code == 409
+
+    repeat = client.put(f"/api/v1/opportunities/{opportunity['id']}", json={"deal_stage": "Won"}, headers=admin)
+    assert repeat.status_code == 200, repeat.text
+    assert repeat.json()["order_auto_created"] is None
+    assert client.get("/api/v1/orders", params={"customer_id": customer_id, "limit": 100, "offset": 0}, headers=admin).json()["total"] == 1
+
+    assert client.put(f"/api/v1/opportunities/{opportunity['id']}", json={"deal_stage": "Contacted"}, headers=admin).status_code == 200
+    won_again = client.put(f"/api/v1/opportunities/{opportunity['id']}", json={"deal_stage": "Won"}, headers=admin)
+    assert won_again.status_code == 200, won_again.text
+    assert won_again.json()["order_auto_created"] is False
+    assert won_again.json()["order_id"] == body["order_id"]
+    assert client.get("/api/v1/orders", params={"customer_id": customer_id, "limit": 100, "offset": 0}, headers=admin).json()["total"] == 1
+
+
+def test_winning_requires_a_quotation_and_respects_opportunity_ownership(client: TestClient) -> None:
+    admin = login(client, "admin@example.com", "AdminPass123!")
+    no_quote_customer = _customer(client, admin, "No Quote Won Customer")
+    no_quote = client.post(
+        "/api/v1/opportunities",
+        json={"customer_id": no_quote_customer, "name": "No quote opportunity"},
+        headers=admin,
+    )
+    assert no_quote.status_code == 201, no_quote.text
+    blocked = client.put(f"/api/v1/opportunities/{no_quote.json()['id']}", json={"deal_stage": "Won"}, headers=admin)
+    assert blocked.status_code == 409
+    assert "没有关联报价单" in blocked.json()["detail"]
+    unchanged = client.get(f"/api/v1/opportunities/{no_quote.json()['id']}", headers=admin)
+    assert unchanged.json()["deal_stage"] == "New Inquiry"
+
+    viewer_user = client.post("/api/v1/users", json={"name": "Won Viewer", "email": "won-viewer@example.com", "password": "ViewerPass123!", "role": "Viewer"}, headers=admin)
+    assert viewer_user.status_code == 201
+    viewer = login(client, "won-viewer@example.com", "ViewerPass123!")
+    assert client.put(f"/api/v1/opportunities/{no_quote.json()['id']}", json={"deal_stage": "Won"}, headers=viewer).status_code == 403
+
+    sales_a_user = client.post("/api/v1/users", json={"name": "Won Sales A", "email": "won-sales-a@example.com", "password": "SalesPass123!", "role": "Sales"}, headers=admin)
+    sales_b_user = client.post("/api/v1/users", json={"name": "Won Sales B", "email": "won-sales-b@example.com", "password": "SalesPass123!", "role": "Sales"}, headers=admin)
+    assert sales_a_user.status_code == 201 and sales_b_user.status_code == 201
+    sales_a = login(client, "won-sales-a@example.com", "SalesPass123!")
+    sales_b = login(client, "won-sales-b@example.com", "SalesPass123!")
+    sales_customer = _customer(client, sales_a, "Sales A Won Customer")
+    opportunity, _ = _opportunity_quotation(client, sales_a, sales_customer, "SALES")
+    forbidden = client.put(f"/api/v1/opportunities/{opportunity['id']}", json={"deal_stage": "Won"}, headers=sales_b)
+    assert forbidden.status_code == 403
+    assert client.get("/api/v1/orders", params={"customer_id": sales_customer, "limit": 100, "offset": 0}, headers=admin).json()["total"] == 0

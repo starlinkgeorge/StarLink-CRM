@@ -1,8 +1,10 @@
 from collections.abc import Sequence
 from datetime import datetime, timezone
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, or_, select, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.models.customer import Customer
@@ -17,7 +19,8 @@ from app.models.opportunity import (
     OpportunityStageHistory,
 )
 from app.models.product import OpportunityProduct, Product
-from app.models.quotation import Quotation, QuotationItem
+from app.models.order import Order
+from app.models.quotation import Quotation, QuotationItem, QuotationStatus
 from app.models.user import User, UserRole
 from app.schemas.opportunity import (
     OpportunityCreate,
@@ -29,10 +32,15 @@ from app.schemas.opportunity import (
     OpportunityPipelineColumn,
     OpportunityUpdate,
 )
+from app.schemas.order import OrderCreate
 from app.schemas.product import OpportunityProductRead, OpportunityProductReplace
 from app.schemas.quotation import QuotationListItem
 from app.services import access_service
+from app.services import order_service
 from app.services.errors import ConflictError, ForbiddenError, NotFoundError
+
+
+BUSINESS_TIME_ZONE = ZoneInfo("Asia/Shanghai")
 
 
 # The V3 enum is still persisted for existing clients and quotation workflows.
@@ -441,6 +449,68 @@ def _quotation_item(
     )
 
 
+def _opportunity_order(session: Session, opportunity_id: int) -> Order | None:
+    return order_service.get_order_for_opportunity(session, opportunity_id)
+
+
+def _select_order_quotation(opportunity: Opportunity) -> Quotation:
+    """Select an order source only when the existing relationship is unambiguous."""
+    quotations = list(opportunity.quotations)
+    accepted = [quote for quote in quotations if quote.status is QuotationStatus.ACCEPTED]
+    if len(accepted) == 1:
+        return accepted[0]
+    if len(accepted) > 1:
+        raise ConflictError("该商机关联了多份已接受报价单，无法可靠确定订单报价。请先保留唯一最终报价。")
+    if not quotations:
+        raise ConflictError("该商机没有关联报价单，无法自动生成订单。请先创建或关联报价单。")
+    active = [
+        quote
+        for quote in quotations
+        if quote.status in (QuotationStatus.DRAFT, QuotationStatus.SENT, QuotationStatus.ACCEPTED)
+    ]
+    if len(active) == 1:
+        return active[0]
+    if not active:
+        raise ConflictError("该商机没有可用于订单的有效报价单，请先创建或关联有效报价单。")
+    raise ConflictError("该商机关联了多份有效报价单，无法可靠确定最终报价。请先关联唯一最终报价。")
+
+
+def _current_quotation_version(quotation: Quotation):
+    version = next((item for item in quotation.versions if item.version_no == quotation.current_version), None)
+    if version is None:
+        raise ConflictError("关联报价单缺少当前报价版本，无法自动生成订单。")
+    return version
+
+
+def _create_or_reuse_won_order(session: Session, opportunity: Opportunity, editor: User) -> tuple[Order, bool]:
+    """Create or reuse exactly one order within the caller's transaction."""
+    existing = _opportunity_order(session, opportunity.id)
+    if existing is not None:
+        return existing, False
+    quotation = _select_order_quotation(opportunity)
+    existing_for_quote = order_service.get_order_for_quotation(session, quotation.id)
+    if existing_for_quote is not None:
+        if existing_for_quote.opportunity_id == opportunity.id:
+            return existing_for_quote, False
+        raise ConflictError("该报价单已关联其它订单，无法重复用于当前商机。")
+    current_version = _current_quotation_version(quotation)
+    order = order_service.create_order_in_transaction(
+        session,
+        OrderCreate(
+            order_no=quotation.quotation_number,
+            customer_id=opportunity.customer_id,
+            opportunity_id=opportunity.id,
+            quotation_id=quotation.id,
+            order_date=datetime.now(BUSINESS_TIME_ZONE).date(),
+            currency=current_version.currency,
+            order_amount=current_version.total_amount,
+            owner_id=opportunity.owner_id,
+        ),
+        editor,
+    )
+    return order, True
+
+
 def list_opportunities(
     session: Session,
     user: User,
@@ -522,6 +592,7 @@ def get_opportunity_detail(
 ) -> OpportunityDetail:
     opportunity = get_opportunity(session, opportunity_id)
     _ensure_read_access(user, opportunity)
+    order = _opportunity_order(session, opportunity.id)
     return OpportunityDetail.model_validate(
         {
             **opportunity.__dict__,
@@ -543,6 +614,8 @@ def get_opportunity_detail(
                 _quotation_item(quotation, opportunity.customer, opportunity)
                 for quotation in opportunity.quotations
             ],
+            "order_id": order.id if order else None,
+            "order_no": order.order_no if order else None,
         }
     )
 
@@ -618,6 +691,11 @@ def update_opportunity(
         _validate_owner(session, changes["owner_id"])
     current_sales_stage = _as_sales_stage(opportunity.sales_stage)
     current_deal_stage = _as_deal_stage(opportunity.deal_stage)
+    was_won = (
+        opportunity.stage is OpportunityStage.WON
+        or current_sales_stage is OpportunitySalesStage.WON
+        or current_deal_stage is OpportunityDealStage.WON
+    )
     if changes.get("deal_stage") is not None:
         next_deal_stage = _as_deal_stage(changes["deal_stage"])
         next_sales_stage = DEAL_STAGE_TO_SALES_STAGE[next_deal_stage]
@@ -671,8 +749,28 @@ def update_opportunity(
         setattr(opportunity, field, value)
     if changes:
         opportunity.last_activity_at = datetime.now(timezone.utc)
-    session.commit()
-    return get_opportunity_detail(session, opportunity.id, editor)
+    order: Order | None = None
+    order_auto_created: bool | None = None
+    entering_won = not was_won and next_deal_stage is OpportunityDealStage.WON
+    try:
+        if entering_won:
+            order, order_auto_created = _create_or_reuse_won_order(session, opportunity, editor)
+        session.commit()
+    except IntegrityError as error:
+        session.rollback()
+        # The order number and quotation reference are unique at database level.
+        # A concurrent win action can therefore lose the race after the initial
+        # preflight; expose a business conflict instead of an unhandled 500.
+        raise ConflictError("该商机或报价单已被同时创建订单，请刷新后查看现有订单。") from error
+    except Exception:
+        session.rollback()
+        raise
+    detail = get_opportunity_detail(session, opportunity.id, editor)
+    if order is not None:
+        detail.order_id = order.id
+        detail.order_no = order.order_no
+        detail.order_auto_created = order_auto_created
+    return detail
 
 
 def delete_opportunity(session: Session, opportunity_id: int, user: User) -> None:
@@ -684,6 +782,8 @@ def delete_opportunity(session: Session, opportunity_id: int, user: User) -> Non
     """
     _ensure_delete_access(user)
     opportunity = get_opportunity(session, opportunity_id)
+    if _opportunity_order(session, opportunity.id) is not None:
+        raise ConflictError("该商机已关联订单，无法删除，以保留订单来源追溯。")
     try:
         session.delete(opportunity)
         session.commit()

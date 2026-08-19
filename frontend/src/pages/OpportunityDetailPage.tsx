@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import type { AxiosError } from "axios";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import {
@@ -36,6 +37,7 @@ export function OpportunityDetailPage() {
   const [nextAction, setNextAction] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [orderNotice, setOrderNotice] = useState<{ orderId: number; message: string } | null>(null);
   const editable = user?.role !== "Viewer";
 
   const load = useCallback(async () => {
@@ -50,6 +52,7 @@ export function OpportunityDetailPage() {
       setCloseDate(item.expected_close_date ?? "");
       setNextAction(item.next_action ?? "");
       setError("");
+      setOrderNotice(null);
     } catch {
       setError("无法加载商机详情。");
     }
@@ -67,6 +70,7 @@ export function OpportunityDetailPage() {
     if (!opportunity) return;
     setSaving(true);
     try {
+      const enteringWon = opportunity.deal_stage !== "Won" && dealStage === "Won";
       const item = await updateOpportunity(opportunity.id, {
         deal_stage: dealStage,
         amount: amount || undefined,
@@ -78,8 +82,20 @@ export function OpportunityDetailPage() {
       setProductLines(item.products);
       setDealStage(item.deal_stage);
       setError("");
-    } catch {
-      setError("无法更新商机，请检查销售阶段、概率和金额。");
+      if (enteringWon && item.order_id && item.order_no) {
+        setOrderNotice({
+          orderId: item.order_id,
+          message: item.order_auto_created
+            ? `商机已赢单，订单 ${item.order_no} 已自动创建。`
+            : `该商机已存在订单 ${item.order_no}。`,
+        });
+      } else {
+        setOrderNotice(null);
+      }
+    } catch (requestError: unknown) {
+      const detail = (requestError as AxiosError<{ detail?: string }>).response?.data?.detail;
+      setOrderNotice(null);
+      setError(detail || "无法更新商机，请检查销售阶段、概率和金额。");
     } finally {
       setSaving(false);
     }
@@ -150,7 +166,14 @@ export function OpportunityDetailPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Link to="/opportunities" className="text-sm text-blue-700">← 返回商机列表</Link>
         {editable && (
-          <div className="flex gap-2">{opportunity.deal_stage === "Won" && <Link to={`/orders/new?customer_id=${opportunity.customer_id}&opportunity_id=${opportunity.id}`} className="rounded-lg border border-emerald-600 px-4 py-2 font-semibold text-emerald-700">创建订单</Link>}<button disabled={saving} onClick={() => void createQuote()} className="rounded-lg bg-emerald-600 px-4 py-2 font-semibold text-white disabled:opacity-60">创建报价</button></div>
+          <div className="flex gap-2">
+            {opportunity.order_id ? (
+              <Link to={`/orders/${opportunity.order_id}`} className="rounded-lg border border-emerald-600 px-4 py-2 font-semibold text-emerald-700">查看订单</Link>
+            ) : opportunity.deal_stage === "Won" ? (
+              <Link to={`/orders/new?customer_id=${opportunity.customer_id}&opportunity_id=${opportunity.id}`} className="rounded-lg border border-emerald-600 px-4 py-2 font-semibold text-emerald-700">创建订单</Link>
+            ) : null}
+            <button type="button" disabled={saving} onClick={() => void createQuote()} className="rounded-lg bg-emerald-600 px-4 py-2 font-semibold text-white disabled:opacity-60">创建报价</button>
+          </div>
         )}
       </div>
       <div className="mt-4">
@@ -177,6 +200,7 @@ export function OpportunityDetailPage() {
         )}
       </div>
       {error && <p className="mt-4 text-sm text-rose-600">{error}</p>}
+      {orderNotice && <p className="mt-4 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{orderNotice.message} <Link className="font-semibold underline" to={`/orders/${orderNotice.orderId}`}>查看订单</Link></p>}
 
       <section className="mt-6 grid gap-5 lg:grid-cols-2">
         <article className="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
