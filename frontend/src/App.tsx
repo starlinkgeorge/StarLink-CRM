@@ -20,6 +20,8 @@ import { QuotationDetailPage } from "./pages/QuotationDetailPage";
 import { QuotationCreatePage } from "./pages/QuotationCreatePage";
 import { QuotationsPage } from "./pages/QuotationsPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { OrdersPage } from "./pages/OrdersPage";
+import { OrderDetailPage } from "./pages/OrderDetailPage";
 import { AuthProvider } from "./store/auth";
 
 function LegacyCustomerQuotationCreateRedirect() {
@@ -41,6 +43,7 @@ export function App() {
       <Route path="/pipeline" element={<PipelinePage />} />
       <Route path="/products" element={<ProductsPage />} /><Route path="/products/:id" element={<ProductDetailPage />} />
       <Route path="/quotations" element={<QuotationsPage />} /><Route path="/quotations/new" element={<QuotationCreatePage />} /><Route path="/quotations/:id" element={<QuotationDetailPage />} />
+      <Route path="/orders" element={<OrdersPage />} /><Route path="/orders/new" element={<OrdersPage />} /><Route path="/orders/:id" element={<OrderDetailPage />} />
       <Route path="/settings" element={<SettingsPage />} />
     </Route></Route>
     <Route path="*" element={<Navigate to="/" replace />} />

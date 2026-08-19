@@ -1,5 +1,5 @@
 import api from "./api";
-import type { AlibabaInquiryResult, AlibabaIntegrationStatus, AnalyticsPeriod, BusinessAnalyticsOverview, CalculatedFollowupReminderStatus, Customer, CustomerActivity, CustomerCategory, CustomerCenter, CustomerDetail, CustomerFollowupReminderPage, CustomerPage, CustomerScoreHistory, DashboardStats, FollowUp, FollowUpAttachment, Inquiry, InquiryConversion, InquiryPage, InquiryStatus, OpportunityDealPipeline, OpportunityDealStage, OpportunityDetail, OpportunityListItem, OpportunityPage, OpportunityPipeline, OpportunitySalesStage, OpportunityStage, Product, ProductCategory, ProductPage, QuotationDetail, QuotationPage, QuotationStatus, Tag } from "../types";
+import type { AlibabaInquiryResult, AlibabaIntegrationStatus, AnalyticsPeriod, BusinessAnalyticsOverview, CalculatedFollowupReminderStatus, Customer, CustomerActivity, CustomerCategory, CustomerCenter, CustomerDetail, CustomerFollowupReminderPage, CustomerPage, CustomerScoreHistory, DashboardStats, FollowUp, FollowUpAttachment, Inquiry, InquiryConversion, InquiryPage, InquiryStatus, OpportunityDealPipeline, OpportunityDealStage, OpportunityDetail, OpportunityListItem, OpportunityPage, OpportunityPipeline, OpportunitySalesStage, OpportunityStage, Order, OrderPage, Product, ProductCategory, ProductPage, QuotationDetail, QuotationPage, QuotationStatus, Tag } from "../types";
 
 export type CustomerCreatePayload = {
   company_name: string; contact_name?: string; country?: string; email?: string; phone?: string;
@@ -104,6 +104,13 @@ export const getOpportunityDealPipeline = async () => (await api.get<Opportunity
 export const createOpportunity = async (data: OpportunityPayload) => (await api.post<OpportunityListItem>("/opportunities", data)).data;
 export const updateOpportunity = async (id: number, data: Partial<Omit<OpportunityPayload, "customer_id">>) => (await api.put<OpportunityDetail>(`/opportunities/${id}`, data)).data;
 export const deleteOpportunity = async (id: number) => { await api.delete(`/opportunities/${id}`); };
+export type OrderPayload = { order_no:string; customer_id:number; opportunity_id?:number; quotation_id?:number; order_date:string; currency:string; order_amount:string; payment_status?:Order["payment_status"]; production_status?:Order["production_status"]; shipping_status?:Order["shipping_status"]; expected_delivery_date?:string; shipped_at?:string; notes?:string; rmb_received_amount?:string; purchase_cost?:string; freight_cost?:string; };
+export const getOrders = async (params:{limit:number;offset:number;q?:string;customer_id?:number;start_date?:string;end_date?:string;payment_status?:Order["payment_status"];production_status?:Order["production_status"];shipping_status?:Order["shipping_status"]}) => (await api.get<OrderPage>("/orders",{params})).data;
+export const getOrder = async (id:string|number) => (await api.get<Order>(`/orders/${id}`)).data;
+export const createOrder = async (payload:OrderPayload) => (await api.post<Order>("/orders",payload)).data;
+export const updateOrder = async (id:number,payload:Partial<OrderPayload>) => (await api.put<Order>(`/orders/${id}`,payload)).data;
+export const deleteOrder = async (id:number) => { await api.delete(`/orders/${id}`); };
+export const getOrderByQuotation = async (id:number) => (await api.get<Order|null>(`/orders/by-quotation/${id}`)).data;
 
 export type ProductImagePayload = { image_url: string; is_primary?: boolean; sort_order?: number };
 export type ProductPayload = {

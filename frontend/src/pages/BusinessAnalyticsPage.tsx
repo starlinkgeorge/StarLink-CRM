@@ -177,6 +177,17 @@ export function BusinessAnalyticsPage() {
         <article className="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200"><h3 className="font-bold">销售漏斗</h3><p className="mt-1 text-sm text-slate-500">按客户跟进阶段统计；历史阶段单独保留</p><div className="mt-4"><BreakdownBars items={data.sales_funnel.map((item) => ({ value: item.stage, count: item.count, percentage: 0 }))} showPercentage={false} /></div></article>
       </section>
 
+      <section className="mt-6 rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+        <div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-bold">订单 / 利润分析</h3><p className="mt-1 text-sm text-slate-500">按订单日期统计；外币订单金额按币种分别显示，利润均以人民币核算。</p></div><Link to="/orders" className="text-sm font-medium text-blue-700">打开订单管理 →</Link></div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard title="订单数量" value={data.order_profit.order_count} />
+          <StatCard title="订单金额" value={currencyText(data.order_profit.order_amounts)} subtext="不同币种不合并" />
+          <StatCard title="人民币实收" value={`¥${data.order_profit.rmb_received_total}`} />
+          <StatCard title="总利润" value={`¥${data.order_profit.profit_total}`} subtext={`整体利润率：${data.order_profit.average_profit_margin ?? "—"}%`} />
+        </div>
+        <div className="mt-3 grid gap-3 text-sm text-slate-600 sm:grid-cols-2"><p>采购总金额：¥{data.order_profit.purchase_cost_total}</p><p>运费总额：¥{data.order_profit.freight_cost_total}</p></div>
+      </section>
+
       <section className="mt-6 rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200"><div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-bold">跟进效率</h3><p className="mt-1 text-sm text-slate-500">{isCurrentReminderView ? "提醒状态按今天的客户跟进规则计算" : "提醒状态截至所选统计周期的最后一天计算"}</p></div>{isCurrentReminderView && <Link to="/followup-reminders" className="text-sm font-medium text-blue-700">打开跟进提醒 →</Link>}</div><div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5"><StatCard title="本周期新增跟进" value={followup?.created_followup_count ?? 0} /><StatCard title="已逾期" value={followup?.overdue_count ?? 0} to={isCurrentReminderView ? "/followup-reminders?status=overdue" : undefined} /><StatCard title="今天需要跟进" value={followup?.today_count ?? 0} to={isCurrentReminderView ? "/followup-reminders?status=today" : undefined} /><StatCard title="未来 3 天" value={followup?.upcoming_count ?? 0} to={isCurrentReminderView ? "/followup-reminders?status=upcoming" : undefined} /><StatCard title="尚未跟进" value={followup?.unfollowed_count ?? 0} to={isCurrentReminderView ? "/followup-reminders?status=unfollowed" : undefined} /></div></section>
     </>}
   </>;

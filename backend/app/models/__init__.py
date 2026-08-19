@@ -26,6 +26,7 @@ from app.models.opportunity import (
 )
 from app.models.product import Product, ProductCategory, ProductImage, OpportunityProduct
 from app.models.quotation import Quotation, QuotationItem, QuotationStatus, QuotationVersion
+from app.models.order import Order, OrderPaymentStatus, OrderProductionStatus, OrderShippingStatus
 from app.models.user import User, UserRole
 
 __all__ = [
@@ -37,4 +38,5 @@ __all__ = [
     "OpportunityStageHistory", "OpportunityProduct", "Product", "ProductCategory",
     "ProductImage", "RefreshToken", "Tag", "User", "UserRole",
     "Quotation", "QuotationItem", "QuotationStatus", "QuotationVersion",
+    "Order", "OrderPaymentStatus", "OrderProductionStatus", "OrderShippingStatus",
 ]

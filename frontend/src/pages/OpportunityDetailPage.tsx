@@ -150,13 +150,7 @@ export function OpportunityDetailPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Link to="/opportunities" className="text-sm text-blue-700">← 返回商机列表</Link>
         {editable && (
-          <button
-            disabled={saving}
-            onClick={() => void createQuote()}
-            className="rounded-lg bg-emerald-600 px-4 py-2 font-semibold text-white disabled:opacity-60"
-          >
-            创建报价
-          </button>
+          <div className="flex gap-2">{opportunity.deal_stage === "Won" && <Link to={`/orders/new?customer_id=${opportunity.customer_id}&opportunity_id=${opportunity.id}`} className="rounded-lg border border-emerald-600 px-4 py-2 font-semibold text-emerald-700">创建订单</Link>}<button disabled={saving} onClick={() => void createQuote()} className="rounded-lg bg-emerald-600 px-4 py-2 font-semibold text-white disabled:opacity-60">创建报价</button></div>
         )}
       </div>
       <div className="mt-4">

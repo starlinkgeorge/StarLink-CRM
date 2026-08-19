@@ -340,6 +340,7 @@ export function QuotationDetailPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {user?.role !== "Viewer" && <Link to={`/orders/new?customer_id=${quotation.customer_id}&opportunity_id=${quotation.opportunity_id ?? ""}&quotation_id=${quotation.id}`} className="rounded border border-emerald-600 px-3 py-2 text-emerald-700">创建订单</Link>}
           <select
             value={selectedVersion.version_no}
             onChange={(event) => void selectVersion(Number(event.target.value))}

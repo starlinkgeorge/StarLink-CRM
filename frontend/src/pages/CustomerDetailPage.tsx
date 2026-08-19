@@ -14,6 +14,7 @@ import {
   deleteFollowupAttachment,
   downloadFollowupAttachment,
   getCustomerCenter,
+  getOrders,
   getTags,
   removeTag,
   updateFollowup,
@@ -22,7 +23,7 @@ import {
   uploadFollowupAttachment,
 } from "../services/crm";
 import { useAuth } from "../store/auth";
-import type { CustomerActivity, CustomerCenter, CustomerScoreHistory, CustomerStatus, FollowUp, FollowUpType, OpportunityDealStage, OpportunityListItem, QuotationListItem, QuotationStatus, Tag } from "../types";
+import type { CustomerActivity, CustomerCenter, CustomerScoreHistory, CustomerStatus, FollowUp, FollowUpType, OpportunityDealStage, OpportunityListItem, Order, QuotationListItem, QuotationStatus, Tag } from "../types";
 
 const stages: CustomerStatus[] = ["Lead", "Contacted", "Quotation", "Negotiation", "Won", "Lost"];
 const stageText: Record<CustomerStatus, string> = {
@@ -123,17 +124,22 @@ export function CustomerDetailPage() {
   const [scoreReason, setScoreReason] = useState("");
   const [saving, setSaving] = useState(false);
   const [creatingQuotation, setCreatingQuotation] = useState(false);
+  const [orders, setOrders] = useState<Order[]>([]);
 
   const load = useCallback(async () => {
     if (!id) return;
     try {
-      const center = await getCustomerCenter(id);
+      const [center, orderPage] = await Promise.all([
+        getCustomerCenter(id),
+        getOrders({ limit: 20, offset: 0, customer_id: Number(id) }),
+      ]);
       setCustomer(center);
       setTimeline(center.activities);
       setOpportunities(center.opportunities);
       setQuotations(center.quotations);
       setScoreHistory(center.score_history);
       setScoreInput(String(center.customer_score));
+      setOrders(orderPage.items);
       setError("");
     } catch {
       setError("无法加载客户详情。");
@@ -320,6 +326,7 @@ export function CustomerDetailPage() {
           <p className="mt-1 text-slate-600">{customer.contact_name ?? "未设置主联系人"}</p>
         </div>
         <div className="flex items-center gap-2">
+          {editable && <Link to={`/orders/new?customer_id=${customer.id}`} className="rounded border border-emerald-600 px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-50">新建订单</Link>}
           {editable && <button type="button" onClick={() => void createCustomerQuotation()} disabled={creatingQuotation} className="rounded bg-blue-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60">{creatingQuotation ? "正在创建…" : "创建报价"}</button>}
           <StatusBadge status={customer.sales_stage} />
           {editable && (
@@ -467,6 +474,14 @@ export function CustomerDetailPage() {
             </Link>
           ))}
           {!opportunities.length && <p className="text-sm text-slate-500">该客户暂无商机。</p>}
+        </div>
+      </section>
+
+      <section className="mt-5 rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+        <div className="flex items-center justify-between gap-3"><div><h3 className="font-bold">订单</h3><p className="mt-1 text-sm text-slate-500">订单、履约状态和订单利润统一在订单管理中维护。</p></div><Link to={`/orders?customer_id=${customer.id}`} className="text-sm text-blue-700">查看全部 →</Link></div>
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {orders.map((order) => <Link key={order.id} to={`/orders/${order.id}`} className="rounded-lg bg-slate-50 p-4 hover:bg-blue-50"><div className="flex items-center justify-between gap-2"><strong>{order.order_no}</strong><span className="text-sm text-slate-600">{order.currency} {order.order_amount}</span></div><p className="mt-2 text-sm text-slate-600">{order.order_date} · {order.payment_status}</p><p className="mt-1 text-sm">利润：¥{order.profit}</p></Link>)}
+          {!orders.length && <p className="text-sm text-slate-500">该客户暂无订单。</p>}
         </div>
       </section>
 

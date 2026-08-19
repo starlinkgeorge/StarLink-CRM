@@ -79,6 +79,15 @@ class AnalyticsFollowupSummary(BaseModel):
     upcoming_count: int
     unfollowed_count: int
 
+class AnalyticsOrderProfit(BaseModel):
+    order_count: int
+    order_amounts: list[AnalyticsCurrencyAmount]
+    rmb_received_total: Decimal
+    purchase_cost_total: Decimal
+    freight_cost_total: Decimal
+    profit_total: Decimal
+    average_profit_margin: Decimal | None
+
 
 class BusinessAnalyticsOverview(BaseModel):
     period: AnalyticsPeriod
@@ -92,3 +101,4 @@ class BusinessAnalyticsOverview(BaseModel):
     quoted_products: list[AnalyticsQuotedProductItem]
     sales_funnel: list[AnalyticsFunnelItem]
     followup_summary: AnalyticsFollowupSummary
+    order_profit: AnalyticsOrderProfit

@@ -21,6 +21,7 @@ from app.models.customer import Customer
 from app.models.followup import FollowUp
 from app.models.opportunity import Opportunity, OpportunityDealStage, OpportunityDealStageHistory
 from app.models.quotation import Quotation, QuotationItem, QuotationVersion
+from app.models.order import Order
 from app.models.user import User, UserRole
 from app.schemas.analytics import AnalyticsPeriod
 from app.services.access_service import customer_scope
@@ -137,6 +138,21 @@ def _quotation_filters(user: User) -> list:
             Opportunity.owner_id == user.id,
         )
     ]
+
+def _order_filters(user: User) -> list:
+    if user.role is not UserRole.SALES:
+        return []
+    return [or_(Order.owner_id == user.id, Customer.owner_id == user.id, Opportunity.owner_id == user.id)]
+
+def _order_profit(session: Session, user: User, start: date, end: date) -> dict[str, object]:
+    filters = [_date_between(Order.order_date, start, end), *_order_filters(user)]
+    base = select(Order).join(Customer).outerjoin(Opportunity).where(*filters)
+    count = session.scalar(select(func.count(Order.id)).select_from(Order).join(Customer).outerjoin(Opportunity).where(*filters)) or 0
+    amounts = _currency_amounts(session.execute(base.with_only_columns(Order.currency, func.coalesce(func.sum(Order.order_amount), 0)).group_by(Order.currency).order_by(Order.currency)).all())
+    received, purchase, freight = session.execute(base.with_only_columns(func.coalesce(func.sum(Order.rmb_received_amount),0),func.coalesce(func.sum(Order.purchase_cost),0),func.coalesce(func.sum(Order.freight_cost),0))).one()
+    received, purchase, freight = Decimal(received), Decimal(purchase), Decimal(freight)
+    profit = received-purchase-freight
+    return {"order_count": count, "order_amounts": amounts, "rmb_received_total": received, "purchase_cost_total": purchase, "freight_cost_total": freight, "profit_total": profit, "average_profit_margin": (profit / received * Decimal("100")) if received else None}
 
 
 def _as_date(value: date | datetime | str) -> date:
@@ -563,4 +579,5 @@ def get_business_analytics(
             "upcoming_count": followup_summary["upcoming_count"],
             "unfollowed_count": followup_summary["unfollowed_count"],
         },
+        "order_profit": _order_profit(session, user, date_range.start_date, date_range.end_date),
     }
