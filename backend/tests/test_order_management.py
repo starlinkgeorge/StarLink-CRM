@@ -82,7 +82,7 @@ def test_order_permissions_and_quotation_can_only_have_one_order(client: TestCli
     assert admin_opportunity.status_code == 201
     scoped_quotation = client.post(
         "/api/v1/quotations",
-        json={"customer_id": own_customer, "opportunity_id": admin_opportunity.json()["id"], "currency": "USD", "items": [{"product_id": product.json()["id"], "unit_price": "100.00", "quantity": "1"}]},
+        json={"opportunity_id": admin_opportunity.json()["id"], "currency": "USD", "items": [{"product_id": product.json()["id"], "unit_price": "100.00", "quantity": "1"}]},
         headers=admin,
     )
     assert scoped_quotation.status_code == 201, scoped_quotation.text
@@ -105,7 +105,6 @@ def _opportunity_quotation(client: TestClient, token: dict, customer_id: int, na
     quotation = client.post(
         "/api/v1/quotations",
         json={
-            "customer_id": customer_id,
             "opportunity_id": opportunity.json()["id"],
             "currency": "USD",
             "items": [{"product_id": product.json()["id"], "unit_price": "123.45", "quantity": "2"}],
@@ -220,6 +219,45 @@ def test_existing_won_opportunity_can_be_edited_without_recreating_an_order(clie
     assert client.get("/api/v1/orders", params={"customer_id": customer_id, "limit": 100, "offset": 0}, headers=admin).json()["total"] == 1
 
 
+def test_historical_won_opportunity_without_an_order_can_be_edited(client: TestClient) -> None:
+    """Saving an already-Won historical record must never try to create an order."""
+    admin = login(client, "admin@example.com", "AdminPass123!")
+    customer_id = _customer(client, admin, "Historical Won Save Customer")
+    historical = client.post(
+        "/api/v1/opportunities",
+        json={
+            "customer_id": customer_id,
+            "name": "Historical Won Save",
+            "deal_stage": "Won",
+            "amount": "667.72",
+            "probability": 60,
+            "expected_close_date": "2026-08-19",
+        },
+        headers=admin,
+    )
+    assert historical.status_code == 201, historical.text
+
+    saved = client.put(
+        f"/api/v1/opportunities/{historical.json()['id']}",
+        json={
+            "deal_stage": "Won",
+            "amount": "667.72",
+            "probability": 60,
+            "expected_close_date": "2026-08-19",
+            "next_action": "Confirm customer requirements",
+        },
+        headers=admin,
+    )
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["deal_stage"] == "Won"
+    assert saved.json()["order_id"] is None
+    assert client.get(
+        "/api/v1/orders",
+        params={"customer_id": customer_id, "limit": 100, "offset": 0},
+        headers=admin,
+    ).json()["total"] == 0
+
+
 def test_historical_won_backfill_is_admin_only_and_idempotent(client: TestClient) -> None:
     admin = login(client, "admin@example.com", "AdminPass123!")
     sales_user = client.post(
@@ -246,7 +284,6 @@ def test_historical_won_backfill_is_admin_only_and_idempotent(client: TestClient
     quotation = client.post(
         "/api/v1/quotations",
         json={
-            "customer_id": customer_id,
             "opportunity_id": historical.json()["id"],
             "currency": "USD",
             "items": [{"product_id": product.json()["id"], "unit_price": "88.00", "quantity": "2"}],

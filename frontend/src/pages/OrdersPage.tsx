@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import type { AxiosError } from "axios";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
 import { backfillWonOrders, createOrder, getCustomers, getOpportunities, getOrderByQuotation, getOrders, getQuotation, getQuotations, previewWonOrderBackfill, type OrderPayload } from "../services/crm";
+import { getApiErrorMessage } from "../services/api";
 import { useAuth } from "../store/auth";
 import type { Customer, OpportunityListItem, Order, OrderPage, QuotationListItem, WonOrderBackfillPreview, WonOrderBackfillResult } from "../types";
 
@@ -32,8 +32,7 @@ export function OrdersPage() {
       setData(await getOrders({ limit: 20, offset: nextOffset, customer_id: customerId, q: nextFilters.q || undefined, start_date: nextFilters.start_date || undefined, end_date: nextFilters.end_date || undefined, payment_status: nextFilters.payment_status || undefined, production_status: nextFilters.production_status || undefined, shipping_status: nextFilters.shipping_status || undefined }));
       setError("");
     } catch (requestError: unknown) {
-      const detail = (requestError as AxiosError<{ detail?: string }>).response?.data?.detail;
-      setError(detail || "无法加载订单。");
+      setError(getApiErrorMessage(requestError, "无法加载订单。"));
     }
   }, [customerId, filters, offset]);
   useEffect(() => { void loadOrders(); void getCustomers({ limit: 100, offset: 0 }).then((page) => setCustomers(page.items)).catch(() => setError("无法加载可选客户。")); }, [loadOrders]);
@@ -59,11 +58,11 @@ export function OrdersPage() {
       setForm((current) => ({ ...current, quotation_id: quotationId, customer_id: quote.customer_id, opportunity_id: quote.opportunity_id ?? undefined, currency: version?.currency ?? quote.currency, order_amount: version?.total_amount ?? quote.total_amount }));
     })().catch(() => setError("无法读取报价默认信息。请从订单管理手动创建。")).finally(() => setBusy(false));
   }, [navigate, params]);
-  async function submit(event: FormEvent) { event.preventDefault(); setBusy(true); try { const order = await createOrder(form); navigate(`/orders/${order.id}`); } catch (requestError: unknown) { setError(requestError instanceof Error ? requestError.message : "无法创建订单，请检查客户、订单号和报价是否重复。"); } finally { setBusy(false); } }
+  async function submit(event: FormEvent) { event.preventDefault(); setBusy(true); try { const order = await createOrder(form); navigate(`/orders/${order.id}`); } catch (requestError: unknown) { setError(getApiErrorMessage(requestError, "无法创建订单，服务端已回滚本次操作。请检查客户、订单号和报价是否重复。")); } finally { setBusy(false); } }
   async function scanWonOrders() {
     setBackfillBusy(true); setBackfillResult(null);
     try { setBackfillPreview(await previewWonOrderBackfill()); setError(""); }
-    catch (requestError: unknown) { const detail = (requestError as AxiosError<{ detail?: string }>).response?.data?.detail; setError(detail || "无法扫描历史赢单订单。"); }
+    catch (requestError: unknown) { setError(getApiErrorMessage(requestError, "无法扫描历史赢单订单。")); }
     finally { setBackfillBusy(false); }
   }
   async function runWonBackfill() {
@@ -77,8 +76,7 @@ export function OrdersPage() {
       setBackfillResult(result); setBackfillPreview(null); setError("");
       await loadOrders(filters, 0); setOffset(0);
     } catch (requestError: unknown) {
-      const detail = (requestError as AxiosError<{ detail?: string }>).response?.data?.detail;
-      setError(detail || "补建历史订单失败，请刷新扫描结果后重试。");
+      setError(getApiErrorMessage(requestError, "补建历史订单失败，服务端已回滚本次操作。请联系管理员查看服务日志。"));
     } finally { setBackfillBusy(false); }
   }
   const editable = user?.role !== "Viewer";

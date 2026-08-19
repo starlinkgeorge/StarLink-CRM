@@ -111,12 +111,16 @@ def create_order_in_transaction(session: Session, payload: OrderCreate, user: Us
     owner_id = user.id if user.role is UserRole.SALES else (payload.owner_id or user.id)
     if not session.get(User, owner_id):
         raise NotFoundError("Order owner not found.")
-    order = Order(
-        **payload.model_dump(),
-        order_no=payload.order_no.strip(),
-        owner_id=owner_id,
-        created_by_id=user.id,
-    )
+    # ``OrderCreate`` deliberately includes caller-supplied order_no and
+    # owner_id.  Normalize/override those values in one mapping before
+    # constructing the ORM object; passing both ``**payload`` and explicit
+    # keyword arguments raises TypeError and previously made every automatic
+    # or historical order creation fail before the transaction could commit.
+    order_data = payload.model_dump()
+    order_data["order_no"] = payload.order_no.strip()
+    order_data["owner_id"] = owner_id
+    order_data["created_by_id"] = user.id
+    order = Order(**order_data)
     session.add(order)
     # Surface unique-constraint failures inside the caller's transaction so the
     # opportunity stage and order can be rolled back together.

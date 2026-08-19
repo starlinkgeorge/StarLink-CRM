@@ -11,6 +11,27 @@ type RefreshResponse = { access_token: string; refresh_token: string };
 type RetriableRequestConfig = InternalAxiosRequestConfig & { _retry?: boolean };
 let refreshPromise: Promise<string> | null = null;
 
+/**
+ * Return the safe business/validation message supplied by FastAPI without
+ * exposing internal server errors, SQL, or credentials to CRM users.
+ */
+export function getApiErrorMessage(error: unknown, fallback: string): string {
+  const response = (error as AxiosError<{ detail?: unknown }>).response;
+  // Only API validation/business errors are user-facing. Never render a
+  // server-generated 5xx message because it could expose implementation
+  // details such as SQL or infrastructure configuration.
+  if (!response || response.status < 400 || response.status >= 500) return fallback;
+  const detail = response.data?.detail;
+  if (typeof detail === "string" && detail.trim()) return detail;
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map((item) => (item && typeof item === "object" && "msg" in item && typeof item.msg === "string" ? item.msg : null))
+      .filter((message): message is string => Boolean(message));
+    if (messages.length) return messages.join("；");
+  }
+  return fallback;
+}
+
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("starlink.access_token");
   if (token) config.headers.Authorization = `Bearer ${token}`;

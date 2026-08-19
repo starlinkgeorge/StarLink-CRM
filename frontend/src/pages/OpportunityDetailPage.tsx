@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import type { AxiosError } from "axios";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import {
@@ -9,6 +8,7 @@ import {
   replaceOpportunityProducts,
   updateOpportunity,
 } from "../services/crm";
+import { getApiErrorMessage } from "../services/api";
 import {
   opportunityDealStageClass,
   opportunityDealStageLabels,
@@ -54,8 +54,7 @@ export function OpportunityDetailPage() {
       setError("");
       setOrderNotice(null);
     } catch (requestError: unknown) {
-      const detail = (requestError as AxiosError<{ detail?: string }>).response?.data?.detail;
-      setError(detail || "无法加载商机详情。");
+      setError(getApiErrorMessage(requestError, "无法加载商机详情。"));
     }
   }, [id]);
 
@@ -94,9 +93,8 @@ export function OpportunityDetailPage() {
         setOrderNotice(null);
       }
     } catch (requestError: unknown) {
-      const detail = (requestError as AxiosError<{ detail?: string }>).response?.data?.detail;
       setOrderNotice(null);
-      setError(detail || "无法更新商机，请检查销售阶段、概率和金额。");
+      setError(getApiErrorMessage(requestError, "无法更新商机，服务端已回滚本次修改。请联系管理员查看服务日志。"));
     } finally {
       setSaving(false);
     }

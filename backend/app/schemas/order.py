@@ -15,9 +15,9 @@ class OrderFields(BaseModel):
     expected_delivery_date: date | None = None
     shipped_at: date | None = None
     notes: str | None = None
-    rmb_received_amount: Decimal = Field(default=0, ge=0, max_digits=18, decimal_places=2)
-    purchase_cost: Decimal = Field(default=0, ge=0, max_digits=18, decimal_places=2)
-    freight_cost: Decimal = Field(default=0, ge=0, max_digits=18, decimal_places=2)
+    rmb_received_amount: Decimal = Field(default=Decimal("0"), ge=0, max_digits=18, decimal_places=2)
+    purchase_cost: Decimal = Field(default=Decimal("0"), ge=0, max_digits=18, decimal_places=2)
+    freight_cost: Decimal = Field(default=Decimal("0"), ge=0, max_digits=18, decimal_places=2)
     @field_validator("currency")
     @classmethod
     def upper_currency(cls, value: str) -> str: return value.strip().upper()
