@@ -4,6 +4,8 @@ from decimal import Decimal
 
 from fastapi.testclient import TestClient
 
+from app.services import opportunity_service
+from app.services.errors import ConflictError
 from test_crm_api import login
 
 
@@ -251,6 +253,38 @@ def test_historical_won_opportunity_without_an_order_can_be_edited(client: TestC
     assert saved.status_code == 200, saved.text
     assert saved.json()["deal_stage"] == "Won"
     assert saved.json()["order_id"] is None
+    assert client.get(
+        "/api/v1/orders",
+        params={"customer_id": customer_id, "limit": 100, "offset": 0},
+        headers=admin,
+    ).json()["total"] == 0
+
+
+def test_order_creation_failure_rolls_back_won_stage(
+    client: TestClient, monkeypatch
+) -> None:
+    """A failed automatic order must not leave an opportunity falsely Won."""
+    admin = login(client, "admin@example.com", "AdminPass123!")
+    customer_id = _customer(client, admin, "Won Transaction Rollback Customer")
+    opportunity, _ = _opportunity_quotation(client, admin, customer_id, "ROLLBACK")
+
+    def fail_order_creation(*_args, **_kwargs):
+        raise ConflictError("订单创建被业务约束阻止。")
+
+    monkeypatch.setattr(
+        opportunity_service.order_service,
+        "create_order_in_transaction",
+        fail_order_creation,
+    )
+    failed = client.put(
+        f"/api/v1/opportunities/{opportunity['id']}",
+        json={"deal_stage": "Won"},
+        headers=admin,
+    )
+    assert failed.status_code == 409, failed.text
+    unchanged = client.get(f"/api/v1/opportunities/{opportunity['id']}", headers=admin)
+    assert unchanged.status_code == 200, unchanged.text
+    assert unchanged.json()["deal_stage"] == "New Inquiry"
     assert client.get(
         "/api/v1/orders",
         params={"customer_id": customer_id, "limit": 100, "offset": 0},
