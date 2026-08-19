@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 
@@ -32,7 +32,13 @@ from app.schemas.opportunity import (
     OpportunityPipelineColumn,
     OpportunityUpdate,
 )
-from app.schemas.order import OrderCreate
+from app.schemas.order import (
+    OrderCreate,
+    OrderRead,
+    WonOrderBackfillCandidate,
+    WonOrderBackfillPreview,
+    WonOrderBackfillResult,
+)
 from app.schemas.product import OpportunityProductRead, OpportunityProductReplace
 from app.schemas.quotation import QuotationListItem
 from app.services import access_service
@@ -482,7 +488,13 @@ def _current_quotation_version(quotation: Quotation):
     return version
 
 
-def _create_or_reuse_won_order(session: Session, opportunity: Opportunity, editor: User) -> tuple[Order, bool]:
+def _create_or_reuse_won_order(
+    session: Session,
+    opportunity: Opportunity,
+    editor: User,
+    *,
+    order_date: date | None = None,
+) -> tuple[Order, bool]:
     """Create or reuse exactly one order within the caller's transaction."""
     existing = _opportunity_order(session, opportunity.id)
     if existing is not None:
@@ -501,7 +513,7 @@ def _create_or_reuse_won_order(session: Session, opportunity: Opportunity, edito
             customer_id=opportunity.customer_id,
             opportunity_id=opportunity.id,
             quotation_id=quotation.id,
-            order_date=datetime.now(BUSINESS_TIME_ZONE).date(),
+            order_date=order_date or datetime.now(BUSINESS_TIME_ZONE).date(),
             currency=current_version.currency,
             order_amount=current_version.total_amount,
             owner_id=opportunity.owner_id,
@@ -509,6 +521,170 @@ def _create_or_reuse_won_order(session: Session, opportunity: Opportunity, edito
         editor,
     )
     return order, True
+
+
+def _is_won_opportunity(opportunity: Opportunity) -> bool:
+    """Recognize every persisted representation of a Won opportunity."""
+    return (
+        opportunity.stage is OpportunityStage.WON
+        or _as_sales_stage(opportunity.sales_stage) is OpportunitySalesStage.WON
+        or _as_deal_stage(opportunity.deal_stage) is OpportunityDealStage.WON
+    )
+
+
+def _historical_won_date(opportunity: Opportunity) -> tuple[date | None, str | None]:
+    """Use an existing transition timestamp only; never invent a historical win date."""
+    transitions: list[datetime] = []
+    transitions.extend(
+        item.created_at
+        for item in opportunity.deal_stage_history
+        if item.new_deal_stage == OpportunityDealStage.WON.value and item.created_at
+    )
+    transitions.extend(
+        item.created_at
+        for item in opportunity.sales_stage_history
+        if item.new_sales_stage == OpportunitySalesStage.WON.value and item.created_at
+    )
+    transitions.extend(
+        item.created_at
+        for item in opportunity.stage_history
+        if item.new_stage is OpportunityStage.WON and item.created_at
+    )
+    # A timezone-aware history timestamp is the only reliable business date.
+    timezone_aware = [item for item in transitions if item.tzinfo is not None]
+    if not timezone_aware:
+        return None, None
+    return min(timezone_aware).astimezone(BUSINESS_TIME_ZONE).date(), "赢单阶段历史"
+
+
+def _historical_won_opportunities(session: Session) -> list[Opportunity]:
+    """Load all potential backfill records with no hidden per-row query behavior."""
+    statement = select(Opportunity).options(
+        joinedload(Opportunity.customer),
+        selectinload(Opportunity.stage_history),
+        selectinload(Opportunity.sales_stage_history),
+        selectinload(Opportunity.deal_stage_history),
+        selectinload(Opportunity.quotations).selectinload(Quotation.versions),
+    )
+    return [item for item in session.scalars(statement) if _is_won_opportunity(item)]
+
+
+def _backfill_candidate(opportunity: Opportunity) -> WonOrderBackfillCandidate:
+    """Describe a backfill decision without changing data."""
+    try:
+        quotation = _select_order_quotation(opportunity)
+        quotation_id = quotation.id
+        quotation_number = quotation.quotation_number
+        reason = None
+    except ConflictError as error:
+        quotation_id = None
+        quotation_number = None
+        reason = str(error)
+    order_date, order_date_source = _historical_won_date(opportunity)
+    return WonOrderBackfillCandidate(
+        opportunity_id=opportunity.id,
+        opportunity_name=opportunity.name,
+        customer_id=opportunity.customer_id,
+        customer_company=opportunity.customer.company_name,
+        quotation_id=quotation_id,
+        quotation_number=quotation_number,
+        order_date=order_date,
+        order_date_source=order_date_source,
+        reason=reason,
+    )
+
+
+def preview_historical_won_order_backfill(
+    session: Session, user: User
+) -> WonOrderBackfillPreview:
+    """Admin-only, read-only report for deliberate historical order backfills."""
+    if user.role is not UserRole.ADMIN:
+        raise ForbiddenError("Only Admin accounts can preview historical order backfills.")
+    opportunities = _historical_won_opportunities(session)
+    candidates: list[WonOrderBackfillCandidate] = []
+    already_ordered = 0
+    eligible_auto_build = 0
+    requires_date_confirmation = 0
+    unbuildable = 0
+    for opportunity in opportunities:
+        if _opportunity_order(session, opportunity.id) is not None:
+            already_ordered += 1
+            continue
+        candidate = _backfill_candidate(opportunity)
+        candidates.append(candidate)
+        if candidate.reason is not None:
+            unbuildable += 1
+        elif candidate.order_date is None:
+            requires_date_confirmation += 1
+        else:
+            eligible_auto_build += 1
+    return WonOrderBackfillPreview(
+        total_won=len(opportunities),
+        already_ordered=already_ordered,
+        eligible_auto_build=eligible_auto_build,
+        requires_date_confirmation=requires_date_confirmation,
+        unbuildable=unbuildable,
+        candidates=candidates,
+    )
+
+
+def backfill_historical_won_orders(
+    session: Session,
+    user: User,
+    *,
+    fallback_order_date: date | None,
+) -> WonOrderBackfillResult:
+    """Create only explicitly approved, recoverable historical orders.
+
+    This action is intentionally Admin-only and is idempotent: each order is
+    created through the same locked service path as a live Won transition.
+    """
+    if user.role is not UserRole.ADMIN:
+        raise ForbiddenError("Only Admin accounts can create historical orders.")
+    created_orders: list[OrderRead] = []
+    skipped: list[WonOrderBackfillCandidate] = []
+    already_ordered = requires_date_confirmation = unbuildable = 0
+    try:
+        for opportunity in _historical_won_opportunities(session):
+            if _opportunity_order(session, opportunity.id) is not None:
+                already_ordered += 1
+                continue
+            candidate = _backfill_candidate(opportunity)
+            if candidate.reason is not None:
+                unbuildable += 1
+                skipped.append(candidate)
+                continue
+            chosen_order_date = candidate.order_date or fallback_order_date
+            if chosen_order_date is None:
+                requires_date_confirmation += 1
+                candidate.reason = "缺少可靠赢单日期；请由管理员确认补建订单日期。"
+                skipped.append(candidate)
+                continue
+            # Reuse the live creation path: it locks the opportunity row and
+            # rechecks existing orders before flushing, so repeated or
+            # concurrent batch calls cannot create a duplicate order.
+            order, created = _create_or_reuse_won_order(
+                session, opportunity, user, order_date=chosen_order_date
+            )
+            if created:
+                created_orders.append(order_service.serialize_order(session, order))
+            else:
+                already_ordered += 1
+        session.commit()
+    except IntegrityError as error:
+        session.rollback()
+        raise ConflictError("补建订单时检测到并发冲突，请刷新扫描结果后重试。") from error
+    except Exception:
+        session.rollback()
+        raise
+    return WonOrderBackfillResult(
+        created=len(created_orders),
+        already_ordered=already_ordered,
+        requires_date_confirmation=requires_date_confirmation,
+        unbuildable=unbuildable,
+        created_orders=created_orders,
+        skipped=skipped,
+    )
 
 
 def list_opportunities(

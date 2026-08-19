@@ -53,8 +53,9 @@ export function OpportunityDetailPage() {
       setNextAction(item.next_action ?? "");
       setError("");
       setOrderNotice(null);
-    } catch {
-      setError("无法加载商机详情。");
+    } catch (requestError: unknown) {
+      const detail = (requestError as AxiosError<{ detail?: string }>).response?.data?.detail;
+      setError(detail || "无法加载商机详情。");
     }
   }, [id]);
 

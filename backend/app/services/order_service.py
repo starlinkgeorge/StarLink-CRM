@@ -31,6 +31,11 @@ def _serialize(session: Session, order: Order) -> OrderRead:
     margin = (profit / order.rmb_received_amount * Decimal("100")) if order.rmb_received_amount else None
     rate = (order.rmb_received_amount / order.order_amount) if order.order_amount and order.currency != "CNY" else None
     return OrderRead.model_validate({**order.__dict__, "customer_company": customer.company_name if customer else "—", "owner_name": owner_name, "profit": profit, "profit_margin": margin, "realized_exchange_rate": rate})
+
+
+def serialize_order(session: Session, order: Order) -> OrderRead:
+    """Public serialization helper for the Opportunity order workflow."""
+    return _serialize(session, order)
 def list_orders(session: Session, user: User, limit: int, offset: int, q: str | None = None, customer_id: int | None = None, start=None, end=None, payment_status=None, production_status=None, shipping_status=None):
     filters=[]; scope=_visible(user)
     if scope is not None: filters.append(scope)

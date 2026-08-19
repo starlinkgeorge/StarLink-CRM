@@ -1,5 +1,5 @@
 import api from "./api";
-import type { AlibabaInquiryResult, AlibabaIntegrationStatus, AnalyticsPeriod, BusinessAnalyticsOverview, CalculatedFollowupReminderStatus, Customer, CustomerActivity, CustomerCategory, CustomerCenter, CustomerDetail, CustomerFollowupReminderPage, CustomerPage, CustomerScoreHistory, DashboardStats, FollowUp, FollowUpAttachment, Inquiry, InquiryConversion, InquiryPage, InquiryStatus, OpportunityDealPipeline, OpportunityDealStage, OpportunityDetail, OpportunityListItem, OpportunityPage, OpportunityPipeline, OpportunitySalesStage, OpportunityStage, Order, OrderPage, Product, ProductCategory, ProductPage, QuotationDetail, QuotationPage, QuotationStatus, Tag } from "../types";
+import type { AlibabaInquiryResult, AlibabaIntegrationStatus, AnalyticsPeriod, BusinessAnalyticsOverview, CalculatedFollowupReminderStatus, Customer, CustomerActivity, CustomerCategory, CustomerCenter, CustomerDetail, CustomerFollowupReminderPage, CustomerPage, CustomerScoreHistory, DashboardStats, FollowUp, FollowUpAttachment, Inquiry, InquiryConversion, InquiryPage, InquiryStatus, OpportunityDealPipeline, OpportunityDealStage, OpportunityDetail, OpportunityListItem, OpportunityPage, OpportunityPipeline, OpportunitySalesStage, OpportunityStage, Order, OrderPage, Product, ProductCategory, ProductPage, QuotationDetail, QuotationPage, QuotationStatus, Tag, WonOrderBackfillPreview, WonOrderBackfillResult } from "../types";
 
 export type CustomerCreatePayload = {
   company_name: string; contact_name?: string; country?: string; email?: string; phone?: string;
@@ -111,6 +111,8 @@ export const createOrder = async (payload:OrderPayload) => (await api.post<Order
 export const updateOrder = async (id:number,payload:Partial<OrderPayload>) => (await api.put<Order>(`/orders/${id}`,payload)).data;
 export const deleteOrder = async (id:number) => { await api.delete(`/orders/${id}`); };
 export const getOrderByQuotation = async (id:number) => (await api.get<Order|null>(`/orders/by-quotation/${id}`)).data;
+export const previewWonOrderBackfill = async () => (await api.get<WonOrderBackfillPreview>("/orders/won-backfill/preview")).data;
+export const backfillWonOrders = async (fallback_order_date?: string) => (await api.post<WonOrderBackfillResult>("/orders/won-backfill", { fallback_order_date: fallback_order_date || null })).data;
 
 export type ProductImagePayload = { image_url: string; is_primary?: boolean; sort_order?: number };
 export type ProductPayload = {

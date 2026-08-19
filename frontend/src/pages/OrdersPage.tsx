@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import type { AxiosError } from "axios";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
-import { createOrder, getCustomers, getOpportunities, getOrderByQuotation, getOrders, getQuotation, getQuotations, type OrderPayload } from "../services/crm";
+import { backfillWonOrders, createOrder, getCustomers, getOpportunities, getOrderByQuotation, getOrders, getQuotation, getQuotations, previewWonOrderBackfill, type OrderPayload } from "../services/crm";
 import { useAuth } from "../store/auth";
-import type { Customer, OpportunityListItem, Order, OrderPage, QuotationListItem } from "../types";
+import type { Customer, OpportunityListItem, Order, OrderPage, QuotationListItem, WonOrderBackfillPreview, WonOrderBackfillResult } from "../types";
 
 const payment = [["Unpaid", "未付款"], ["Deposit Received", "已收定金"], ["Paid in Full", "已收全款"]] as const;
 const production = [["Not Started", "未开始"], ["In Production", "生产中"], ["Completed", "已完成"]] as const;
@@ -20,13 +21,20 @@ export function OrdersPage() {
   const [opportunities, setOpportunities] = useState<OpportunityListItem[]>([]); const [quotations, setQuotations] = useState<QuotationListItem[]>([]);
   const [offset, setOffset] = useState(0);
   const [filters, setFilters] = useState<Filters>(emptyFilters); const [error, setError] = useState(""); const [busy, setBusy] = useState(false);
+  const [backfillPreview, setBackfillPreview] = useState<WonOrderBackfillPreview | null>(null);
+  const [backfillResult, setBackfillResult] = useState<WonOrderBackfillResult | null>(null);
+  const [fallbackOrderDate, setFallbackOrderDate] = useState("");
+  const [backfillBusy, setBackfillBusy] = useState(false);
   const [show, setShow] = useState(location.pathname.endsWith("/new"));
   const [form, setForm] = useState<OrderPayload>({ order_no: "", customer_id: customerId ?? 0, opportunity_id: Number(params.get("opportunity_id")) || undefined, quotation_id: Number(params.get("quotation_id")) || undefined, order_date: today, currency: "USD", order_amount: "", rmb_received_amount: "0", purchase_cost: "0", freight_cost: "0" });
   const loadOrders = useCallback(async (nextFilters = filters, nextOffset = offset) => {
     try {
       setData(await getOrders({ limit: 20, offset: nextOffset, customer_id: customerId, q: nextFilters.q || undefined, start_date: nextFilters.start_date || undefined, end_date: nextFilters.end_date || undefined, payment_status: nextFilters.payment_status || undefined, production_status: nextFilters.production_status || undefined, shipping_status: nextFilters.shipping_status || undefined }));
       setError("");
-    } catch { setError("无法加载订单。"); }
+    } catch (requestError: unknown) {
+      const detail = (requestError as AxiosError<{ detail?: string }>).response?.data?.detail;
+      setError(detail || "无法加载订单。");
+    }
   }, [customerId, filters, offset]);
   useEffect(() => { void loadOrders(); void getCustomers({ limit: 100, offset: 0 }).then((page) => setCustomers(page.items)).catch(() => setError("无法加载可选客户。")); }, [loadOrders]);
   useEffect(() => {
@@ -52,10 +60,40 @@ export function OrdersPage() {
     })().catch(() => setError("无法读取报价默认信息。请从订单管理手动创建。")).finally(() => setBusy(false));
   }, [navigate, params]);
   async function submit(event: FormEvent) { event.preventDefault(); setBusy(true); try { const order = await createOrder(form); navigate(`/orders/${order.id}`); } catch (requestError: unknown) { setError(requestError instanceof Error ? requestError.message : "无法创建订单，请检查客户、订单号和报价是否重复。"); } finally { setBusy(false); } }
+  async function scanWonOrders() {
+    setBackfillBusy(true); setBackfillResult(null);
+    try { setBackfillPreview(await previewWonOrderBackfill()); setError(""); }
+    catch (requestError: unknown) { const detail = (requestError as AxiosError<{ detail?: string }>).response?.data?.detail; setError(detail || "无法扫描历史赢单订单。"); }
+    finally { setBackfillBusy(false); }
+  }
+  async function runWonBackfill() {
+    if (!backfillPreview) return;
+    if (backfillPreview.requires_date_confirmation > 0 && !fallbackOrderDate) {
+      setError("有历史赢单缺少可靠赢单日期，请先由管理员确认补建订单日期。"); return;
+    }
+    setBackfillBusy(true);
+    try {
+      const result = await backfillWonOrders(fallbackOrderDate || undefined);
+      setBackfillResult(result); setBackfillPreview(null); setError("");
+      await loadOrders(filters, 0); setOffset(0);
+    } catch (requestError: unknown) {
+      const detail = (requestError as AxiosError<{ detail?: string }>).response?.data?.detail;
+      setError(detail || "补建历史订单失败，请刷新扫描结果后重试。");
+    } finally { setBackfillBusy(false); }
+  }
   const editable = user?.role !== "Viewer";
+  const isAdmin = user?.role === "Admin";
   const setFilter = <K extends keyof Filters>(key: K, value: Filters[K]) => setFilters((current) => ({ ...current, [key]: value }));
   return <>
-    <div className="flex items-center justify-between gap-3"><div><p className="text-sm text-slate-500">真实成交、履约与利润核算</p><h2 className="text-3xl font-bold">订单管理</h2></div>{editable && !show && <button type="button" onClick={() => { setShow(true); navigate("/orders/new"); }} className="rounded bg-blue-700 px-4 py-2 font-semibold text-white">新建订单</button>}</div>
+    <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-sm text-slate-500">真实成交、履约与利润核算</p><h2 className="text-3xl font-bold">订单管理</h2></div><div className="flex flex-wrap gap-2">{isAdmin && !show && <button type="button" onClick={() => void scanWonOrders()} disabled={backfillBusy} className="rounded border border-amber-500 px-4 py-2 font-semibold text-amber-700 disabled:opacity-60">{backfillBusy ? "正在扫描…" : "补建赢单订单"}</button>}{editable && !show && <button type="button" onClick={() => { setShow(true); navigate("/orders/new"); }} className="rounded bg-blue-700 px-4 py-2 font-semibold text-white">新建订单</button>}</div></div>
+    {backfillPreview && <section className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-slate-700">
+      <div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="text-base font-bold text-slate-900">历史赢单订单扫描</h3><p className="mt-1">仅会处理当前为“赢单”且尚未关联订单的商机。确认前不会修改任何数据。</p></div><button type="button" onClick={() => setBackfillPreview(null)} className="text-slate-600">关闭</button></div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5"><div><b>{backfillPreview.total_won}</b><p>赢单商机总数</p></div><div><b>{backfillPreview.already_ordered}</b><p>已有订单</p></div><div><b>{backfillPreview.eligible_auto_build}</b><p>可直接补建</p></div><div><b>{backfillPreview.requires_date_confirmation}</b><p>需确认日期</p></div><div><b>{backfillPreview.unbuildable}</b><p>无法自动补建</p></div></div>
+      {backfillPreview.requires_date_confirmation > 0 && <label className="mt-4 block max-w-xs font-medium">缺少可靠赢单日期时使用的订单日期<input required type="date" value={fallbackOrderDate} onChange={(event) => setFallbackOrderDate(event.target.value)} className="mt-1 block w-full rounded border bg-white px-3 py-2" /></label>}
+      {backfillPreview.candidates.length > 0 && <div className="mt-4 max-h-56 overflow-auto rounded border bg-white"><table className="min-w-[760px] w-full text-left"><thead className="bg-slate-100"><tr><th className="px-3 py-2">商机</th><th className="px-3 py-2">客户</th><th className="px-3 py-2">报价</th><th className="px-3 py-2">订单日期</th><th className="px-3 py-2">结果</th></tr></thead><tbody>{backfillPreview.candidates.map((candidate) => <tr key={candidate.opportunity_id} className="border-t"><td className="px-3 py-2"><Link className="text-blue-700" to={`/opportunities/${candidate.opportunity_id}`}>{candidate.opportunity_name}</Link></td><td className="px-3 py-2">{candidate.customer_company}</td><td className="px-3 py-2">{candidate.quotation_number ?? "—"}</td><td className="px-3 py-2">{candidate.order_date ?? "需确认"}</td><td className="px-3 py-2">{candidate.reason ?? "可补建"}</td></tr>)}</tbody></table></div>}
+      <button type="button" onClick={() => void runWonBackfill()} disabled={backfillBusy || (!backfillPreview.eligible_auto_build && !backfillPreview.requires_date_confirmation)} className="mt-4 rounded bg-amber-600 px-4 py-2 font-semibold text-white disabled:opacity-60">{backfillBusy ? "正在补建…" : "确认补建安全订单"}</button>
+    </section>}
+    {backfillResult && <p className="mt-4 rounded bg-emerald-50 px-4 py-3 text-sm text-emerald-800">补建完成：新建 {backfillResult.created} 个订单；已有订单跳过 {backfillResult.already_ordered} 个；缺少日期 {backfillResult.requires_date_confirmation} 个；无法自动补建 {backfillResult.unbuildable} 个。</p>}
     {show && <form onSubmit={submit} className="mt-5 grid gap-3 rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200 md:grid-cols-3">
       <div className="md:col-span-3 flex items-center justify-between"><h3 className="font-bold">新建订单</h3><button type="button" onClick={() => { setShow(false); navigate("/orders"); }} className="text-sm text-slate-600">取消</button></div>
       <label>订单号<input required placeholder="例如 SO-20260819-1" value={form.order_no} onChange={(event) => setForm({ ...form, order_no: event.target.value })} className="mt-1 w-full rounded border px-3 py-2" /></label>

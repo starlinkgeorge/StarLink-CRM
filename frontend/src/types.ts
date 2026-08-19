@@ -187,6 +187,9 @@ export type OrderProductionStatus = "Not Started" | "In Production" | "Completed
 export type OrderShippingStatus = "Pending Shipment" | "Shipped" | "Delivered";
 export interface Order { id:number; order_no:string; customer_id:number; opportunity_id:number|null; quotation_id:number|null; order_date:string; currency:string; order_amount:string; owner_id:number|null; created_by_id:number; payment_status:OrderPaymentStatus; production_status:OrderProductionStatus; shipping_status:OrderShippingStatus; expected_delivery_date:string|null; shipped_at:string|null; notes:string|null; rmb_received_amount:string; purchase_cost:string; freight_cost:string; profit:string; profit_margin:string|null; realized_exchange_rate:string|null; customer_company:string; owner_name:string|null; created_at:string; updated_at:string; }
 export interface OrderPage { items: Order[]; total:number; limit:number; offset:number; }
+export interface WonOrderBackfillCandidate { opportunity_id:number; opportunity_name:string; customer_id:number; customer_company:string; quotation_id:number|null; quotation_number:string|null; order_date:string|null; order_date_source:string|null; reason:string|null; }
+export interface WonOrderBackfillPreview { total_won:number; already_ordered:number; eligible_auto_build:number; requires_date_confirmation:number; unbuildable:number; candidates:WonOrderBackfillCandidate[]; }
+export interface WonOrderBackfillResult { created:number; already_ordered:number; requires_date_confirmation:number; unbuildable:number; created_orders:Order[]; skipped:WonOrderBackfillCandidate[]; }
 export interface AnalyticsOrderProfit { order_count:number; order_amounts:AnalyticsCurrencyAmount[]; rmb_received_total:string; purchase_cost_total:string; freight_cost_total:string; profit_total:string; average_profit_margin:string|null; }
 export interface BusinessAnalyticsOverview {
   period: AnalyticsPeriod; date_range: AnalyticsDateRange; kpis: AnalyticsKpis;

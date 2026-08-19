@@ -7,8 +7,8 @@ from app.api.dependencies import get_current_user
 from app.db.session import get_db_session
 from app.models.order import OrderPaymentStatus, OrderProductionStatus, OrderShippingStatus
 from app.models.user import User
-from app.schemas.order import OrderCreate, OrderPage, OrderRead, OrderUpdate
-from app.services import order_service
+from app.schemas.order import OrderCreate, OrderPage, OrderRead, OrderUpdate, WonOrderBackfillPreview, WonOrderBackfillRequest, WonOrderBackfillResult
+from app.services import opportunity_service, order_service
 from app.services.errors import ConflictError, ForbiddenError, NotFoundError
 router=APIRouter(prefix="/orders",tags=["orders"])
 def guard(fn):
@@ -29,6 +29,14 @@ def create_order(payload:OrderCreate,session:Session=Depends(get_db_session),cur
 @router.get("/by-quotation/{quotation_id}",response_model=OrderRead|None)
 @guard
 def by_quote(quotation_id:int,session:Session=Depends(get_db_session),current_user:User=Depends(get_current_user)): return order_service.quotation_order(session,current_user,quotation_id)
+@router.get("/won-backfill/preview", response_model=WonOrderBackfillPreview)
+@guard
+def won_backfill_preview(session: Session = Depends(get_db_session), current_user: User = Depends(get_current_user)):
+ return opportunity_service.preview_historical_won_order_backfill(session, current_user)
+@router.post("/won-backfill", response_model=WonOrderBackfillResult)
+@guard
+def won_backfill(payload: WonOrderBackfillRequest, session: Session = Depends(get_db_session), current_user: User = Depends(get_current_user)):
+ return opportunity_service.backfill_historical_won_orders(session, current_user, fallback_order_date=payload.fallback_order_date)
 @router.get("/{order_id}",response_model=OrderRead)
 @guard
 def get_order(order_id:int,session:Session=Depends(get_db_session),current_user:User=Depends(get_current_user)): return order_service.get_order(session,current_user,order_id)

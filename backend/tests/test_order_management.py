@@ -184,3 +184,114 @@ def test_winning_requires_a_quotation_and_respects_opportunity_ownership(client:
     forbidden = client.put(f"/api/v1/opportunities/{opportunity['id']}", json={"deal_stage": "Won"}, headers=sales_b)
     assert forbidden.status_code == 403
     assert client.get("/api/v1/orders", params={"customer_id": sales_customer, "limit": 100, "offset": 0}, headers=admin).json()["total"] == 0
+
+
+def test_existing_won_opportunity_can_be_edited_without_recreating_an_order(client: TestClient) -> None:
+    """The order guard applies only to a real transition into Won."""
+    admin = login(client, "admin@example.com", "AdminPass123!")
+    customer_id = _customer(client, admin, "Existing Won Edit Customer")
+    opportunity, _ = _opportunity_quotation(client, admin, customer_id, "EDIT")
+
+    won = client.put(
+        f"/api/v1/opportunities/{opportunity['id']}",
+        json={"deal_stage": "Won"},
+        headers=admin,
+    )
+    assert won.status_code == 200, won.text
+    order_id = won.json()["order_id"]
+
+    note_update = client.put(
+        f"/api/v1/opportunities/{opportunity['id']}",
+        json={"next_action": "Confirm production artwork"},
+        headers=admin,
+    )
+    assert note_update.status_code == 200, note_update.text
+    assert note_update.json()["next_action"] == "Confirm production artwork"
+    assert note_update.json()["order_id"] == order_id
+
+    amount_update = client.put(
+        f"/api/v1/opportunities/{opportunity['id']}",
+        json={"amount": "999.99", "probability": 100},
+        headers=admin,
+    )
+    assert amount_update.status_code == 200, amount_update.text
+    assert Decimal(amount_update.json()["amount"]) == Decimal("999.99")
+    assert amount_update.json()["order_id"] == order_id
+    assert client.get("/api/v1/orders", params={"customer_id": customer_id, "limit": 100, "offset": 0}, headers=admin).json()["total"] == 1
+
+
+def test_historical_won_backfill_is_admin_only_and_idempotent(client: TestClient) -> None:
+    admin = login(client, "admin@example.com", "AdminPass123!")
+    sales_user = client.post(
+        "/api/v1/users",
+        json={"name": "Backfill Sales", "email": "backfill-sales@example.com", "password": "SalesPass123!", "role": "Sales"},
+        headers=admin,
+    )
+    assert sales_user.status_code == 201
+    sales = login(client, "backfill-sales@example.com", "SalesPass123!")
+    customer_id = _customer(client, admin, "Historical Won Customer")
+
+    product = client.post(
+        "/api/v1/products",
+        json={"sku": "HIST-WON-1", "name": "Historical Won Product", "reference_price": "88.00"},
+        headers=admin,
+    )
+    assert product.status_code == 201, product.text
+    historical = client.post(
+        "/api/v1/opportunities",
+        json={"customer_id": customer_id, "name": "Historical won with quote", "deal_stage": "Won"},
+        headers=admin,
+    )
+    assert historical.status_code == 201, historical.text
+    quotation = client.post(
+        "/api/v1/quotations",
+        json={
+            "customer_id": customer_id,
+            "opportunity_id": historical.json()["id"],
+            "currency": "USD",
+            "items": [{"product_id": product.json()["id"], "unit_price": "88.00", "quantity": "2"}],
+        },
+        headers=admin,
+    )
+    assert quotation.status_code == 201, quotation.text
+    without_quote = client.post(
+        "/api/v1/opportunities",
+        json={"customer_id": customer_id, "name": "Historical won without quote", "deal_stage": "Won"},
+        headers=admin,
+    )
+    assert without_quote.status_code == 201, without_quote.text
+
+    assert client.get("/api/v1/orders/won-backfill/preview", headers=sales).status_code == 403
+    assert client.post("/api/v1/orders/won-backfill", json={}, headers=sales).status_code == 403
+
+    preview = client.get("/api/v1/orders/won-backfill/preview", headers=admin)
+    assert preview.status_code == 200, preview.text
+    preview_body = preview.json()
+    assert preview_body["total_won"] >= 2
+    quoted_candidate = next(item for item in preview_body["candidates"] if item["opportunity_id"] == historical.json()["id"])
+    no_quote_candidate = next(item for item in preview_body["candidates"] if item["opportunity_id"] == without_quote.json()["id"])
+    assert quoted_candidate["quotation_id"] == quotation.json()["id"]
+    assert no_quote_candidate["reason"] is not None
+
+    # SQLite test timestamps are intentionally timezone-naive, so an Admin must
+    # explicitly approve the fallback business date before creation.
+    built = client.post(
+        "/api/v1/orders/won-backfill",
+        json={"fallback_order_date": "2026-08-19"},
+        headers=admin,
+    )
+    assert built.status_code == 200, built.text
+    assert built.json()["created"] == 1
+    order = built.json()["created_orders"][0]
+    assert order["opportunity_id"] == historical.json()["id"]
+    assert order["quotation_id"] == quotation.json()["id"]
+    assert order["order_no"] == quotation.json()["quotation_number"]
+
+    repeated = client.post(
+        "/api/v1/orders/won-backfill",
+        json={"fallback_order_date": "2026-08-19"},
+        headers=admin,
+    )
+    assert repeated.status_code == 200, repeated.text
+    assert repeated.json()["created"] == 0
+    assert repeated.json()["already_ordered"] >= 1

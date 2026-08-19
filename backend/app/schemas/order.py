@@ -60,3 +60,41 @@ class OrderRead(BaseModel):
 
 class OrderPage(BaseModel):
     items: list[OrderRead]; total: int; limit: int; offset: int
+
+
+class WonOrderBackfillCandidate(BaseModel):
+    """One historical Won opportunity considered by the Admin-only backfill tool."""
+
+    opportunity_id: int
+    opportunity_name: str
+    customer_id: int
+    customer_company: str
+    quotation_id: int | None = None
+    quotation_number: str | None = None
+    order_date: date | None = None
+    order_date_source: str | None = None
+    reason: str | None = None
+
+
+class WonOrderBackfillPreview(BaseModel):
+    total_won: int
+    already_ordered: int
+    eligible_auto_build: int
+    requires_date_confirmation: int
+    unbuildable: int
+    candidates: list[WonOrderBackfillCandidate]
+
+
+class WonOrderBackfillRequest(BaseModel):
+    """A date explicitly confirmed by Admin for records without Won history."""
+
+    fallback_order_date: date | None = None
+
+
+class WonOrderBackfillResult(BaseModel):
+    created: int
+    already_ordered: int
+    requires_date_confirmation: int
+    unbuildable: int
+    created_orders: list[OrderRead]
+    skipped: list[WonOrderBackfillCandidate]
