@@ -75,6 +75,26 @@ def test_business_analytics_uses_archive_dates_and_current_quotation_version(
         headers=admin_token,
     )
     assert followup.status_code == 201
+    counted_customer = client.post(
+        "/api/v1/customers",
+        json={
+            "company_name": "Yesterday Followup Customer",
+            "customer_acquired_at": (today - timedelta(days=7)).isoformat(),
+        },
+        headers=token,
+    )
+    assert counted_customer.status_code == 201
+    counted_followup = client.post(
+        "/api/v1/followups",
+        json={
+            "customer_id": counted_customer.json()["id"],
+            "type": "Email",
+            "content": "Created yesterday",
+            "followup_date": yesterday.isoformat(),
+        },
+        headers=token,
+    )
+    assert counted_followup.status_code == 201
 
     overview = client.get("/api/v1/analytics/overview", params={"period": "today"}, headers=admin_token)
     assert overview.status_code == 200
@@ -99,3 +119,48 @@ def test_business_analytics_requires_a_complete_custom_range(client: TestClient)
     )
 
     assert response.status_code == 422
+
+
+def test_business_analytics_yesterday_uses_the_previous_shanghai_business_day(
+    client: TestClient,
+) -> None:
+    token = login(client, "admin@example.com", "AdminPass123!")
+    today = shanghai_today()
+    yesterday = today - timedelta(days=1)
+    customer = client.post(
+        "/api/v1/customers",
+        json={
+            "company_name": "Yesterday Reminder Customer",
+            "customer_acquired_at": (today - timedelta(days=7)).isoformat(),
+            "followup_stage": "已报价",
+        },
+        headers=token,
+    )
+    assert customer.status_code == 201
+    followup = client.post(
+        "/api/v1/followups",
+        json={
+            "customer_id": customer.json()["id"],
+            "type": "Email",
+            "content": "Set reminder due yesterday",
+            "followup_date": (yesterday - timedelta(days=3)).isoformat(),
+        },
+        headers=token,
+    )
+    assert followup.status_code == 201
+
+    response = client.get(
+        "/api/v1/analytics/overview",
+        params={"period": "yesterday"},
+        headers=token,
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    yesterday_text = yesterday.isoformat()
+    assert payload["period"] == "yesterday"
+    assert payload["date_range"]["start_date"] == yesterday_text
+    assert payload["date_range"]["end_date"] == yesterday_text
+    assert payload["date_range"]["comparison_end_date"] == (today - timedelta(days=2)).isoformat()
+    assert payload["followup_summary"]["created_followup_count"] == 1
+    assert payload["followup_summary"]["today_count"] == 1

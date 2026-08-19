@@ -57,6 +57,10 @@ def _period_range(
         start = end = current_day
         label = current_day.isoformat()
         granularity = "day"
+    elif period is AnalyticsPeriod.YESTERDAY:
+        start = end = current_day - timedelta(days=1)
+        label = f"Yesterday · {start.isoformat()}"
+        granularity = "day"
     elif period is AnalyticsPeriod.WEEK:
         start = current_day - timedelta(days=current_day.weekday())
         end = current_day
@@ -498,7 +502,12 @@ def get_business_analytics(
     quoted_opportunities = _quoted_opportunity_count(
         session, user, date_range.start_date, date_range.end_date
     )
-    followup_summary, _ = list_customer_followup_reminders(session, user)
+    # Keep reminder statuses on the same business-date basis as the selected
+    # analytics period.  In particular, the "yesterday" view must not combine
+    # yesterday's activity totals with today's reminder state.
+    followup_summary, _ = list_customer_followup_reminders(
+        session, user, today=date_range.end_date
+    )
     followup_count = session.scalar(
         select(func.count(FollowUp.id))
         .join(Customer)

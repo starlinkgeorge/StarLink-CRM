@@ -152,7 +152,7 @@ export interface DashboardStats {
   followup_reminder_upcoming_count: number;
   followup_reminder_unfollowed_count: number;
 }
-export type AnalyticsPeriod = "today" | "week" | "month" | "year" | "custom";
+export type AnalyticsPeriod = "today" | "yesterday" | "week" | "month" | "year" | "custom";
 export interface AnalyticsCurrencyAmount { currency: string; amount: string; }
 export interface AnalyticsDateRange {
   start_date: string; end_date: string; comparison_start_date: string;

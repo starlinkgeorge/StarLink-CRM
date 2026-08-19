@@ -12,6 +12,7 @@ import type {
 
 const periodOptions: Array<[AnalyticsPeriod, string]> = [
   ["today", "今日"],
+  ["yesterday", "昨日"],
   ["week", "本周"],
   ["month", "本月"],
   ["year", "本年"],
@@ -25,10 +26,15 @@ function currencyText(amounts: AnalyticsCurrencyAmount[]) {
   return amounts.map((item) => `${item.currency} ${numberFormat.format(Number(item.amount))}`).join(" / ");
 }
 
-function changeText(value: number | null) {
-  if (value === null) return "无上期可比数据";
-  if (value === 0) return "较上期持平";
-  return `${value > 0 ? "较上期 +" : "较上期 "}${value}%`;
+function previousCurrencyText(amounts: AnalyticsCurrencyAmount[], comparisonLabel: string) {
+  if (!amounts.length) return `无${comparisonLabel}金额`;
+  return `${comparisonLabel}：${currencyText(amounts)}`;
+}
+
+function changeText(value: number | null, comparisonLabel: string) {
+  if (value === null) return `无${comparisonLabel}可比数据`;
+  if (value === 0) return `较${comparisonLabel}持平`;
+  return `${value > 0 ? `较${comparisonLabel} +` : `较${comparisonLabel} `}${value}%`;
 }
 
 function StatCard({ title, value, subtext, to }: { title: string; value: string | number; subtext?: string; to?: string }) {
@@ -127,6 +133,8 @@ export function BusinessAnalyticsPage() {
   const customerDrilldown = useMemo(() => data ? `/customers?customer_acquired_from=${data.date_range.start_date}&customer_acquired_to=${data.date_range.end_date}` : "/customers", [data]);
   const followup = data?.followup_summary;
   const kpis = data?.kpis;
+  const comparisonLabel = period === "today" ? "昨日" : period === "yesterday" ? "前日" : "上期";
+  const isCurrentReminderView = period === "today";
 
   return <>
     <div className="flex flex-wrap items-end justify-between gap-4">
@@ -145,12 +153,13 @@ export function BusinessAnalyticsPage() {
     {loading && !data && <p className="mt-6 text-sm text-slate-500">正在汇总经营数据…</p>}
 
     {data && kpis && <>
+      {period === "today" && <p className="mt-4 text-sm text-slate-600">今日指标已按昨日数据计算对比；可切换到“昨日”查看昨日周期的统计明细。</p>}
       <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <StatCard title="新增客户" value={kpis.new_customer_count} subtext={changeText(kpis.new_customer_change_percent)} to={customerDrilldown} />
-        <StatCard title="报价次数" value={kpis.quotation_count} subtext={changeText(kpis.quotation_count_change_percent)} to="/quotations" />
-        <StatCard title="报价金额" value={currencyText(kpis.quotation_amounts)} subtext="按币种分别统计，不跨币种相加" />
-        <StatCard title="赢单商机数" value={kpis.won_opportunity_count} subtext={changeText(kpis.won_opportunity_change_percent)} to="/opportunities?deal_stage=Won" />
-        <StatCard title="赢单金额" value={currencyText(kpis.won_amounts)} subtext="取赢单商机最新报价的最终金额" />
+        <StatCard title="新增客户" value={kpis.new_customer_count} subtext={changeText(kpis.new_customer_change_percent, comparisonLabel)} to={customerDrilldown} />
+        <StatCard title="报价次数" value={kpis.quotation_count} subtext={changeText(kpis.quotation_count_change_percent, comparisonLabel)} to="/quotations" />
+        <StatCard title="报价金额" value={currencyText(kpis.quotation_amounts)} subtext={`${previousCurrencyText(kpis.previous_quotation_amounts, comparisonLabel)}；按币种分别统计`} />
+        <StatCard title="赢单商机数" value={kpis.won_opportunity_count} subtext={changeText(kpis.won_opportunity_change_percent, comparisonLabel)} to="/opportunities?deal_stage=Won" />
+        <StatCard title="赢单金额" value={currencyText(kpis.won_amounts)} subtext={`${previousCurrencyText(kpis.previous_won_amounts, comparisonLabel)}；取赢单商机最新报价最终金额`} />
         <StatCard title="报价 → 赢单转化率" value={kpis.quote_to_win_rate === null ? "—" : `${kpis.quote_to_win_rate}%`} subtext={`已产生报价的商机：${kpis.quoted_opportunity_count}`} />
       </section>
 
@@ -168,7 +177,7 @@ export function BusinessAnalyticsPage() {
         <article className="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200"><h3 className="font-bold">销售漏斗</h3><p className="mt-1 text-sm text-slate-500">按客户跟进阶段统计；历史阶段单独保留</p><div className="mt-4"><BreakdownBars items={data.sales_funnel.map((item) => ({ value: item.stage, count: item.count, percentage: 0 }))} showPercentage={false} /></div></article>
       </section>
 
-      <section className="mt-6 rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200"><div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-bold">跟进效率</h3><p className="mt-1 text-sm text-slate-500">提醒范围沿用现有客户跟进提醒规则</p></div><Link to="/followup-reminders" className="text-sm font-medium text-blue-700">打开跟进提醒 →</Link></div><div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5"><StatCard title="本周期新增跟进" value={followup?.created_followup_count ?? 0} /><StatCard title="已逾期" value={followup?.overdue_count ?? 0} to="/followup-reminders?status=overdue" /><StatCard title="今天需要跟进" value={followup?.today_count ?? 0} to="/followup-reminders?status=today" /><StatCard title="未来 3 天" value={followup?.upcoming_count ?? 0} to="/followup-reminders?status=upcoming" /><StatCard title="尚未跟进" value={followup?.unfollowed_count ?? 0} to="/followup-reminders?status=unfollowed" /></div></section>
+      <section className="mt-6 rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200"><div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-bold">跟进效率</h3><p className="mt-1 text-sm text-slate-500">{isCurrentReminderView ? "提醒状态按今天的客户跟进规则计算" : "提醒状态截至所选统计周期的最后一天计算"}</p></div>{isCurrentReminderView && <Link to="/followup-reminders" className="text-sm font-medium text-blue-700">打开跟进提醒 →</Link>}</div><div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5"><StatCard title="本周期新增跟进" value={followup?.created_followup_count ?? 0} /><StatCard title="已逾期" value={followup?.overdue_count ?? 0} to={isCurrentReminderView ? "/followup-reminders?status=overdue" : undefined} /><StatCard title="今天需要跟进" value={followup?.today_count ?? 0} to={isCurrentReminderView ? "/followup-reminders?status=today" : undefined} /><StatCard title="未来 3 天" value={followup?.upcoming_count ?? 0} to={isCurrentReminderView ? "/followup-reminders?status=upcoming" : undefined} /><StatCard title="尚未跟进" value={followup?.unfollowed_count ?? 0} to={isCurrentReminderView ? "/followup-reminders?status=unfollowed" : undefined} /></div></section>
     </>}
   </>;
 }
