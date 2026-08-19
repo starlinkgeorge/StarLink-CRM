@@ -21,7 +21,7 @@ class FollowUp(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     customer_id: Mapped[int] = mapped_column(
-        ForeignKey("customers.id", ondelete="CASCADE"), nullable=False, index=True
+        ForeignKey("customers.id", ondelete="RESTRICT"), nullable=False, index=True
     )
     opportunity_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("opportunities.id", ondelete="SET NULL"), index=True

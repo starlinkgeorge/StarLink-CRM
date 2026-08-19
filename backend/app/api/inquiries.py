@@ -38,9 +38,15 @@ def list_inquiries(
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ) -> InquiryPage:
-    del current_user
     items, total = inquiry_service.list_inquiries(
-        session, limit, offset, q, _parse_status(status_filter), source, source_platform
+        session,
+        current_user,
+        limit,
+        offset,
+        q,
+        _parse_status(status_filter),
+        source,
+        source_platform,
     )
     return InquiryPage(items=items, total=total, limit=limit, offset=offset)
 
@@ -63,11 +69,12 @@ def get_inquiry(
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ) -> InquiryRead:
-    del current_user
     try:
-        return inquiry_service.get_inquiry(session, inquiry_id)
+        return inquiry_service.get_inquiry(session, inquiry_id, current_user)
     except NotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
+    except ForbiddenError as error:
+        raise HTTPException(status_code=403, detail=str(error)) from error
 
 
 @router.put("/{inquiry_id}", response_model=InquiryRead)

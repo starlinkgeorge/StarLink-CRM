@@ -90,7 +90,7 @@ class Opportunity(TimestampMixin, Base):
         Uuid(as_uuid=True), default=uuid4, nullable=False, unique=True
     )
     customer_id: Mapped[int] = mapped_column(
-        ForeignKey("customers.id", ondelete="CASCADE"), nullable=False, index=True
+        ForeignKey("customers.id", ondelete="RESTRICT"), nullable=False, index=True
     )
     owner_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), index=True

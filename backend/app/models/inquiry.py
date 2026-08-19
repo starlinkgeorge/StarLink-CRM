@@ -2,8 +2,8 @@ import enum
 from typing import Optional
 from uuid import UUID, uuid4
 
-from sqlalchemy import CheckConstraint, ForeignKey, String, Text, Uuid
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import BigInteger, CheckConstraint, ForeignKey, String, Text, Uuid
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 from app.models.mixins import TimestampMixin
@@ -37,6 +37,12 @@ class Inquiry(TimestampMixin, Base):
     converted_opportunity_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("opportunities.id", ondelete="SET NULL"), unique=True
     )
+    # An inquiry is commercial data owned by the person who records it.  Older
+    # rows intentionally remain nullable after the security migration so they
+    # are Admin-only rather than being guessed into a Sales user's queue.
+    owner_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="SET NULL"), index=True
+    )
     company_name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     contact_name: Mapped[str] = mapped_column(String(120), nullable=False)
     country: Mapped[Optional[str]] = mapped_column(String(100), index=True)
@@ -52,3 +58,5 @@ class Inquiry(TimestampMixin, Base):
     status: Mapped[InquiryStatus] = mapped_column(
         String(30), nullable=False, default=InquiryStatus.NEW, index=True
     )
+
+    owner: Mapped[Optional["User"]] = relationship()

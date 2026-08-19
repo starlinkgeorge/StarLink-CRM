@@ -4,7 +4,7 @@ from decimal import Decimal
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import func, or_, select, text
+from sqlalchemy import and_, func, or_, select, text
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.config import get_settings
@@ -171,7 +171,13 @@ def list_quotations(
     filters = []
     if user.role is UserRole.SALES:
         filters.append(
-            or_(Quotation.opportunity_id.is_(None), Opportunity.owner_id == user.id)
+            or_(
+                Opportunity.owner_id == user.id,
+                and_(
+                    Quotation.opportunity_id.is_(None),
+                    Customer.owner_id == user.id,
+                ),
+            )
         )
     if status is not None:
         filters.append(Quotation.status == status)

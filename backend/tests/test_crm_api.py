@@ -164,7 +164,8 @@ def test_customer_lifecycle_with_contacts_and_followups(client: TestClient) -> N
     assert len(existing_followups.json()) == 1
 
     delete = client.delete(f"/api/v1/customers/{customer['id']}", headers=sales_token)
-    assert delete.status_code == 204
+    assert delete.status_code == 403
+    assert client.get(f"/api/v1/customers/{customer['id']}", headers=sales_token).status_code == 200
 
 
 def test_customer_classification_scoring_and_permissions(client: TestClient) -> None:

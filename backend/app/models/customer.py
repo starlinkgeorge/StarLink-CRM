@@ -129,18 +129,16 @@ class Customer(TimestampMixin, Base):
     category: Mapped[Optional["CustomerCategory"]] = relationship(back_populates="customers")
     score_history: Mapped[list["CustomerScoreHistory"]] = relationship(
         back_populates="customer",
-        cascade="all, delete-orphan",
-        passive_deletes=True,
+        cascade="save-update, merge",
         order_by="(CustomerScoreHistory.created_at.desc(), CustomerScoreHistory.id.desc())",
     )
     contacts: Mapped[list["Contact"]] = relationship(
-        back_populates="customer", cascade="all, delete-orphan", passive_deletes=True
+        back_populates="customer", cascade="save-update, merge"
     )
     tags: Mapped[list["Tag"]] = relationship(secondary=CustomerTag, back_populates="customers")
     followups: Mapped[list["FollowUp"]] = relationship(
         back_populates="customer",
-        cascade="all, delete-orphan",
-        passive_deletes=True,
+        cascade="save-update, merge",
         order_by="(FollowUp.followup_date.desc(), FollowUp.created_at.desc(), FollowUp.id.desc())",
     )
     quotations: Mapped[list["Quotation"]] = relationship(back_populates="customer")
@@ -229,7 +227,9 @@ class Contact(CreatedAtMixin, Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     customer_id: Mapped[int] = mapped_column(
-        ForeignKey("customers.id", ondelete="CASCADE"), nullable=False, index=True
+        # Contacts are customer-history records.  They must not disappear if
+        # somebody attempts to delete the parent customer outside the API.
+        ForeignKey("customers.id", ondelete="RESTRICT"), nullable=False, index=True
     )
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     position: Mapped[Optional[str]] = mapped_column(String(120))

@@ -4,10 +4,13 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
-from app.models.customer import Customer, CustomerLevel, CustomerStatus, Tag
+from app.models.customer import Contact, Customer, CustomerLevel, CustomerStatus, Tag
 from app.models.customer_classification import CustomerCategory, CustomerScoreHistory
 from app.models.customer_activity import CustomerStatusHistory
-from app.models.followup import FollowUp
+from app.models.followup import FollowUp, FollowUpAttachment
+from app.models.inquiry import Inquiry
+from app.models.opportunity import Opportunity
+from app.models.quotation import Quotation
 from app.models.user import User
 from app.schemas.customer import CustomerCreate, CustomerUpdate
 from app.models.user import UserRole
@@ -236,15 +239,87 @@ def update_customer(session: Session, customer_id: int, payload: CustomerUpdate,
     return customer
 
 
+def _customer_dependency_counts(session: Session, customer_id: int) -> dict[str, int]:
+    """Count business records that make a customer deletion unsafe.
+
+    The counts are intentionally calculated immediately before deletion rather
+    than relying on ORM cascades.  This turns a potentially destructive DELETE
+    into an explainable conflict and protects the same records across API and
+    database-constraint layers.
+    """
+    return {
+        "contacts": session.scalar(
+            select(func.count()).select_from(Contact).where(Contact.customer_id == customer_id)
+        )
+        or 0,
+        "opportunities": session.scalar(
+            select(func.count()).select_from(Opportunity).where(Opportunity.customer_id == customer_id)
+        )
+        or 0,
+        "quotations": session.scalar(
+            select(func.count()).select_from(Quotation).where(Quotation.customer_id == customer_id)
+        )
+        or 0,
+        "followups": session.scalar(
+            select(func.count()).select_from(FollowUp).where(FollowUp.customer_id == customer_id)
+        )
+        or 0,
+        "attachments": session.scalar(
+            select(func.count())
+            .select_from(FollowUpAttachment)
+            .join(FollowUp)
+            .where(FollowUp.customer_id == customer_id)
+        )
+        or 0,
+        "inquiries": session.scalar(
+            select(func.count()).select_from(Inquiry).where(Inquiry.customer_id == customer_id)
+        )
+        or 0,
+        "status_history": session.scalar(
+            select(func.count())
+            .select_from(CustomerStatusHistory)
+            .where(CustomerStatusHistory.customer_id == customer_id)
+        )
+        or 0,
+        "score_history": session.scalar(
+            select(func.count())
+            .select_from(CustomerScoreHistory)
+            .where(CustomerScoreHistory.customer_id == customer_id)
+        )
+        or 0,
+    }
+
+
 def delete_customer(session: Session, customer_id: int) -> None:
     customer = get_customer(session, customer_id)
+    dependency_counts = _customer_dependency_counts(session, customer.id)
+    labels = {
+        "contacts": "contact(s)",
+        "opportunities": "opportunity/opportunities",
+        "quotations": "quotation(s)",
+        "followups": "follow-up record(s)",
+        "attachments": "attachment(s)",
+        "inquiries": "inquir(y/ies)",
+        "status_history": "customer status history record(s)",
+        "score_history": "customer score history record(s)",
+    }
+    dependencies = [
+        f"{count} {labels[key]}" for key, count in dependency_counts.items() if count
+    ]
+    if dependencies:
+        raise ConflictError(
+            "Customer cannot be deleted because it has related business records: "
+            + ", ".join(dependencies)
+            + "."
+        )
+
     session.delete(customer)
     try:
         session.commit()
     except IntegrityError as error:
         session.rollback()
         raise ConflictError(
-            "Customers with commercial records such as quotations cannot be deleted."
+            "Customer cannot be deleted because related business records still exist."
         ) from error
 
 

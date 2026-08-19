@@ -230,7 +230,7 @@ def delete_customer(
 ) -> Response:
     try:
         customer = customer_service.get_customer(session, customer_id)
-        access_service.ensure_customer_manage_access(current_user, customer)
+        access_service.ensure_customer_delete_access(current_user)
         customer_service.delete_customer(session, customer_id)
     except NotFoundError as error:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error

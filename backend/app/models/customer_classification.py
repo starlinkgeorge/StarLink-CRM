@@ -29,7 +29,7 @@ class CustomerScoreHistory(CreatedAtMixin, Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     customer_id: Mapped[int] = mapped_column(
-        ForeignKey("customers.id", ondelete="CASCADE"), nullable=False, index=True
+        ForeignKey("customers.id", ondelete="RESTRICT"), nullable=False, index=True
     )
     old_score: Mapped[Optional[int]] = mapped_column(Integer)
     new_score: Mapped[int] = mapped_column(Integer, nullable=False)

@@ -22,8 +22,26 @@ def _as_status(value: InquiryStatus | str) -> InquiryStatus:
     return value if isinstance(value, InquiryStatus) else InquiryStatus(value)
 
 
+def _ensure_inquiry_read_access(user: User, inquiry: Inquiry) -> None:
+    """Sales may access only inquiries explicitly owned by their account.
+
+    Historical inquiries with no owner are deliberately Admin-only until an
+    explicit assignment workflow exists; guessing an owner would leak data.
+    Viewer retains the existing read-only, organization-wide read behaviour.
+    """
+    if user.role is UserRole.SALES and inquiry.owner_id != user.id:
+        raise ForbiddenError("You may only access inquiries assigned to you.")
+
+
+def _ensure_inquiry_manage_access(user: User, inquiry: Inquiry) -> None:
+    if user.role is UserRole.VIEWER:
+        raise ForbiddenError("Viewer accounts have read-only access.")
+    _ensure_inquiry_read_access(user, inquiry)
+
+
 def list_inquiries(
     session: Session,
+    user: User,
     limit: int,
     offset: int,
     query: str | None = None,
@@ -32,6 +50,8 @@ def list_inquiries(
     source_platform: str | None = None,
 ) -> tuple[list[Inquiry], int]:
     filters = []
+    if user.role is UserRole.SALES:
+        filters.append(Inquiry.owner_id == user.id)
     if status is not None:
         filters.append(Inquiry.status == status.value)
     source_term = source.strip() if source else ""
@@ -64,10 +84,11 @@ def list_inquiries(
     return list(session.scalars(statement)), total
 
 
-def get_inquiry(session: Session, inquiry_id: int) -> Inquiry:
+def get_inquiry(session: Session, inquiry_id: int, user: User) -> Inquiry:
     inquiry = session.get(Inquiry, inquiry_id)
     if inquiry is None:
         raise NotFoundError("Inquiry not found.")
+    _ensure_inquiry_read_access(user, inquiry)
     return inquiry
 
 
@@ -76,7 +97,9 @@ def create_inquiry(session: Session, payload: InquiryCreate, creator: User) -> I
         raise ForbiddenError("Viewer accounts have read-only access.")
     data = payload.model_dump()
     data["status"] = data["status"].value
-    inquiry = Inquiry(**data)
+    # Ownership is assigned by the authenticated server-side principal rather
+    # than accepting a client-controlled owner value.
+    inquiry = Inquiry(**data, owner_id=creator.id)
     session.add(inquiry)
     session.commit()
     session.refresh(inquiry)
@@ -86,9 +109,8 @@ def create_inquiry(session: Session, payload: InquiryCreate, creator: User) -> I
 def update_inquiry(
     session: Session, inquiry_id: int, payload: InquiryUpdate, editor: User
 ) -> Inquiry:
-    if editor.role is UserRole.VIEWER:
-        raise ForbiddenError("Viewer accounts have read-only access.")
-    inquiry = get_inquiry(session, inquiry_id)
+    inquiry = get_inquiry(session, inquiry_id, editor)
+    _ensure_inquiry_manage_access(editor, inquiry)
     if _as_status(inquiry.status) is InquiryStatus.CONVERTED:
         raise ConflictError("Converted inquiries are immutable. Update the customer or opportunity instead.")
     changes = payload.model_dump(exclude_unset=True)
@@ -116,9 +138,8 @@ def update_inquiry(
 def convert_inquiry(
     session: Session, inquiry_id: int, converter: User
 ) -> tuple[Inquiry, Customer, Contact, Opportunity]:
-    if converter.role is UserRole.VIEWER:
-        raise ForbiddenError("Viewer accounts have read-only access.")
-    inquiry = get_inquiry(session, inquiry_id)
+    inquiry = get_inquiry(session, inquiry_id, converter)
+    _ensure_inquiry_manage_access(converter, inquiry)
     inquiry_status = _as_status(inquiry.status)
     if inquiry_status is InquiryStatus.CONVERTED or inquiry.converted_opportunity_id is not None:
         raise ConflictError("Inquiry has already been converted.")

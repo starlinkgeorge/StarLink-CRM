@@ -31,6 +31,11 @@ def get_dashboard_stats(session: Session, user: User) -> dict:
     scope = customer_scope(user)
     if scope is not None:
         filters.append(scope)
+    inquiry_filters = []
+    if user.role is UserRole.SALES:
+        # Keep inquiry counts subject to exactly the same Sales ownership
+        # boundary as the inquiry list and detail APIs.
+        inquiry_filters.append(Inquiry.owner_id == user.id)
     customer_count = session.scalar(select(func.count()).select_from(Customer).where(*filters)) or 0
     followup_count = (
         session.scalar(
@@ -55,15 +60,19 @@ def get_dashboard_stats(session: Session, user: User) -> dict:
     today_inquiry_count = session.scalar(
         select(func.count())
         .select_from(Inquiry)
-        .where(func.date(Inquiry.created_at) == today)
+        .where(*inquiry_filters, func.date(Inquiry.created_at) == today)
     ) or 0
     pending_inquiry_count = session.scalar(
         select(func.count())
         .select_from(Inquiry)
-        .where(Inquiry.status.in_((InquiryStatus.NEW.value, InquiryStatus.PROCESSING.value)))
+        .where(
+            *inquiry_filters,
+            Inquiry.status.in_((InquiryStatus.NEW.value, InquiryStatus.PROCESSING.value)),
+        )
     ) or 0
     inquiry_source_rows = session.execute(
         select(Inquiry.source, func.count(Inquiry.id))
+        .where(*inquiry_filters)
         .group_by(Inquiry.source)
         .order_by(Inquiry.source.asc())
     ).all()

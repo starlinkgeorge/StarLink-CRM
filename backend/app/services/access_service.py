@@ -23,6 +23,12 @@ def ensure_customer_manage_access(user: User, customer: Customer) -> None:
     ensure_customer_read_access(user, customer)
 
 
+def ensure_customer_delete_access(user: User) -> None:
+    """Customer deletion is reserved for Admin after dependency preflight."""
+    if user.role is not UserRole.ADMIN:
+        raise ForbiddenError("Only Admin accounts can delete customers.")
+
+
 def ensure_user_management_access(user: User) -> None:
     if user.role is not UserRole.ADMIN:
         raise ForbiddenError("Only administrators may manage users.")

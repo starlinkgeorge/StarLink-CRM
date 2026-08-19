@@ -12,7 +12,7 @@ class CustomerStatusHistory(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     customer_id: Mapped[int] = mapped_column(
-        ForeignKey("customers.id", ondelete="CASCADE"), nullable=False, index=True
+        ForeignKey("customers.id", ondelete="RESTRICT"), nullable=False, index=True
     )
     old_status: Mapped[CustomerStatus | None] = mapped_column(
         Enum(
