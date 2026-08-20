@@ -1,5 +1,6 @@
 from datetime import date, datetime
 from decimal import Decimal
+from enum import Enum
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models.order import OrderPaymentStatus, OrderProductionStatus, OrderShippingStatus
@@ -15,9 +16,9 @@ class OrderFields(BaseModel):
     expected_delivery_date: date | None = None
     shipped_at: date | None = None
     notes: str | None = None
-    rmb_received_amount: Decimal = Field(default=Decimal("0"), ge=0, max_digits=18, decimal_places=2)
-    purchase_cost: Decimal = Field(default=Decimal("0"), ge=0, max_digits=18, decimal_places=2)
-    freight_cost: Decimal = Field(default=Decimal("0"), ge=0, max_digits=18, decimal_places=2)
+    rmb_received_amount: Decimal | None = Field(default=None, ge=0, max_digits=18, decimal_places=2)
+    purchase_cost: Decimal | None = Field(default=None, ge=0, max_digits=18, decimal_places=2)
+    freight_cost: Decimal | None = Field(default=None, ge=0, max_digits=18, decimal_places=2)
     @field_validator("currency")
     @classmethod
     def upper_currency(cls, value: str) -> str: return value.strip().upper()
@@ -54,12 +55,94 @@ class OrderRead(BaseModel):
     order_date: date; currency: str; order_amount: Decimal; owner_id: int | None; created_by_id: int
     payment_status: OrderPaymentStatus; production_status: OrderProductionStatus; shipping_status: OrderShippingStatus
     expected_delivery_date: date | None; shipped_at: date | None; notes: str | None
-    rmb_received_amount: Decimal; purchase_cost: Decimal; freight_cost: Decimal
-    profit: Decimal; profit_margin: Decimal | None; realized_exchange_rate: Decimal | None
+    rmb_received_amount: Decimal | None; purchase_cost: Decimal | None; freight_cost: Decimal | None
+    profit: Decimal | None; profit_margin: Decimal | None; realized_exchange_rate: Decimal | None
+    profit_accounting_status: str
     customer_company: str; owner_name: str | None; created_at: datetime; updated_at: datetime
 
 class OrderPage(BaseModel):
     items: list[OrderRead]; total: int; limit: int; offset: int
+
+
+class OrderProfitPeriod(str, Enum):
+    TODAY = "today"
+    MONTH = "month"
+    QUARTER = "quarter"
+    HALF_YEAR = "half_year"
+    YEAR = "year"
+    CUSTOM = "custom"
+
+
+class OrderProfitCurrencyAmount(BaseModel):
+    currency: str
+    amount: Decimal
+
+
+class OrderProfitSummary(BaseModel):
+    label: str
+    start_date: date
+    end_date: date
+    order_count: int
+    accounted_order_count: int
+    pending_order_count: int
+    order_amounts: list[OrderProfitCurrencyAmount]
+    rmb_received_total: Decimal
+    purchase_cost_total: Decimal
+    freight_cost_total: Decimal
+    profit_total: Decimal
+    profit_margin: Decimal | None
+
+
+class OrderProfitTrendPoint(BaseModel):
+    month: str
+    order_count: int
+    accounted_order_count: int
+    pending_order_count: int
+    rmb_received_total: Decimal
+    profit_total: Decimal
+
+
+class OrderProfitCustomerRank(BaseModel):
+    customer_id: int
+    customer_company: str
+    order_count: int
+    accounted_order_count: int
+    pending_order_count: int
+    rmb_received_total: Decimal
+    profit_total: Decimal
+    profit_contribution_percent: Decimal | None
+
+
+class OrderProfitDetail(BaseModel):
+    id: int
+    order_no: str
+    customer_id: int
+    customer_company: str
+    order_date: date
+    currency: str
+    order_amount: Decimal
+    rmb_received_amount: Decimal | None
+    purchase_cost: Decimal | None
+    freight_cost: Decimal | None
+    profit: Decimal | None
+    profit_margin: Decimal | None
+    profit_accounting_status: str
+
+
+class OrderProfitDetailPage(BaseModel):
+    items: list[OrderProfitDetail]
+    total: int
+    limit: int
+    offset: int
+
+
+class OrderProfitAnalytics(BaseModel):
+    period: OrderProfitPeriod
+    selected_summary: OrderProfitSummary
+    period_summaries: list[OrderProfitSummary]
+    monthly_trend: list[OrderProfitTrendPoint]
+    customer_ranking: list[OrderProfitCustomerRank]
+    details: OrderProfitDetailPage
 
 
 class WonOrderBackfillCandidate(BaseModel):

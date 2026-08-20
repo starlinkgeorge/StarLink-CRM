@@ -480,7 +480,7 @@ export function CustomerDetailPage() {
       <section className="mt-5 rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
         <div className="flex items-center justify-between gap-3"><div><h3 className="font-bold">订单</h3><p className="mt-1 text-sm text-slate-500">订单、履约状态和订单利润统一在订单管理中维护。</p></div><Link to={`/orders?customer_id=${customer.id}`} className="text-sm text-blue-700">查看全部 →</Link></div>
         <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {orders.map((order) => <Link key={order.id} to={`/orders/${order.id}`} className="rounded-lg bg-slate-50 p-4 hover:bg-blue-50"><div className="flex items-center justify-between gap-2"><strong>{order.order_no}</strong><span className="text-sm text-slate-600">{order.currency} {order.order_amount}</span></div><p className="mt-2 text-sm text-slate-600">{order.order_date} · {order.payment_status}</p><p className="mt-1 text-sm">利润：¥{order.profit}</p></Link>)}
+          {orders.map((order) => <Link key={order.id} to={`/orders/${order.id}`} className="rounded-lg bg-slate-50 p-4 hover:bg-blue-50"><div className="flex items-center justify-between gap-2"><strong>{order.order_no}</strong><span className="text-sm text-slate-600">{order.currency} {order.order_amount}</span></div><p className="mt-2 text-sm text-slate-600">{order.order_date} · {order.payment_status}</p><p className="mt-1 text-sm">{order.profit_accounting_status === "Pending" ? "利润：待核算" : `利润：¥${order.profit}`}</p></Link>)}
           {!orders.length && <p className="text-sm text-slate-500">该客户暂无订单。</p>}
         </div>
       </section>

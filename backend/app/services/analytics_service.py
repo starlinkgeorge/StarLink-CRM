@@ -14,7 +14,7 @@ from decimal import Decimal
 import re
 from typing import Iterable
 
-from sqlalchemy import Date, and_, cast, func, or_, select
+from sqlalchemy import Date, and_, case, cast, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.customer import Customer
@@ -149,7 +149,18 @@ def _order_profit(session: Session, user: User, start: date, end: date) -> dict[
     base = select(Order).join(Customer).outerjoin(Opportunity).where(*filters)
     count = session.scalar(select(func.count(Order.id)).select_from(Order).join(Customer).outerjoin(Opportunity).where(*filters)) or 0
     amounts = _currency_amounts(session.execute(base.with_only_columns(Order.currency, func.coalesce(func.sum(Order.order_amount), 0)).group_by(Order.currency).order_by(Order.currency)).all())
-    received, purchase, freight = session.execute(base.with_only_columns(func.coalesce(func.sum(Order.rmb_received_amount),0),func.coalesce(func.sum(Order.purchase_cost),0),func.coalesce(func.sum(Order.freight_cost),0))).one()
+    # Pending accounting rows must not be silently treated as zero-profit in
+    # the existing business analytics overview either.
+    accounted = and_(
+        Order.rmb_received_amount.is_not(None),
+        Order.purchase_cost.is_not(None),
+        Order.freight_cost.is_not(None),
+    )
+    received, purchase, freight = session.execute(base.with_only_columns(
+        func.coalesce(func.sum(case((accounted, Order.rmb_received_amount), else_=0)), 0),
+        func.coalesce(func.sum(case((accounted, Order.purchase_cost), else_=0)), 0),
+        func.coalesce(func.sum(case((accounted, Order.freight_cost), else_=0)), 0),
+    )).one()
     received, purchase, freight = Decimal(received), Decimal(purchase), Decimal(freight)
     profit = received-purchase-freight
     return {"order_count": count, "order_amounts": amounts, "rmb_received_total": received, "purchase_cost_total": purchase, "freight_cost_total": freight, "profit_total": profit, "average_profit_margin": (profit / received * Decimal("100")) if received else None}

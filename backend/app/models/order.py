@@ -50,6 +50,8 @@ class Order(TimestampMixin, Base):
     expected_delivery_date: Mapped[date | None] = mapped_column(Date)
     shipped_at: Mapped[date | None] = mapped_column(Date)
     notes: Mapped[str | None] = mapped_column(Text)
-    rmb_received_amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False, default=0, server_default="0")
-    purchase_cost: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False, default=0, server_default="0")
-    freight_cost: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False, default=0, server_default="0")
+    # A missing profit input means the order is pending accounting.  It must not
+    # be conflated with an intentionally entered zero amount.
+    rmb_received_amount: Mapped[Decimal | None] = mapped_column(Numeric(18, 2), nullable=True)
+    purchase_cost: Mapped[Decimal | None] = mapped_column(Numeric(18, 2), nullable=True)
+    freight_cost: Mapped[Decimal | None] = mapped_column(Numeric(18, 2), nullable=True)

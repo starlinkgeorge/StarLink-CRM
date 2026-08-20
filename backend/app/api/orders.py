@@ -7,8 +7,8 @@ from app.api.dependencies import get_current_user
 from app.db.session import get_db_session
 from app.models.order import OrderPaymentStatus, OrderProductionStatus, OrderShippingStatus
 from app.models.user import User
-from app.schemas.order import OrderCreate, OrderPage, OrderRead, OrderUpdate, WonOrderBackfillPreview, WonOrderBackfillRequest, WonOrderBackfillResult
-from app.services import opportunity_service, order_service
+from app.schemas.order import OrderCreate, OrderPage, OrderProfitAnalytics, OrderProfitPeriod, OrderRead, OrderUpdate, WonOrderBackfillPreview, WonOrderBackfillRequest, WonOrderBackfillResult
+from app.services import opportunity_service, order_profit_service, order_service
 from app.services.errors import ConflictError, ForbiddenError, NotFoundError
 router=APIRouter(prefix="/orders",tags=["orders"])
 def guard(fn):
@@ -26,6 +26,23 @@ def list_orders(limit:int=Query(20,ge=1,le=100),offset:int=Query(0,ge=0),q:str|N
 @router.post("",response_model=OrderRead,status_code=status.HTTP_201_CREATED)
 @guard
 def create_order(payload:OrderCreate,session:Session=Depends(get_db_session),current_user:User=Depends(get_current_user)): return order_service.create_order(session,payload,current_user)
+@router.get("/analytics/profit", response_model=OrderProfitAnalytics)
+@guard
+def order_profit_analytics(
+    period: OrderProfitPeriod = OrderProfitPeriod.MONTH,
+    start_date: date | None = None,
+    end_date: date | None = None,
+    detail_limit: int = Query(50, ge=1, le=100),
+    detail_offset: int = Query(0, ge=0),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        return order_profit_service.get_profit_analytics(
+            session, current_user, period, start_date, end_date, detail_limit, detail_offset
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
 @router.get("/by-quotation/{quotation_id}",response_model=OrderRead|None)
 @guard
 def by_quote(quotation_id:int,session:Session=Depends(get_db_session),current_user:User=Depends(get_current_user)): return order_service.quotation_order(session,current_user,quotation_id)

@@ -11,7 +11,6 @@ from app.schemas.order import OrderCreate, OrderRead, OrderUpdate
 from app.services import access_service
 from app.services.errors import ConflictError, ForbiddenError, NotFoundError
 
-ZERO = Decimal("0.00")
 def _visible(user: User):
     if user.role is UserRole.SALES:
         return or_(Order.owner_id == user.id, Customer.owner_id == user.id, Opportunity.owner_id == user.id)
@@ -27,10 +26,28 @@ def _read(session: Session, user: User, order_id: int) -> Order:
 def _serialize(session: Session, order: Order) -> OrderRead:
     customer = session.get(Customer, order.customer_id)
     owner_name = session.get(User, order.owner_id).name if order.owner_id and session.get(User, order.owner_id) else None
-    profit = (order.rmb_received_amount or ZERO) - (order.purchase_cost or ZERO) - (order.freight_cost or ZERO)
-    margin = (profit / order.rmb_received_amount * Decimal("100")) if order.rmb_received_amount else None
-    rate = (order.rmb_received_amount / order.order_amount) if order.order_amount and order.currency != "CNY" else None
-    return OrderRead.model_validate({**order.__dict__, "customer_company": customer.company_name if customer else "—", "owner_name": owner_name, "profit": profit, "profit_margin": margin, "realized_exchange_rate": rate})
+    is_accounted = all(value is not None for value in (
+        order.rmb_received_amount, order.purchase_cost, order.freight_cost,
+    ))
+    profit = (
+        order.rmb_received_amount - order.purchase_cost - order.freight_cost
+        if is_accounted else None
+    )
+    margin = (
+        profit / order.rmb_received_amount * Decimal("100")
+        if profit is not None and order.rmb_received_amount else None
+    )
+    rate = (
+        order.rmb_received_amount / order.order_amount
+        if order.rmb_received_amount is not None and order.order_amount and order.currency != "CNY"
+        else None
+    )
+    return OrderRead.model_validate({
+        **order.__dict__, "customer_company": customer.company_name if customer else "—",
+        "owner_name": owner_name, "profit": profit, "profit_margin": margin,
+        "realized_exchange_rate": rate,
+        "profit_accounting_status": "Accounted" if is_accounted else "Pending",
+    })
 
 
 def serialize_order(session: Session, order: Order) -> OrderRead:
