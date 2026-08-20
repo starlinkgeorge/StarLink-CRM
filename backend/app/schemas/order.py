@@ -113,36 +113,12 @@ class OrderProfitCustomerRank(BaseModel):
     profit_contribution_percent: Decimal | None
 
 
-class OrderProfitDetail(BaseModel):
-    id: int
-    order_no: str
-    customer_id: int
-    customer_company: str
-    order_date: date
-    currency: str
-    order_amount: Decimal
-    rmb_received_amount: Decimal | None
-    purchase_cost: Decimal | None
-    freight_cost: Decimal | None
-    profit: Decimal | None
-    profit_margin: Decimal | None
-    profit_accounting_status: str
-
-
-class OrderProfitDetailPage(BaseModel):
-    items: list[OrderProfitDetail]
-    total: int
-    limit: int
-    offset: int
-
-
 class OrderProfitAnalytics(BaseModel):
     period: OrderProfitPeriod
     selected_summary: OrderProfitSummary
     period_summaries: list[OrderProfitSummary]
     monthly_trend: list[OrderProfitTrendPoint]
     customer_ranking: list[OrderProfitCustomerRank]
-    details: OrderProfitDetailPage
 
 
 class WonOrderBackfillCandidate(BaseModel):

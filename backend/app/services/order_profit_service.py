@@ -16,8 +16,6 @@ from app.schemas.order import (
     OrderProfitAnalytics,
     OrderProfitCurrencyAmount,
     OrderProfitCustomerRank,
-    OrderProfitDetail,
-    OrderProfitDetailPage,
     OrderProfitPeriod,
     OrderProfitSummary,
     OrderProfitTrendPoint,
@@ -208,52 +206,12 @@ def _customer_ranking(session: Session, start_date: date, end_date: date) -> lis
     return ranking
 
 
-def _details(session: Session, start_date: date, end_date: date, limit: int, offset: int) -> OrderProfitDetailPage:
-    filters = _filters(start_date, end_date)
-    total = int(session.scalar(select(func.count(Order.id)).where(*filters)) or 0)
-    rows = session.execute(
-        select(Order, Customer.company_name, Customer.contact_name)
-        .join(Customer)
-        .where(*filters)
-        .order_by(Order.order_date.desc(), Order.id.desc())
-        .limit(limit)
-        .offset(offset)
-    ).all()
-    items: list[OrderProfitDetail] = []
-    for order, company_name, contact_name in rows:
-        is_accounted = all(value is not None for value in (
-            order.rmb_received_amount, order.purchase_cost, order.freight_cost,
-        ))
-        profit = (
-            order.rmb_received_amount - order.purchase_cost - order.freight_cost
-            if is_accounted else None
-        )
-        items.append(OrderProfitDetail(
-            id=order.id,
-            order_no=order.order_no,
-            customer_id=order.customer_id,
-            customer_company=company_name or contact_name or "—",
-            order_date=order.order_date,
-            currency=order.currency,
-            order_amount=order.order_amount,
-            rmb_received_amount=order.rmb_received_amount,
-            purchase_cost=order.purchase_cost,
-            freight_cost=order.freight_cost,
-            profit=profit,
-            profit_margin=(profit / order.rmb_received_amount * Decimal("100")) if profit is not None and order.rmb_received_amount else None,
-            profit_accounting_status="Accounted" if is_accounted else "Pending",
-        ))
-    return OrderProfitDetailPage(items=items, total=total, limit=limit, offset=offset)
-
-
 def get_profit_analytics(
     session: Session,
     user: User,
     period: OrderProfitPeriod,
     start_date: date | None,
     end_date: date | None,
-    detail_limit: int,
-    detail_offset: int,
 ) -> OrderProfitAnalytics:
     if user.role is not UserRole.ADMIN:
         raise ForbiddenError("Only Admin accounts can access company profit analysis.")
@@ -276,5 +234,4 @@ def get_profit_analytics(
         period_summaries=summaries,
         monthly_trend=_monthly_trend(session, today),
         customer_ranking=_customer_ranking(session, selected_start, selected_end),
-        details=_details(session, selected_start, selected_end, detail_limit, detail_offset),
     )

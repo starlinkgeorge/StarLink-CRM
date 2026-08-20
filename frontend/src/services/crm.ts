@@ -111,7 +111,7 @@ export const createOrder = async (payload:OrderPayload) => (await api.post<Order
 export const updateOrder = async (id:number,payload:Partial<OrderPayload>) => (await api.put<Order>(`/orders/${id}`,payload)).data;
 export const deleteOrder = async (id:number) => { await api.delete(`/orders/${id}`); };
 export const getOrderByQuotation = async (id:number) => (await api.get<Order|null>(`/orders/by-quotation/${id}`)).data;
-export const getOrderProfitAnalytics = async (params: { period: OrderProfitPeriod; start_date?: string; end_date?: string; detail_limit?: number; detail_offset?: number }) => (await api.get<OrderProfitAnalytics>("/orders/analytics/profit", { params })).data;
+export const getOrderProfitAnalytics = async (params: { period: OrderProfitPeriod; start_date?: string; end_date?: string }) => (await api.get<OrderProfitAnalytics>("/orders/analytics/profit", { params })).data;
 export const previewWonOrderBackfill = async () => (await api.get<WonOrderBackfillPreview>("/orders/won-backfill/preview")).data;
 export const backfillWonOrders = async (fallback_order_date?: string) => (await api.post<WonOrderBackfillResult>("/orders/won-backfill", { fallback_order_date: fallback_order_date || null })).data;
 

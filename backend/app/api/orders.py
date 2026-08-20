@@ -32,14 +32,12 @@ def order_profit_analytics(
     period: OrderProfitPeriod = OrderProfitPeriod.MONTH,
     start_date: date | None = None,
     end_date: date | None = None,
-    detail_limit: int = Query(50, ge=1, le=100),
-    detail_offset: int = Query(0, ge=0),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ):
     try:
         return order_profit_service.get_profit_analytics(
-            session, current_user, period, start_date, end_date, detail_limit, detail_offset
+            session, current_user, period, start_date, end_date
         )
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error

@@ -27,23 +27,19 @@ export function OrderProfitAnalytics() {
   const [period, setPeriod] = useState<OrderProfitPeriod>("month");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [detailOffset, setDetailOffset] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const appliedCustomRange = useRef<{ startDate: string; endDate: string } | null>(null);
 
-  const load = useCallback(async (nextPeriod: OrderProfitPeriod, nextOffset = 0) => {
+  const load = useCallback(async (nextPeriod: OrderProfitPeriod) => {
     setLoading(true);
     try {
       const result = await getOrderProfitAnalytics({
         period: nextPeriod,
         start_date: nextPeriod === "custom" ? appliedCustomRange.current?.startDate : undefined,
         end_date: nextPeriod === "custom" ? appliedCustomRange.current?.endDate : undefined,
-        detail_limit: 50,
-        detail_offset: nextOffset,
       });
       setData(result);
-      setDetailOffset(nextOffset);
       setError("");
     } catch (requestError: unknown) {
       setError(getApiErrorMessage(requestError, "无法加载利润分析。"));
@@ -110,10 +106,8 @@ export function OrderProfitAnalytics() {
         })}
       </div></div></section>
 
-      <section className="mt-6 grid gap-6 xl:grid-cols-2">
-        <div><h4 className="font-bold">客户利润排行</h4><div className="mt-3 overflow-x-auto rounded-lg border"><table className="min-w-[620px] w-full text-left text-sm"><thead className="bg-slate-50 text-slate-500"><tr><th className="px-3 py-2">客户</th><th className="px-3 py-2">订单</th><th className="px-3 py-2">人民币实收</th><th className="px-3 py-2">利润</th><th className="px-3 py-2">贡献</th></tr></thead><tbody>{data.customer_ranking.map((item) => <tr key={item.customer_id} className="border-t"><td className="px-3 py-2"><Link className="text-blue-700" to={`/customers/${item.customer_id}`}>{item.customer_company}</Link></td><td className="px-3 py-2">{item.order_count}（待 {item.pending_order_count}）</td><td className="px-3 py-2">{formatRmb(item.rmb_received_total)}</td><td className="px-3 py-2">{formatRmb(item.profit_total)}</td><td className="px-3 py-2">{item.profit_contribution_percent === null ? "—" : `${Number(item.profit_contribution_percent).toFixed(2)}%`}</td></tr>)}{!data.customer_ranking.length && <tr><td colSpan={5} className="px-3 py-6 text-center text-slate-500">当前时间范围内暂无订单。</td></tr>}</tbody></table></div></div>
-        <div><h4 className="font-bold">利润明细</h4><div className="mt-3 overflow-x-auto rounded-lg border"><table className="min-w-[980px] w-full text-left text-sm"><thead className="bg-slate-50 text-slate-500"><tr>{["订单号", "客户", "日期", "订单金额", "人民币实收", "采购", "运费", "利润", "利润率", "核算"].map((label) => <th key={label} className="px-3 py-2">{label}</th>)}</tr></thead><tbody>{data.details.items.map((item) => <tr key={item.id} className="border-t"><td className="px-3 py-2"><Link className="text-blue-700" to={`/orders/${item.id}`}>{item.order_no}</Link></td><td className="px-3 py-2">{item.customer_company}</td><td className="px-3 py-2">{item.order_date}</td><td className="px-3 py-2">{item.currency} {item.order_amount}</td><td className="px-3 py-2">{formatRmb(item.rmb_received_amount)}</td><td className="px-3 py-2">{formatRmb(item.purchase_cost)}</td><td className="px-3 py-2">{formatRmb(item.freight_cost)}</td><td className="px-3 py-2">{item.profit_accounting_status === "Pending" ? "—" : formatRmb(item.profit)}</td><td className="px-3 py-2">{item.profit_margin === null ? "—" : `${Number(item.profit_margin).toFixed(2)}%`}</td><td className="px-3 py-2"><span className={item.profit_accounting_status === "Pending" ? "rounded bg-amber-100 px-2 py-1 text-amber-800" : "rounded bg-emerald-100 px-2 py-1 text-emerald-800"}>{item.profit_accounting_status === "Pending" ? "待核算" : "已核算"}</span></td></tr>)}{!data.details.items.length && <tr><td colSpan={10} className="px-3 py-6 text-center text-slate-500">当前时间范围内暂无订单。</td></tr>}</tbody></table></div>
-        {data.details.total > data.details.limit && <div className="mt-3 flex items-center justify-between text-sm text-slate-600"><span>共 {data.details.total} 笔</span><div className="flex gap-2"><button type="button" disabled={loading || detailOffset === 0} onClick={() => void load(period, Math.max(0, detailOffset - data.details.limit))} className="rounded border px-3 py-1 disabled:opacity-50">上一页</button><button type="button" disabled={loading || detailOffset + data.details.limit >= data.details.total} onClick={() => void load(period, detailOffset + data.details.limit)} className="rounded border px-3 py-1 disabled:opacity-50">下一页</button></div></div>}</div>
+      <section className="mt-6">
+        <h4 className="font-bold">客户利润排行</h4><div className="mt-3 overflow-x-auto rounded-lg border"><table className="min-w-[620px] w-full text-left text-sm"><thead className="bg-slate-50 text-slate-500"><tr><th className="px-3 py-2">客户</th><th className="px-3 py-2">订单</th><th className="px-3 py-2">人民币实收</th><th className="px-3 py-2">利润</th><th className="px-3 py-2">贡献</th></tr></thead><tbody>{data.customer_ranking.map((item) => <tr key={item.customer_id} className="border-t"><td className="px-3 py-2"><Link className="text-blue-700" to={`/customers/${item.customer_id}`}>{item.customer_company}</Link></td><td className="px-3 py-2">{item.order_count}（待 {item.pending_order_count}）</td><td className="px-3 py-2">{formatRmb(item.rmb_received_total)}</td><td className="px-3 py-2">{formatRmb(item.profit_total)}</td><td className="px-3 py-2">{item.profit_contribution_percent === null ? "—" : `${Number(item.profit_contribution_percent).toFixed(2)}%`}</td></tr>)}{!data.customer_ranking.length && <tr><td colSpan={5} className="px-3 py-6 text-center text-slate-500">当前时间范围内暂无订单。</td></tr>}</tbody></table></div>
       </section>
     </>}
   </section>;

@@ -97,7 +97,6 @@ def test_profit_analysis_excludes_pending_orders_and_keeps_currencies_separate(
         "EUR": Decimal("200.00"),
         "USD": Decimal("200.00"),
     }
-    assert any(item["profit_accounting_status"] == "Pending" for item in response.json()["details"]["items"])
     assert {item["customer_company"] for item in response.json()["customer_ranking"]} == {
         "Profit First Customer", "Profit Second Customer"
     }
@@ -131,7 +130,6 @@ def test_profit_analysis_all_pending_and_empty_ranges(client: TestClient) -> Non
     )
     assert empty.status_code == 200, empty.text
     assert empty.json()["selected_summary"]["order_count"] == 0
-    assert empty.json()["details"]["items"] == []
 
 
 def test_profit_periods_custom_boundaries_and_admin_only(client: TestClient) -> None:
