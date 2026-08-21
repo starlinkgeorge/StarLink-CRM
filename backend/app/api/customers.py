@@ -91,6 +91,7 @@ def list_customers(
     automatic_stage_judgement: str | None = Query(default=None, max_length=120),
     latest_followup_from: date | None = None,
     latest_followup_to: date | None = None,
+    cold_customer: bool | None = Query(default=None),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ) -> CustomerPage:
@@ -129,6 +130,7 @@ def list_customers(
         automatic_stage_judgement=automatic_stage_judgement,
         latest_followup_from=latest_followup_from,
         latest_followup_to=latest_followup_to,
+        cold_customer=cold_customer,
     )
     return CustomerPage(items=items, total=total, limit=limit, offset=offset)
 

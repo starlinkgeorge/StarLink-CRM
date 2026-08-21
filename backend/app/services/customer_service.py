@@ -1,4 +1,4 @@
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
@@ -37,6 +37,7 @@ def list_customers(
     customer_size: int | None = None, customer_total_score_min: int | None = None,
     customer_total_score_max: int | None = None, automatic_stage_judgement: str | None = None,
     latest_followup_from: date | None = None, latest_followup_to: date | None = None,
+    cold_customer: bool | None = None,
 ) -> tuple[list[Customer], int]:
     filters = []
     if owner_id is not None:
@@ -95,6 +96,16 @@ def list_customers(
         filters.append(Customer.latest_followup_date >= latest_followup_from)
     if latest_followup_to is not None:
         filters.append(Customer.latest_followup_date <= latest_followup_to)
+    if cold_customer is True:
+        from app.services.followup_reminder_service import COLD_CUSTOMER_AFTER_DAYS, NEW_CUSTOMER_STAGE, shanghai_today
+
+        filters.extend(
+            (
+                Customer.customer_acquired_at.is_not(None),
+                Customer.customer_acquired_at <= (shanghai_today() - timedelta(days=COLD_CUSTOMER_AFTER_DAYS)),
+                Customer.followup_stage.in_((NEW_CUSTOMER_STAGE, "新开发未回复")),
+            )
+        )
 
     for column, value in (
         (Customer.contact_name, customer_name),
@@ -119,7 +130,7 @@ def list_customers(
         filters.append(Customer.customer_score <= score_max)
     statement = (
         select(Customer)
-        .options(selectinload(Customer.category))
+        .options(selectinload(Customer.category), selectinload(Customer.followups))
         .where(*filters)
         .order_by(Customer.updated_at.desc(), Customer.id.desc())
     )
@@ -172,6 +183,9 @@ def create_customer(session: Session, payload: CustomerCreate, creator: User) ->
         data["level"] = level_for_score(data["customer_score"])
         data["score_updated_at"] = datetime.now(timezone.utc)
     customer = Customer(**data)
+    from app.services.followup_reminder_service import sync_customer_cold_status
+
+    sync_customer_cold_status(customer)
     session.add(customer)
     session.commit()
     session.refresh(customer)
@@ -223,6 +237,9 @@ def update_customer(session: Session, customer_id: int, payload: CustomerUpdate,
         )
     for field, value in changes.items():
         setattr(customer, field, value)
+    from app.services.followup_reminder_service import sync_customer_cold_status
+
+    sync_customer_cold_status(customer)
     session.commit()
     session.refresh(customer)
     if score_changed and changes["customer_score"] != old_score:

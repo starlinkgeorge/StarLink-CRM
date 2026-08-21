@@ -29,6 +29,7 @@ export type CustomerFilters = {
   customer_acquired_from?: string; customer_acquired_to?: string;
   customer_size?: number; customer_total_score_min?: number; customer_total_score_max?: number;
   automatic_stage_judgement?: string; latest_followup_from?: string; latest_followup_to?: string;
+  cold_customer?: boolean;
   tag_id?: number; category_id?: number; score_min?: number; score_max?: number;
 };
 export const getCustomers = async (params: CustomerFilters) => (await api.get<CustomerPage>("/customers", { params })).data;

@@ -4,141 +4,110 @@ import pytest
 from pydantic import ValidationError
 
 from app.schemas.customer import CustomerCreate, CustomerRead, CustomerUpdate
-from app.services.followup_reminder_service import (
-    FollowupReminderStatus,
-    calculate_customer_followup_reminder,
-    calculate_followup_reminder,
-    is_followup_reminder_applicable,
-    shanghai_today,
-)
 from app.services.customer_followup_stage_service import (
-    COLD_CUSTOMER_STAGE,
     calculate_automatic_stage_judgement,
     normalize_manual_followup_stage,
 )
+from app.services.followup_reminder_service import (
+    FollowupReminderStatus,
+    calculate_customer_followup_reminder,
+    cold_customer_effective_date,
+    is_customer_cold,
+    shanghai_today,
+)
 
 
-def test_quotation_stage_calculates_three_day_cadence() -> None:
-    reminder = calculate_followup_reminder(
-        date(2026, 8, 10), "已报价", today=date(2026, 8, 12)
+def _reminder(acquired: date, latest: date | None, stage: str, today: date):
+    return calculate_customer_followup_reminder(acquired, latest, stage, today=today)
+
+
+def test_new_customer_first_reminder_is_acquisition_plus_three_days() -> None:
+    reminder = _reminder(date(2026, 8, 20), None, "新客户未回复", date(2026, 8, 20))
+    assert reminder.suggested_followup_date == date(2026, 8, 23)
+
+
+def test_customer_without_stage_or_followup_is_still_actionable() -> None:
+    reminder = calculate_customer_followup_reminder(
+        date(2026, 8, 20), None, None, today=date(2026, 8, 20)
     )
-    assert reminder.suggested_followup_date == date(2026, 8, 13)
-    assert reminder.status is FollowupReminderStatus.UPCOMING
+    assert reminder.status is FollowupReminderStatus.UNFOLLOWED
+    assert reminder.label == "尚未跟进"
+    assert reminder.suggested_followup_date == date(2026, 8, 23)
+
+
+def test_new_customer_followup_resets_to_three_days() -> None:
+    reminder = _reminder(date(2026, 8, 20), date(2026, 8, 23), "新客户未回复", date(2026, 8, 23))
+    assert reminder.suggested_followup_date == date(2026, 8, 26)
+
+
+def test_talking_customer_uses_three_day_cadence() -> None:
+    reminder = _reminder(date(2026, 8, 20), date(2026, 8, 23), "沟通中", date(2026, 8, 23))
+    assert reminder.suggested_followup_date == date(2026, 8, 26)
+
+
+def test_quoted_customer_uses_one_day_cadence() -> None:
+    reminder = _reminder(date(2026, 8, 20), date(2026, 8, 23), "已报价", date(2026, 8, 23))
+    assert reminder.suggested_followup_date == date(2026, 8, 24)
     assert reminder.label == "明天跟进"
 
 
-def test_reminder_statuses_cover_overdue_today_upcoming_and_not_needed() -> None:
-    assert calculate_followup_reminder(
-        date(2026, 8, 9), "沟通中", today=date(2026, 8, 12)
-    ).label == "已逾期 2 天"
-    assert calculate_followup_reminder(
-        date(2026, 8, 11), "沟通中", today=date(2026, 8, 12)
-    ).status is FollowupReminderStatus.TODAY
-    assert calculate_followup_reminder(
-        date(2026, 8, 11), "已报价", today=date(2026, 8, 12)
-    ).label == "2天后跟进"
-    assert calculate_followup_reminder(
-        date(2026, 8, 12), "已复购", today=date(2026, 8, 12)
-    ).status is FollowupReminderStatus.NOT_NEEDED
+def test_new_customer_becomes_cold_at_acquisition_plus_fifteen_days() -> None:
+    acquired = date(2026, 8, 1)
+    assert cold_customer_effective_date(acquired) == date(2026, 8, 16)
+    assert not is_customer_cold(acquired, "新客户未回复", today=date(2026, 8, 15))
+    assert is_customer_cold(acquired, "新客户未回复", today=date(2026, 8, 16))
 
 
-def test_missing_latest_followup_is_actionable() -> None:
-    reminder = calculate_followup_reminder(None, "已报价", today=date(2026, 8, 12))
-    assert reminder.status is FollowupReminderStatus.UNFOLLOWED
-    assert reminder.label == "尚未跟进"
-    assert reminder.suggested_followup_date is None
+def test_followup_history_does_not_restart_cold_clock() -> None:
+    assert is_customer_cold(date(2026, 8, 1), "新客户未回复", today=date(2026, 8, 16))
+    reminder = _reminder(date(2026, 8, 1), date(2026, 8, 13), "新客户未回复", date(2026, 8, 16))
+    assert reminder.suggested_followup_date == date(2026, 9, 12)
 
 
-def test_archive_acquisition_date_controls_reminder_eligibility() -> None:
-    before_cutoff = calculate_customer_followup_reminder(
-        date(2026, 8, 11),
-        date(2026, 8, 10),
-        "已报价",
-        today=date(2026, 8, 12),
-    )
-    missing_date = calculate_customer_followup_reminder(
-        None,
-        None,
-        "已报价",
-        today=date(2026, 8, 12),
-    )
-
-    assert not is_followup_reminder_applicable(date(2026, 8, 11))
-    assert not is_followup_reminder_applicable(None)
-    assert before_cutoff.status is FollowupReminderStatus.NOT_APPLICABLE
-    assert before_cutoff.label == "不适用"
-    assert before_cutoff.suggested_followup_date is None
-    assert missing_date.status is FollowupReminderStatus.NOT_APPLICABLE
-    assert missing_date.label == "不适用"
+def test_cold_customer_followup_uses_thirty_days() -> None:
+    reminder = _reminder(date(2026, 8, 1), date(2026, 8, 16), "新客户未回复", date(2026, 8, 16))
+    assert reminder.suggested_followup_date == date(2026, 9, 15)
 
 
-def test_cutoff_date_is_eligible_and_missing_followup_is_actionable() -> None:
-    reminder = calculate_customer_followup_reminder(
-        date(2026, 8, 12),
-        None,
-        "已报价",
-        today=date(2026, 8, 12),
-    )
-
-    assert is_followup_reminder_applicable(date(2026, 8, 12))
-    assert reminder.status is FollowupReminderStatus.UNFOLLOWED
-    assert reminder.label == "尚未跟进"
+def test_cold_customer_becomes_active_when_stage_changes_to_talking() -> None:
+    acquired, latest, today = date(2026, 8, 1), date(2026, 8, 16), date(2026, 8, 16)
+    assert is_customer_cold(acquired, "新客户未回复", today=today)
+    assert not is_customer_cold(acquired, "沟通中", today=today)
+    assert _reminder(acquired, latest, "沟通中", today).suggested_followup_date == date(2026, 8, 19)
 
 
-def test_today_uses_asia_shanghai_not_utc_calendar_day() -> None:
-    # 18:30 UTC is the following calendar day in China.
+def test_cold_customer_becomes_active_when_stage_changes_to_quoted() -> None:
+    acquired, latest, today = date(2026, 8, 1), date(2026, 8, 16), date(2026, 8, 16)
+    assert not is_customer_cold(acquired, "已报价", today=today)
+    assert _reminder(acquired, latest, "已报价", today).suggested_followup_date == date(2026, 8, 17)
+
+
+def test_closed_stage_clears_cold_and_does_not_use_cold_cadence() -> None:
+    acquired, latest, today = date(2026, 8, 1), date(2026, 8, 16), date(2026, 8, 16)
+    assert not is_customer_cold(acquired, "已成交", today=today)
+    assert _reminder(acquired, latest, "已成交", today).suggested_followup_date == date(2026, 8, 23)
+
+
+def test_missing_acquisition_date_and_unknown_stage_are_safe() -> None:
+    assert not is_customer_cold(None, "新客户未回复", today=date(2026, 8, 16))
+    assert _reminder(None, date(2026, 8, 16), "新客户未回复", date(2026, 8, 16)).status is FollowupReminderStatus.NOT_APPLICABLE
+    assert _reminder(date(2026, 8, 1), date(2026, 8, 16), "已发目录", date(2026, 8, 16)).status is FollowupReminderStatus.STAGE_UNSET
+
+
+def test_asia_shanghai_clock_and_historical_schema_compatibility() -> None:
     assert shanghai_today(datetime(2026, 8, 12, 18, 30, tzinfo=timezone.utc)) == date(2026, 8, 13)
-
-
-def test_legacy_manual_stages_normalize_without_changing_cold_customer() -> None:
     assert normalize_manual_followup_stage("新开发未回复") == "新客户未回复"
-    assert normalize_manual_followup_stage("新开发已回复") == "沟通中"
-    assert normalize_manual_followup_stage("已采购样品") == "已成交样品"
-    assert normalize_manual_followup_stage("冷客户") == "冷客户"
-    reminder = calculate_followup_reminder(
-        date(2026, 8, 10), "新开发未回复", today=date(2026, 8, 12)
-    )
-    assert reminder.suggested_followup_date == date(2026, 8, 12)
-
-
-def test_automatic_cold_customer_is_strictly_more_than_thirty_days() -> None:
-    today = date(2026, 8, 12)
-    assert calculate_automatic_stage_judgement(date(2026, 7, 12), "沟通中", today=today) == COLD_CUSTOMER_STAGE
-    assert calculate_automatic_stage_judgement(date(2026, 7, 13), "沟通中", today=today) == "沟通中"
-    assert calculate_automatic_stage_judgement(None, "已报价", today=today) == "已报价"
-
-
-def test_customer_schema_normalizes_known_legacy_stages_and_rejects_cold_customer() -> None:
-    created = CustomerCreate(company_name="Stage compatibility", followup_stage="新开发未回复")
+    created = CustomerCreate(company_name="Stage", followup_stage="新开发未回复")
     updated = CustomerUpdate(followup_stage="已采购样品")
-
     assert created.followup_stage == "新客户未回复"
     assert updated.followup_stage == "已成交样品"
     with pytest.raises(ValidationError):
         CustomerUpdate(followup_stage="冷客户")
-
-
-def test_customer_read_schema_preserves_unknown_historical_stage() -> None:
-    payload = CustomerRead.model_validate(
-        {
-            "id": 42,
-            "company_name": "Historical Stage Company",
-            "customer_score": 0,
-            "level": "C",
-            "status": "Lead",
-            "sales_stage": "Lead",
-            "followup_stage": "已发目录",
-            "created_at": datetime(2026, 8, 13),
-            "updated_at": datetime(2026, 8, 13),
-        }
-    )
-
-    assert payload.followup_stage == "已发目录"
-
-
-def test_unknown_historical_stage_does_not_break_reminder_calculation() -> None:
-    reminder = calculate_followup_reminder(
-        date(2026, 8, 10), "已发目录", today=date(2026, 8, 13)
-    )
-
-    assert reminder.status is FollowupReminderStatus.STAGE_UNSET
+    historical = CustomerRead.model_validate({
+        "id": 42, "company_name": "Historical", "customer_score": 0,
+        "level": "C", "status": "Lead", "sales_stage": "Lead",
+        "followup_stage": "已发目录", "created_at": datetime(2026, 8, 13),
+        "updated_at": datetime(2026, 8, 13),
+    })
+    assert historical.followup_stage == "已发目录"
+    assert calculate_automatic_stage_judgement(date(2026, 7, 1), "历史判断", today=date(2026, 8, 16)) == "历史判断"

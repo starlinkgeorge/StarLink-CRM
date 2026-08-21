@@ -253,6 +253,17 @@ stale Alembic stamp. The repair only adds missing V10 reminder columns and
 preserves existing customer, opportunity, inquiry, quotation, and follow-up
 data.
 
+Customer follow-up reminders use the `Asia/Shanghai` business date and prefer
+the newest real follow-up record over the editable archive date. New customers
+and customers in **沟通中** are reminded after three days; **已报价** customers
+after one day. A customer who remains **新客户未回复** becomes a separate **冷客户**
+state 15 calendar days after `customer_acquired_at`, regardless of intervening
+follow-up records. Cold customers are reminded every 30 days and immediately
+return to the cadence for their selected stage when that stage progresses.
+`0025_add_customer_cold_status` adds the indexed status snapshot without
+rewriting historical customer data; read paths calculate the effective state
+dynamically, so no cron job is required.
+
 Quotation PDF generation resolves URLs under `/product-images/` from the backend's local `PRODUCT_IMAGE_DIR` (default `/app/product-images`) before attempting public HTTP images. The backend Docker image copies the catalog image assets so product pictures remain available inside containers.
 
 When saving a draft, blank payment terms, delivery time, currency, or shipping cost values are normalized to the configured defaults; product prices and quantities remain strictly validated.

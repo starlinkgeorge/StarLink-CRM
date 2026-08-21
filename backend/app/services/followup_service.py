@@ -64,6 +64,11 @@ def _refresh_customer_reminder(
     # not overwrite an imported archive date that may pre-date CRM history.
     if sync_latest_followup_date and latest is not None:
         customer.latest_followup_date = latest.followup_date
+    # Persist a current snapshot for future reporting/filter indexes.  The
+    # reminder read path still recalculates it from acquisition date + stage.
+    from app.services.followup_reminder_service import sync_customer_cold_status
+
+    sync_customer_cold_status(customer)
 
 
 def _sync_opportunity_followup_activity(

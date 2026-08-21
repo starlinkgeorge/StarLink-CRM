@@ -144,6 +144,7 @@ class CustomerRead(BaseModel):
     followup_stage: Optional[str] = None
     automatic_stage_judgement: Optional[str] = None
     latest_followup_date: Optional[date] = None
+    is_cold_customer: bool = False
     category_id: Optional[int] = None
     customer_score: int
     score_updated_at: Optional[datetime] = None

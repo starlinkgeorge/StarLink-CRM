@@ -2,7 +2,7 @@ import enum
 from datetime import date, datetime
 from typing import Optional
 
-from sqlalchemy import Column, Date, DateTime, Enum, ForeignKey, Integer, String, Table, Text, case, literal
+from sqlalchemy import Boolean, Column, Date, DateTime, Enum, ForeignKey, Integer, String, Table, Text
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -68,13 +68,19 @@ class Customer(TimestampMixin, Base):
     customer_size: Mapped[Optional[int]] = mapped_column(Integer)
     customer_total_score: Mapped[Optional[int]] = mapped_column(Integer)
     followup_stage: Mapped[Optional[str]] = mapped_column(String(120), index=True)
-    # The persisted value is preserved for archive compatibility.  The public
+    # The persisted value is preserved for archive compatibility. The public
     # hybrid property below overlays the live cold-customer judgement whenever
-    # the latest follow-up is more than 30 China-business days old.
+    # a new customer reaches its acquisition-date + 15-day boundary.
     automatic_stage_judgement_value: Mapped[Optional[str]] = mapped_column(
         "automatic_stage_judgement", String(120)
     )
     latest_followup_date: Mapped[Optional[date]] = mapped_column(Date, index=True)
+    # Persisted for filtering and future reporting.  Read paths still derive
+    # the effective value from the acquisition date and stage, so no cron is
+    # required for a customer to become cold at the fifteen-day boundary.
+    is_cold_customer_value: Mapped[bool] = mapped_column(
+        "is_cold_customer", Boolean, nullable=False, server_default="false", default=False, index=True
+    )
     response_status: Mapped[Optional[str]] = mapped_column(String(80))
     followup_requirement: Mapped[Optional[str]] = mapped_column(String(80), index=True)
     # Import-only identity: hidden from the public API, immutable external
@@ -160,19 +166,18 @@ class Customer(TimestampMixin, Base):
 
     @automatic_stage_judgement.expression
     def automatic_stage_judgement(cls):
-        from app.services.customer_followup_stage_service import (
-            COLD_CUSTOMER_STAGE,
-            cold_customer_cutoff_date,
-        )
+        return cls.automatic_stage_judgement_value
 
-        return case(
-            (
-                (cls.latest_followup_date.is_not(None))
-                & (cls.latest_followup_date < cold_customer_cutoff_date()),
-                literal(COLD_CUSTOMER_STAGE),
-            ),
-            else_=cls.automatic_stage_judgement_value,
-        )
+    @property
+    def is_cold_customer(self) -> bool:
+        """Return the live cold-customer state for every read path."""
+        return self.effective_is_cold_customer
+
+    @is_cold_customer.setter
+    def is_cold_customer(self, value: bool) -> None:
+        # Keep the persisted flag useful for reporting/indexing, while the
+        # public state remains calendar-correct without requiring a cron job.
+        self.is_cold_customer_value = bool(value)
 
     @property
     def followup_reminder_status(self) -> CustomerFollowUpReminderStatus:
@@ -196,9 +201,25 @@ class Customer(TimestampMixin, Base):
 
         return calculate_customer_followup_reminder(
             self.customer_acquired_at,
-            self.latest_followup_date,
+            self.effective_latest_followup_date,
             self.followup_stage,
+            is_cold_customer=self.effective_is_cold_customer,
         ).suggested_followup_date
+
+    @property
+    def effective_latest_followup_date(self) -> Optional[date]:
+        """Prefer a real FollowUp date when that history is loaded."""
+        if "followups" in self.__dict__:
+            dates = [followup.followup_date for followup in self.followups if followup.followup_date]
+            if dates:
+                return max(dates)
+        return self.latest_followup_date
+
+    @property
+    def effective_is_cold_customer(self) -> bool:
+        from app.services.followup_reminder_service import is_customer_cold
+
+        return is_customer_cold(self.customer_acquired_at, self.followup_stage)
 
     @property
     def calculated_followup_reminder_status(self) -> str:
@@ -207,8 +228,9 @@ class Customer(TimestampMixin, Base):
 
         return calculate_customer_followup_reminder(
             self.customer_acquired_at,
-            self.latest_followup_date,
+            self.effective_latest_followup_date,
             self.followup_stage,
+            is_cold_customer=self.effective_is_cold_customer,
         ).status.value
 
     @property
@@ -217,8 +239,9 @@ class Customer(TimestampMixin, Base):
 
         return calculate_customer_followup_reminder(
             self.customer_acquired_at,
-            self.latest_followup_date,
+            self.effective_latest_followup_date,
             self.followup_stage,
+            is_cold_customer=self.effective_is_cold_customer,
         ).label
 
 

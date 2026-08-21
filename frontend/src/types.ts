@@ -76,6 +76,7 @@ export interface Customer {
   customer_level_value: number | null; customer_size: number | null;
   customer_total_score: number | null; followup_stage: string | null;
   automatic_stage_judgement: string | null; latest_followup_date: string | null;
+  is_cold_customer: boolean;
   category_id: number | null; category: CustomerCategory | null;
   customer_score: number; score_updated_at: string | null;
   next_followup_date: string | null; last_followup_at: string | null;
@@ -213,6 +214,7 @@ export interface CustomerFollowupReminder {
   id: number; customer_name: string | null; company_name: string; country: string | null;
   customer_level_value: number | null; customer_total_score: number | null;
   followup_stage: string | null; latest_followup_date: string | null;
+  is_cold_customer: boolean;
   suggested_followup_date: string | null; followup_reminder: CustomerFollowupReminderState;
   whatsapp: string | null; email: string | null;
 }

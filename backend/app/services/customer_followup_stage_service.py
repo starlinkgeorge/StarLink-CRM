@@ -7,10 +7,7 @@ selectable manual stage: it is calculated from the China business day.
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
-from zoneinfo import ZoneInfo
-
-CHINA_TIMEZONE = ZoneInfo("Asia/Shanghai")
+from datetime import date
 
 
 MANUAL_FOLLOWUP_STAGES: tuple[str, ...] = (
@@ -30,9 +27,6 @@ LEGACY_FOLLOWUP_STAGE_RENAMES: dict[str, str] = {
     "已采购样品": "已成交样品",
 }
 
-COLD_CUSTOMER_STAGE = "冷客户"
-COLD_CUSTOMER_AFTER_DAYS = 30
-
 
 def normalize_manual_followup_stage(value: str | None) -> str | None:
     """Return a compatible manual stage without converting ``冷客户``."""
@@ -44,22 +38,17 @@ def normalize_manual_followup_stage(value: str | None) -> str | None:
     return LEGACY_FOLLOWUP_STAGE_RENAMES.get(stage, stage)
 
 
-def cold_customer_cutoff_date(*, today: date | None = None) -> date:
-    """Dates strictly before this value are more than 30 days old."""
-    current_day = today or datetime.now(CHINA_TIMEZONE).date()
-    return current_day - timedelta(days=COLD_CUSTOMER_AFTER_DAYS)
-
-
 def calculate_automatic_stage_judgement(
     latest_followup_date: date | None,
     stored_value: str | None,
     *,
     today: date | None = None,
 ) -> str | None:
-    """Overlay the live cold-customer rule without overwriting stored data."""
-    if (
-        latest_followup_date is not None
-        and latest_followup_date < cold_customer_cutoff_date(today=today)
-    ):
-        return COLD_CUSTOMER_STAGE
+    """Keep the archive's automatic judgement independent from cold status.
+
+    Cold customers are now represented by ``Customer.is_cold_customer`` and
+    are calculated from the acquisition date plus manual follow-up stage.  Do
+    not overwrite a historical automatic-stage value based on a stale follow-up
+    date.
+    """
     return stored_value

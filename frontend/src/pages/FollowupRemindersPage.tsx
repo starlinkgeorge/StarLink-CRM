@@ -88,7 +88,7 @@ export function FollowupRemindersPage() {
                 <td className="whitespace-nowrap px-4 py-3">{dash(item.customer_name)}</td>
                 <td className="px-4 py-3 font-semibold text-blue-700"><Link to={`/customers/${item.id}`}>{item.company_name}</Link></td>
                 <td className="whitespace-nowrap px-4 py-3">{dash(item.country)}</td><td className="whitespace-nowrap px-4 py-3">{dash(item.customer_level_value)}</td><td className="whitespace-nowrap px-4 py-3">{dash(item.customer_total_score)}</td>
-                <td className="whitespace-nowrap px-4 py-3">{dash(item.followup_stage)}</td><td className="whitespace-nowrap px-4 py-3">{dateOnly(item.latest_followup_date)}</td><td className="whitespace-nowrap px-4 py-3">{dateOnly(item.suggested_followup_date)}</td>
+                <td className="whitespace-nowrap px-4 py-3"><span>{dash(item.followup_stage)}</span>{item.is_cold_customer && <span className="ml-2 rounded-full bg-orange-100 px-2 py-0.5 text-xs font-semibold text-orange-800">冷客户</span>}</td><td className="whitespace-nowrap px-4 py-3">{dateOnly(item.latest_followup_date)}</td><td className="whitespace-nowrap px-4 py-3">{dateOnly(item.suggested_followup_date)}</td>
                 <td className="px-4 py-3"><FollowupReminderBadge status={item.followup_reminder.status} label={item.followup_reminder.label} /></td>
                 <td className="whitespace-nowrap px-4 py-3">{dash(item.whatsapp)}</td><td className="whitespace-nowrap px-4 py-3">{dash(item.email)}</td>
               </tr>)}

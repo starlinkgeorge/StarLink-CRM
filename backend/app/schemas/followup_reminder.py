@@ -20,6 +20,7 @@ class CustomerFollowupReminder(BaseModel):
     customer_total_score: int | None = None
     followup_stage: str | None = None
     latest_followup_date: date | None = None
+    is_cold_customer: bool = False
     suggested_followup_date: date | None = None
     followup_reminder: FollowupReminderState
     whatsapp: str | None = None

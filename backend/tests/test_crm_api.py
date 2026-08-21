@@ -333,7 +333,7 @@ def test_customer_followup_reminder_v1_recalculates_after_a_new_followup(
     )
     assert customer.status_code == 201
     assert customer.json()["suggested_followup_date"] == (
-        previous_followup_date + timedelta(days=3)
+        previous_followup_date + timedelta(days=1)
     ).isoformat()
 
     created_followup = client.post(
@@ -352,16 +352,16 @@ def test_customer_followup_reminder_v1_recalculates_after_a_new_followup(
     detail = client.get(f"/api/v1/customers/{customer.json()['id']}", headers=admin_token)
     assert detail.status_code == 200
     assert detail.json()["latest_followup_date"] == today.isoformat()
-    assert detail.json()["suggested_followup_date"] == (today + timedelta(days=3)).isoformat()
+    assert detail.json()["suggested_followup_date"] == (today + timedelta(days=1)).isoformat()
 
     reminders = client.get("/api/v1/followup-reminders?status=upcoming", headers=admin_token)
     assert reminders.status_code == 200
     reminder = next(item for item in reminders.json()["items"] if item["id"] == customer.json()["id"])
-    assert reminder["suggested_followup_date"] == (today + timedelta(days=3)).isoformat()
+    assert reminder["suggested_followup_date"] == (today + timedelta(days=1)).isoformat()
     assert reminder["followup_reminder"]["status"] == "upcoming"
 
 
-def test_customer_followup_stage_api_normalizes_legacy_values_and_keeps_cold_automatic(
+def test_customer_followup_stage_api_normalizes_legacy_values_without_overwriting_automatic_stage(
     client: TestClient,
 ) -> None:
     from app.services.followup_reminder_service import shanghai_today
@@ -393,7 +393,7 @@ def test_customer_followup_stage_api_normalizes_legacy_values_and_keeps_cold_aut
         headers=admin_token,
     )
     assert cold.status_code == 201
-    assert cold.json()["automatic_stage_judgement"] == "冷客户"
+    assert cold.json()["automatic_stage_judgement"] == "原有自动阶段"
 
     exactly_thirty_days = client.post(
         "/api/v1/customers",
@@ -415,17 +415,20 @@ def test_customer_followup_stage_api_normalizes_legacy_values_and_keeps_cold_aut
     assert manual_cold.status_code == 422
 
 
-def test_followup_reminders_exclude_legacy_and_unknown_acquisition_dates(
+def test_followup_reminders_include_known_acquisition_dates_and_skip_unknown_dates(
     client: TestClient,
 ) -> None:
+    from app.services.followup_reminder_service import shanghai_today
+
     admin_token = login(client, "admin@example.com", "AdminPass123!")
+    today = shanghai_today()
     legacy = client.post(
         "/api/v1/customers",
         json={
             "company_name": "Legacy Reminder Customer",
-            "customer_acquired_at": "2026-08-11",
+            "customer_acquired_at": (today - timedelta(days=3)).isoformat(),
             "followup_stage": "已报价",
-            "latest_followup_date": "2026-08-10",
+            "latest_followup_date": (today - timedelta(days=1)).isoformat(),
         },
         headers=admin_token,
     )
@@ -434,34 +437,88 @@ def test_followup_reminders_exclude_legacy_and_unknown_acquisition_dates(
         json={
             "company_name": "Unknown Acquisition Customer",
             "followup_stage": "已报价",
-            "latest_followup_date": "2026-08-10",
+            "latest_followup_date": (today - timedelta(days=1)).isoformat(),
+        },
+        headers=admin_token,
+    )
+    unfollowed = client.post(
+        "/api/v1/customers",
+        json={
+            "company_name": "Unfollowed Reminder Customer",
+            "customer_acquired_at": today.isoformat(),
         },
         headers=admin_token,
     )
     assert legacy.status_code == 201
     assert unknown.status_code == 201
+    assert unfollowed.status_code == 201
 
-    for customer in (legacy.json(), unknown.json()):
-        assert customer["suggested_followup_date"] is None
-        assert customer["calculated_followup_reminder_status"] == "not_applicable"
-        assert customer["calculated_followup_reminder_label"] == "不适用"
+    assert legacy.json()["suggested_followup_date"] == today.isoformat()
+    assert legacy.json()["calculated_followup_reminder_status"] == "today"
+    assert unknown.json()["suggested_followup_date"] is None
+    assert unknown.json()["calculated_followup_reminder_status"] == "not_applicable"
+    assert unknown.json()["calculated_followup_reminder_label"] == "不适用"
+    assert unfollowed.json()["suggested_followup_date"] == (today + timedelta(days=3)).isoformat()
+    assert unfollowed.json()["calculated_followup_reminder_status"] == "unfollowed"
+    assert unfollowed.json()["calculated_followup_reminder_label"] == "尚未跟进"
 
     reminders = client.get("/api/v1/followup-reminders", headers=admin_token)
     assert reminders.status_code == 200
-    assert reminders.json()["items"] == []
+    assert {item["id"] for item in reminders.json()["items"]} == {
+        legacy.json()["id"],
+        unfollowed.json()["id"],
+    }
     assert reminders.json()["summary"] == {
         "overdue_count": 0,
-        "today_count": 0,
+        "today_count": 1,
         "upcoming_count": 0,
-        "unfollowed_count": 0,
+        "unfollowed_count": 1,
     }
 
     dashboard = client.get("/api/v1/dashboard/stats", headers=admin_token)
     assert dashboard.status_code == 200
     assert dashboard.json()["followup_reminder_overdue_count"] == 0
-    assert dashboard.json()["followup_reminder_today_count"] == 0
+    assert dashboard.json()["followup_reminder_today_count"] == 1
     assert dashboard.json()["followup_reminder_upcoming_count"] == 0
-    assert dashboard.json()["followup_reminder_unfollowed_count"] == 0
+    assert dashboard.json()["followup_reminder_unfollowed_count"] == 1
+
+
+def test_customer_list_exposes_and_filters_dynamic_cold_customers(client: TestClient) -> None:
+    from app.services.followup_reminder_service import COLD_CUSTOMER_AFTER_DAYS, shanghai_today
+
+    admin_token = login(client, "admin@example.com", "AdminPass123!")
+    today = shanghai_today()
+    cold = client.post(
+        "/api/v1/customers",
+        json={
+            "company_name": "Cold List Customer",
+            "customer_acquired_at": (today - timedelta(days=COLD_CUSTOMER_AFTER_DAYS)).isoformat(),
+            "followup_stage": "新客户未回复",
+        },
+        headers=admin_token,
+    )
+    active = client.post(
+        "/api/v1/customers",
+        json={
+            "company_name": "Active List Customer",
+            "customer_acquired_at": (today - timedelta(days=COLD_CUSTOMER_AFTER_DAYS)).isoformat(),
+            "followup_stage": "沟通中",
+        },
+        headers=admin_token,
+    )
+    assert cold.status_code == 201
+    assert active.status_code == 201
+
+    response = client.get("/api/v1/customers?limit=10&cold_customer=true", headers=admin_token)
+    assert response.status_code == 200
+    assert [item["id"] for item in response.json()["items"]] == [cold.json()["id"]]
+    assert response.json()["items"][0]["is_cold_customer"] is True
+
+    center = client.get(
+        f"/api/v1/customers/{cold.json()['id']}/center", headers=admin_token
+    )
+    assert center.status_code == 200
+    assert center.json()["is_cold_customer"] is True
 
 
 def test_alibaba_followup_channel_is_supported_and_visible_in_timeline(client: TestClient) -> None:

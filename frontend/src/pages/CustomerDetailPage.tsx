@@ -322,7 +322,7 @@ export function CustomerDetailPage() {
       <div className="mt-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-sm text-slate-500">客户中心 · {customer.country ?? "未填写国家/地区"}</p>
-          <h2 className="text-3xl font-bold">{customer.company_name}</h2>
+          <div className="flex flex-wrap items-center gap-2"><h2 className="text-3xl font-bold">{customer.company_name}</h2>{customer.is_cold_customer && <span className="rounded-full bg-orange-100 px-3 py-1 text-sm font-semibold text-orange-800">冷客户</span>}</div>
           <p className="mt-1 text-slate-600">{customer.contact_name ?? "未设置主联系人"}</p>
         </div>
         <div className="flex items-center gap-2">
