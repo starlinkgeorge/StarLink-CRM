@@ -19,6 +19,7 @@ from app.api import (
     system_settings,
     tags,
     users,
+    workbench,
 )
 from app.config import get_settings
 
@@ -57,6 +58,7 @@ app.include_router(products.category_router, prefix=settings["api_prefix"])
 app.include_router(products.router, prefix=settings["api_prefix"])
 app.include_router(quotations.router, prefix=settings["api_prefix"])
 app.include_router(system_settings.router, prefix=settings["api_prefix"])
+app.include_router(workbench.router, prefix=settings["api_prefix"])
 
 
 @app.get(f"{settings['api_prefix']}/health", tags=["system"])

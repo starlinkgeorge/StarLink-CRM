@@ -83,6 +83,19 @@ export interface SystemSettings {
   company_profile: CompanyProfileSettings;
   quotation_order_defaults: QuotationOrderDefaultsSettings;
 }
+export type TaskPriority = "high" | "medium" | "low";
+export type TaskStatus = "pending" | "completed";
+export interface WorkbenchTask {
+  id: number; title: string; due_date: string; priority: TaskPriority; status: TaskStatus;
+  customer_id: number | null; customer_name: string | null; created_by_id: number;
+  created_at: string; completed_at: string | null;
+}
+export interface DailyWorkNote { work_date: string; content: string; updated_at: string; }
+export interface WorkbenchMetrics {
+  overdue_customers: number; due_today_customers: number; new_customers: number;
+  new_quotations: number; new_orders: number; new_followups: number; completed_tasks: number;
+}
+export interface WorkbenchToday { today: string; metrics: WorkbenchMetrics; tasks: WorkbenchTask[]; daily_note: DailyWorkNote | null; }
 
 export interface User { id: number; name: string; email: string; role: UserRole; created_at: string; updated_at: string; }
 export interface Customer {
