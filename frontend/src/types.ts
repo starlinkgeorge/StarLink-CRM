@@ -91,11 +91,9 @@ export interface WorkbenchTask {
   created_at: string; completed_at: string | null;
 }
 export interface DailyWorkNote { work_date: string; content: string; updated_at: string; }
-export interface WorkbenchMetrics {
-  overdue_customers: number; due_today_customers: number; new_customers: number;
-  new_quotations: number; new_orders: number; new_followups: number; completed_tasks: number;
-}
-export interface WorkbenchToday { today: string; metrics: WorkbenchMetrics; tasks: WorkbenchTask[]; daily_note: DailyWorkNote | null; }
+export type WorkbenchPeriod = "today" | "week" | "month";
+export interface WorkbenchMetric { metric_group: string; metric_key: string; completed_value: number | string; target_value: number | string; }
+export interface WorkbenchToday { today: string; period: WorkbenchPeriod; metrics: WorkbenchMetric[]; tasks: WorkbenchTask[]; daily_note: DailyWorkNote | null; }
 
 export interface User { id: number; name: string; email: string; role: UserRole; created_at: string; updated_at: string; }
 export interface Customer {

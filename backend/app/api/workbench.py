@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.api.dependencies import get_current_user
 from app.db.session import get_db_session
 from app.models.user import User
-from app.schemas.workbench import DailyWorkNoteRead, DailyWorkNoteUpdate, TaskCreate, TaskRead, WorkbenchToday
+from app.schemas.workbench import DailyWorkNoteRead, DailyWorkNoteUpdate, TaskCreate, TaskRead, WorkbenchMetricRead, WorkbenchMetricUpdate, WorkbenchToday
 from app.services import workbench_service
 from app.services.errors import ForbiddenError, NotFoundError
 
@@ -17,9 +17,17 @@ def _raise(error: Exception) -> None:
     raise error
 
 
-@router.get("/today", response_model=WorkbenchToday)
-def get_today(session: Session = Depends(get_db_session), current_user: User = Depends(get_current_user)) -> WorkbenchToday:
-    try: return workbench_service.get_today(session, current_user)
+@router.get("", response_model=WorkbenchToday)
+def get_workbench(period: str = "today", session: Session = Depends(get_db_session), current_user: User = Depends(get_current_user)) -> WorkbenchToday:
+    if period not in {"today", "week", "month"}:
+        raise HTTPException(status_code=422, detail="period must be today, week, or month")
+    try: return workbench_service.get_workbench(session, current_user, period)
+    except (ForbiddenError, NotFoundError) as error: _raise(error)
+
+
+@router.put("/metrics", response_model=WorkbenchMetricRead)
+def update_metric(payload: WorkbenchMetricUpdate, session: Session = Depends(get_db_session), current_user: User = Depends(get_current_user)) -> WorkbenchMetricRead:
+    try: return workbench_service.update_metric(session, payload, current_user)
     except (ForbiddenError, NotFoundError) as error: _raise(error)
 
 

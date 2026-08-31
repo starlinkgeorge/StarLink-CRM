@@ -28,7 +28,7 @@ from app.models.product import Product, ProductCategory, ProductImage, Opportuni
 from app.models.quotation import Quotation, QuotationItem, QuotationStatus, QuotationVersion
 from app.models.order import Order, OrderPaymentStatus, OrderProductionStatus, OrderShippingStatus
 from app.models.system_setting import SystemSetting
-from app.models.workbench import DailyWorkNote, Task
+from app.models.workbench import DailyWorkNote, Task, WorkbenchDailyMetric
 from app.models.user import User, UserRole
 
 __all__ = [
@@ -42,5 +42,5 @@ __all__ = [
     "Quotation", "QuotationItem", "QuotationStatus", "QuotationVersion",
     "Order", "OrderPaymentStatus", "OrderProductionStatus", "OrderShippingStatus",
     "SystemSetting",
-    "DailyWorkNote", "Task",
+    "DailyWorkNote", "Task", "WorkbenchDailyMetric",
 ]

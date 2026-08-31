@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from decimal import Decimal
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -34,18 +35,23 @@ class DailyWorkNoteRead(BaseModel):
     updated_at: datetime
 
 
-class WorkbenchMetrics(BaseModel):
-    overdue_customers: int
-    due_today_customers: int
-    new_customers: int
-    new_quotations: int
-    new_orders: int
-    new_followups: int
-    completed_tasks: int
+class WorkbenchMetricRead(BaseModel):
+    metric_group: str
+    metric_key: str
+    completed_value: Decimal
+    target_value: Decimal
+
+
+class WorkbenchMetricUpdate(BaseModel):
+    metric_group: str = Field(min_length=1, max_length=40)
+    metric_key: str = Field(min_length=1, max_length=80)
+    completed_value: Decimal = Field(ge=0, max_digits=14, decimal_places=2)
+    target_value: Decimal = Field(ge=0, max_digits=14, decimal_places=2)
 
 
 class WorkbenchToday(BaseModel):
     today: date
-    metrics: WorkbenchMetrics
     tasks: list[TaskRead]
     daily_note: DailyWorkNoteRead | None
+    metrics: list[WorkbenchMetricRead]
+    period: Literal["today", "week", "month"]
