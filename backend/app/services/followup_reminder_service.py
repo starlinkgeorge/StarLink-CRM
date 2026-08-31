@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING
 from zoneinfo import ZoneInfo
 
 from app.services.customer_followup_stage_service import normalize_manual_followup_stage
+from app.services.system_settings_service import FollowupRules, get_followup_rules
 
 if TYPE_CHECKING:
     from app.models.customer import Customer
@@ -71,10 +72,14 @@ def shanghai_today(now: datetime | None = None) -> date:
     return now.astimezone(CHINA_TIMEZONE).date()
 
 
-def cold_customer_effective_date(customer_acquired_at: date | None) -> date | None:
+def cold_customer_effective_date(
+    customer_acquired_at: date | None, *, rules: FollowupRules | None = None
+) -> date | None:
     if customer_acquired_at is None:
         return None
-    return customer_acquired_at + timedelta(days=COLD_CUSTOMER_AFTER_DAYS)
+    return customer_acquired_at + timedelta(
+        days=(rules or get_followup_rules()).cold_customer_after_days
+    )
 
 
 def is_customer_cold(
@@ -82,13 +87,14 @@ def is_customer_cold(
     followup_stage: str | None,
     *,
     today: date | None = None,
+    rules: FollowupRules | None = None,
 ) -> bool:
     """Whether a still-unanswered new customer has become cold.
 
     The fifteen-day age is deliberately based only on acquisition date.  A
     later follow-up does not restart that commercial clock.
     """
-    effective_date = cold_customer_effective_date(customer_acquired_at)
+    effective_date = cold_customer_effective_date(customer_acquired_at, rules=rules)
     return bool(
         effective_date is not None
         and normalize_manual_followup_stage(followup_stage) == NEW_CUSTOMER_STAGE
@@ -96,12 +102,15 @@ def is_customer_cold(
     )
 
 
-def sync_customer_cold_status(customer: Customer, *, today: date | None = None) -> None:
+def sync_customer_cold_status(
+    customer: Customer, *, today: date | None = None, session: Session | None = None
+) -> None:
     """Refresh the persisted flag after a write without changing history."""
     customer.is_cold_customer = is_customer_cold(
         customer.customer_acquired_at,
         customer.followup_stage,
         today=today,
+        rules=get_followup_rules(session),
     )
 
 
@@ -143,6 +152,7 @@ def calculate_customer_followup_reminder(
     *,
     is_cold_customer: bool | None = None,
     today: date | None = None,
+    rules: FollowupRules | None = None,
 ) -> FollowupReminder:
     """Calculate one safe, real-time reminder for a customer.
 
@@ -154,13 +164,20 @@ def calculate_customer_followup_reminder(
         return FollowupReminder(FollowupReminderStatus.NOT_APPLICABLE, "不适用", None, 99)
 
     current_day = today or shanghai_today()
+    active_rules = rules or get_followup_rules()
     normalized_stage = normalize_manual_followup_stage(followup_stage) or ""
-    cold = is_customer_cold(customer_acquired_at, normalized_stage, today=current_day)
+    cold = is_customer_cold(
+        customer_acquired_at, normalized_stage, today=current_day, rules=active_rules
+    )
     if cold:
-        base_date = latest_followup_date or cold_customer_effective_date(customer_acquired_at)
+        base_date = latest_followup_date or cold_customer_effective_date(
+            customer_acquired_at, rules=active_rules
+        )
         assert base_date is not None
         return _reminder_for_due_date(
-            base_date + timedelta(days=30), today=current_day, priority_offset=30
+            base_date + timedelta(days=active_rules.cold_customer_reminder_days),
+            today=current_day,
+            priority_offset=30,
         )
 
     # Imported/new records can legitimately have an acquisition date but no
@@ -168,7 +185,7 @@ def calculate_customer_followup_reminder(
     # being hidden behind the historical "stage unset" compatibility state.
     if latest_followup_date is None and not normalized_stage:
         suggested_date = customer_acquired_at + timedelta(
-            days=FOLLOWUP_STAGE_INTERVAL_DAYS[NEW_CUSTOMER_STAGE]
+            days=active_rules.new_customer_first_followup_days
         )
         return FollowupReminder(
             FollowupReminderStatus.UNFOLLOWED,
@@ -178,7 +195,14 @@ def calculate_customer_followup_reminder(
             days_until_due=(suggested_date - current_day).days,
         )
 
-    interval_days = FOLLOWUP_STAGE_INTERVAL_DAYS.get(normalized_stage)
+    interval_days = {
+        NEW_CUSTOMER_STAGE: active_rules.new_customer_unanswered_reminder_days,
+        "沟通中": active_rules.communicating_reminder_days,
+        "已报价": active_rules.quoted_reminder_days,
+        "已成交样品": FOLLOWUP_STAGE_INTERVAL_DAYS["已成交样品"],
+        "已成交": FOLLOWUP_STAGE_INTERVAL_DAYS["已成交"],
+        "已复购": FOLLOWUP_STAGE_INTERVAL_DAYS["已复购"],
+    }.get(normalized_stage)
     if interval_days is None:
         return FollowupReminder(FollowupReminderStatus.STAGE_UNSET, "未设置跟进阶段", None, 90)
 
@@ -193,12 +217,21 @@ def calculate_followup_reminder(
     followup_stage: str | None,
     *,
     today: date | None = None,
+    rules: FollowupRules | None = None,
 ) -> FollowupReminder:
     """Legacy helper retained for callers that have no acquisition date."""
     if latest_followup_date is None:
         return FollowupReminder(FollowupReminderStatus.UNFOLLOWED, "尚未跟进", None, 80)
     normalized_stage = normalize_manual_followup_stage(followup_stage) or ""
-    interval_days = FOLLOWUP_STAGE_INTERVAL_DAYS.get(normalized_stage)
+    active_rules = rules or get_followup_rules()
+    interval_days = {
+        NEW_CUSTOMER_STAGE: active_rules.new_customer_unanswered_reminder_days,
+        "沟通中": active_rules.communicating_reminder_days,
+        "已报价": active_rules.quoted_reminder_days,
+        "已成交样品": FOLLOWUP_STAGE_INTERVAL_DAYS["已成交样品"],
+        "已成交": FOLLOWUP_STAGE_INTERVAL_DAYS["已成交"],
+        "已复购": FOLLOWUP_STAGE_INTERVAL_DAYS["已复购"],
+    }.get(normalized_stage)
     if interval_days is None:
         return FollowupReminder(FollowupReminderStatus.STAGE_UNSET, "未设置跟进阶段", None, 90)
     return _reminder_for_due_date(
@@ -206,9 +239,20 @@ def calculate_followup_reminder(
     )
 
 
-def is_followup_reminder_applicable(customer_acquired_at: date | None) -> bool:
-    """A known acquisition date is needed for a reliable customer reminder."""
-    return customer_acquired_at is not None
+def is_followup_reminder_applicable(
+    customer_acquired_at: date | None,
+    *,
+    has_followup_since_rule_start: bool = False,
+    rules: FollowupRules | None = None,
+) -> bool:
+    """Keep pre-rule customers out until a real later follow-up reactivates them."""
+    if customer_acquired_at is None:
+        return False
+    active_rules = rules or get_followup_rules()
+    return (
+        customer_acquired_at >= active_rules.rule_start_date
+        or has_followup_since_rule_start
+    )
 
 
 def _sort_key(item: dict[str, object]) -> tuple[int, int, str, int]:
@@ -227,15 +271,51 @@ def _sort_key(item: dict[str, object]) -> tuple[int, int, str, int]:
     return (stage_priority, urgency, secondary, str(item["company_name"]).casefold(), int(item["id"]))
 
 
-def _serialize_customer(customer: Customer, *, today: date) -> dict[str, object]:
+def _serialize_customer(
+    customer: Customer, *, today: date, rules: FollowupRules
+) -> dict[str, object]:
     latest_followup_date = customer.effective_latest_followup_date
-    cold = is_customer_cold(customer.customer_acquired_at, customer.followup_stage, today=today)
+    has_followup_since_rule_start = any(
+        followup.followup_date >= rules.rule_start_date
+        for followup in customer.followups
+        if followup.followup_date is not None
+    )
+    if not is_followup_reminder_applicable(
+        customer.customer_acquired_at,
+        has_followup_since_rule_start=has_followup_since_rule_start,
+        rules=rules,
+    ):
+        reminder = FollowupReminder(
+            FollowupReminderStatus.NOT_APPLICABLE,
+            "跟进规则开始前获得",
+            None,
+            99,
+        ).as_dict()
+        return {
+            "id": customer.id,
+            "customer_name": customer.contact_name,
+            "company_name": customer.company_name,
+            "country": customer.country,
+            "customer_level_value": customer.customer_level_value,
+            "customer_total_score": customer.customer_total_score,
+            "followup_stage": customer.followup_stage,
+            "latest_followup_date": latest_followup_date,
+            "is_cold_customer": False,
+            "suggested_followup_date": None,
+            "followup_reminder": reminder,
+            "whatsapp": customer.whatsapp,
+            "email": customer.email,
+        }
+    cold = is_customer_cold(
+        customer.customer_acquired_at, customer.followup_stage, today=today, rules=rules
+    )
     reminder = calculate_customer_followup_reminder(
         customer.customer_acquired_at,
         latest_followup_date,
         customer.followup_stage,
         is_cold_customer=cold,
         today=today,
+        rules=rules,
     ).as_dict()
     return {
         "id": customer.id,
@@ -269,13 +349,17 @@ def list_customer_followup_reminders(
     from app.services.access_service import customer_scope
 
     current_day = today or shanghai_today()
+    rules = get_followup_rules(session)
     scope = customer_scope(user)
     statement = select(Customer).options(selectinload(Customer.followups)).where(
         Customer.customer_acquired_at.is_not(None)
     )
     if scope is not None:
         statement = statement.where(scope)
-    rows = [_serialize_customer(customer, today=current_day) for customer in session.scalars(statement)]
+    rows = [
+        _serialize_customer(customer, today=current_day, rules=rules)
+        for customer in session.scalars(statement)
+    ]
     summary = {
         "overdue_count": sum(item["followup_reminder"]["status"] == FollowupReminderStatus.OVERDUE for item in rows),
         "today_count": sum(item["followup_reminder"]["status"] == FollowupReminderStatus.TODAY for item in rows),

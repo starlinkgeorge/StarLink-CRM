@@ -68,7 +68,7 @@ def _refresh_customer_reminder(
     # reminder read path still recalculates it from acquisition date + stage.
     from app.services.followup_reminder_service import sync_customer_cold_status
 
-    sync_customer_cold_status(customer)
+    sync_customer_cold_status(customer, session=session)
 
 
 def _sync_opportunity_followup_activity(

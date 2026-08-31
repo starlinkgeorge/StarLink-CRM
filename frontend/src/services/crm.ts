@@ -1,5 +1,5 @@
 import api from "./api";
-import type { AlibabaInquiryResult, AlibabaIntegrationStatus, AnalyticsPeriod, BusinessAnalyticsOverview, CalculatedFollowupReminderStatus, Customer, CustomerActivity, CustomerCategory, CustomerCenter, CustomerDetail, CustomerFollowupReminderPage, CustomerPage, CustomerScoreHistory, DashboardStats, FollowUp, FollowUpAttachment, Inquiry, InquiryConversion, InquiryPage, InquiryStatus, OpportunityDealPipeline, OpportunityDealStage, OpportunityDetail, OpportunityListItem, OpportunityPage, OpportunityPipeline, OpportunitySalesStage, OpportunityStage, Order, OrderPage, OrderProfitAnalytics, OrderProfitPeriod, Product, ProductCategory, ProductPage, QuotationDetail, QuotationPage, QuotationStatus, Tag, WonOrderBackfillPreview, WonOrderBackfillResult } from "../types";
+import type { AlibabaInquiryResult, AlibabaIntegrationStatus, AnalyticsPeriod, BusinessAnalyticsOverview, CalculatedFollowupReminderStatus, Customer, CustomerActivity, CustomerCategory, CustomerCenter, CustomerDetail, CustomerFollowupReminderPage, CustomerPage, CustomerScoreHistory, DashboardStats, FollowUp, FollowUpAttachment, Inquiry, InquiryConversion, InquiryPage, InquiryStatus, OpportunityDealPipeline, OpportunityDealStage, OpportunityDetail, OpportunityListItem, OpportunityPage, OpportunityPipeline, OpportunitySalesStage, OpportunityStage, Order, OrderPage, OrderProfitAnalytics, OrderProfitPeriod, Product, ProductCategory, ProductPage, QuotationDetail, QuotationPage, QuotationStatus, SystemSettings, Tag, WonOrderBackfillPreview, WonOrderBackfillResult } from "../types";
 
 export type CustomerCreatePayload = {
   company_name: string; contact_name?: string; country?: string; email?: string; phone?: string;
@@ -13,6 +13,8 @@ export type CustomerCreatePayload = {
 };
 
 export const getDashboardStats = async () => (await api.get<DashboardStats>("/dashboard/stats")).data;
+export const getSystemSettings = async () => (await api.get<SystemSettings>("/settings")).data;
+export const updateSystemSettings = async (data: SystemSettings) => (await api.put<SystemSettings>("/settings", data)).data;
 export const getBusinessAnalytics = async (params: { period: AnalyticsPeriod; start_date?: string; end_date?: string }) => (
   await api.get<BusinessAnalyticsOverview>("/analytics/overview", { params })
 ).data;

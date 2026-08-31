@@ -34,6 +34,7 @@ from app.services import (
     quotation_pdf_service,
 )
 from app.services.errors import ConflictError, ForbiddenError, NotFoundError
+from app.services.system_settings_service import get_quotation_order_defaults
 
 
 MONEY = Decimal("0.01")
@@ -287,6 +288,15 @@ def create_quotation(
 ) -> QuotationDetail:
     if creator.role is UserRole.VIEWER:
         raise ForbiddenError("Viewer accounts have read-only access.")
+    defaults = get_quotation_order_defaults(session)
+    # Pydantic records fields provided by the caller, allowing administrators to
+    # change defaults without rewriting any existing quotation snapshots.
+    quotation_terms = {
+        "currency": payload.currency if "currency" in payload.model_fields_set else defaults.default_currency,
+        "payment_term": payload.payment_term if "payment_term" in payload.model_fields_set else defaults.default_payment_term,
+        "delivery_time": payload.delivery_time if "delivery_time" in payload.model_fields_set else defaults.default_delivery_time,
+        "validity_days": payload.validity_days if "validity_days" in payload.model_fields_set else defaults.default_quotation_validity_days,
+    }
     try:
         if payload.opportunity_id is not None:
             # Keep the existing opportunity-first workflow unchanged. An explicitly
@@ -318,7 +328,7 @@ def create_quotation(
                     customer=customer,
                     items=items,
                     total_amount=total_amount,
-                    currency=payload.currency,
+                    currency=quotation_terms["currency"],
                     creator=creator,
                 )
 
@@ -334,10 +344,10 @@ def create_quotation(
         quotation.quotation_number = _next_quotation_number(session)
         version = QuotationVersion(
             version_no=1,
-            currency=payload.currency,
-            payment_term=payload.payment_term,
-            delivery_time=payload.delivery_time,
-            validity_days=payload.validity_days,
+            currency=quotation_terms["currency"],
+            payment_term=quotation_terms["payment_term"],
+            delivery_time=quotation_terms["delivery_time"],
+            validity_days=quotation_terms["validity_days"],
             shipping_cost=payload.shipping_cost,
             subtotal=subtotal,
             total_amount=(subtotal + payload.shipping_cost).quantize(MONEY),

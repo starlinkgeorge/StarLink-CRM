@@ -97,12 +97,15 @@ def list_customers(
     if latest_followup_to is not None:
         filters.append(Customer.latest_followup_date <= latest_followup_to)
     if cold_customer is True:
-        from app.services.followup_reminder_service import COLD_CUSTOMER_AFTER_DAYS, NEW_CUSTOMER_STAGE, shanghai_today
+        from app.services.followup_reminder_service import NEW_CUSTOMER_STAGE, shanghai_today
+        from app.services.system_settings_service import get_followup_rules
+
+        rules = get_followup_rules(session)
 
         filters.extend(
             (
                 Customer.customer_acquired_at.is_not(None),
-                Customer.customer_acquired_at <= (shanghai_today() - timedelta(days=COLD_CUSTOMER_AFTER_DAYS)),
+                Customer.customer_acquired_at <= (shanghai_today() - timedelta(days=rules.cold_customer_after_days)),
                 Customer.followup_stage.in_((NEW_CUSTOMER_STAGE, "新开发未回复")),
             )
         )
@@ -185,7 +188,7 @@ def create_customer(session: Session, payload: CustomerCreate, creator: User) ->
     customer = Customer(**data)
     from app.services.followup_reminder_service import sync_customer_cold_status
 
-    sync_customer_cold_status(customer)
+    sync_customer_cold_status(customer, session=session)
     session.add(customer)
     session.commit()
     session.refresh(customer)
@@ -239,7 +242,7 @@ def update_customer(session: Session, customer_id: int, payload: CustomerUpdate,
         setattr(customer, field, value)
     from app.services.followup_reminder_service import sync_customer_cold_status
 
-    sync_customer_cold_status(customer)
+    sync_customer_cold_status(customer, session=session)
     session.commit()
     session.refresh(customer)
     if score_changed and changes["customer_score"] != old_score:

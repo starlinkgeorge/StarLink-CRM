@@ -65,6 +65,24 @@ export interface AlibabaIntegrationStatus {
 export interface AlibabaInquiryResult {
   customer_id: number; created: boolean; customer: Customer;
 }
+export interface FollowupRulesSettings {
+  rule_start_date: string; new_customer_first_followup_days: number;
+  new_customer_unanswered_reminder_days: number; communicating_reminder_days: number;
+  quoted_reminder_days: number; cold_customer_after_days: number; cold_customer_reminder_days: number;
+}
+export interface CompanyProfileSettings {
+  company_name: string; english_name: string; logo_url: string; address: string;
+  phone: string; email: string; website: string;
+}
+export interface QuotationOrderDefaultsSettings {
+  default_currency: string; default_quotation_validity_days: number;
+  default_payment_term: string; default_delivery_time: string;
+}
+export interface SystemSettings {
+  followup_rules: FollowupRulesSettings;
+  company_profile: CompanyProfileSettings;
+  quotation_order_defaults: QuotationOrderDefaultsSettings;
+}
 
 export interface User { id: number; name: string; email: string; role: UserRole; created_at: string; updated_at: string; }
 export interface Customer {
