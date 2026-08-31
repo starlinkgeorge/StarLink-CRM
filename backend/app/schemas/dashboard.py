@@ -2,7 +2,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.models.opportunity import OpportunityReminderStatus, OpportunitySalesStage
 
@@ -83,3 +83,23 @@ class DashboardStats(BaseModel):
     followup_reminder_today_count: int
     followup_reminder_upcoming_count: int
     followup_reminder_unfollowed_count: int
+
+
+class DashboardTaskCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=300)
+    due_date: date
+    priority: Literal["high", "medium", "low"] = "medium"
+    customer_id: int | None = Field(default=None, gt=0)
+
+
+class DashboardTaskRead(BaseModel):
+    id: int
+    title: str
+    due_date: date
+    priority: Literal["high", "medium", "low"]
+    status: Literal["pending", "completed"]
+    customer_id: int | None
+    customer_name: str | None
+    created_by_id: int
+    created_at: datetime
+    completed_at: datetime | None

@@ -1,5 +1,5 @@
 import api from "./api";
-import type { AlibabaInquiryResult, AlibabaIntegrationStatus, AnalyticsPeriod, BusinessAnalyticsOverview, CalculatedFollowupReminderStatus, Customer, CustomerActivity, CustomerCategory, CustomerCenter, CustomerDetail, CustomerFollowupReminderPage, CustomerPage, CustomerScoreHistory, DashboardStats, DailyWorkNote, FollowUp, FollowUpAttachment, Inquiry, InquiryConversion, InquiryPage, InquiryStatus, OpportunityDealPipeline, OpportunityDealStage, OpportunityDetail, OpportunityListItem, OpportunityPage, OpportunityPipeline, OpportunitySalesStage, OpportunityStage, Order, OrderPage, OrderProfitAnalytics, OrderProfitPeriod, Product, ProductCategory, ProductPage, QuotationDetail, QuotationPage, QuotationStatus, SystemSettings, Tag, TaskPriority, WorkbenchMetric, WorkbenchPeriod, WorkbenchTask, WorkbenchToday, WonOrderBackfillPreview, WonOrderBackfillResult } from "../types";
+import type { AlibabaInquiryResult, AlibabaIntegrationStatus, AnalyticsPeriod, BusinessAnalyticsOverview, CalculatedFollowupReminderStatus, Customer, CustomerActivity, CustomerCategory, CustomerCenter, CustomerDetail, CustomerFollowupReminderPage, CustomerPage, CustomerScoreHistory, DashboardStats, DashboardTask, FollowUp, FollowUpAttachment, Inquiry, InquiryConversion, InquiryPage, InquiryStatus, OpportunityDealPipeline, OpportunityDealStage, OpportunityDetail, OpportunityListItem, OpportunityPage, OpportunityPipeline, OpportunitySalesStage, OpportunityStage, Order, OrderPage, OrderProfitAnalytics, OrderProfitPeriod, Product, ProductCategory, ProductPage, QuotationDetail, QuotationPage, QuotationStatus, SystemSettings, Tag, TaskPriority, WonOrderBackfillPreview, WonOrderBackfillResult } from "../types";
 
 export type CustomerCreatePayload = {
   company_name: string; contact_name?: string; country?: string; email?: string; phone?: string;
@@ -15,12 +15,10 @@ export type CustomerCreatePayload = {
 export const getDashboardStats = async () => (await api.get<DashboardStats>("/dashboard/stats")).data;
 export const getSystemSettings = async () => (await api.get<SystemSettings>("/settings")).data;
 export const updateSystemSettings = async (data: SystemSettings) => (await api.put<SystemSettings>("/settings", data)).data;
-export const getWorkbench = async (period: WorkbenchPeriod) => (await api.get<WorkbenchToday>("/workbench", { params: { period } })).data;
-export const saveWorkbenchMetric = async (data: WorkbenchMetric) => (await api.put<WorkbenchMetric>("/workbench/metrics", data)).data;
-export const createWorkbenchTask = async (data: { title: string; due_date: string; priority: TaskPriority; customer_id?: number }) => (await api.post<WorkbenchTask>("/workbench/tasks", data)).data;
-export const completeWorkbenchTask = async (id: number) => (await api.post<WorkbenchTask>(`/workbench/tasks/${id}/complete`)).data;
-export const deleteWorkbenchTask = async (id: number) => { await api.delete(`/workbench/tasks/${id}`); };
-export const saveDailyWorkNote = async (content: string) => (await api.put<DailyWorkNote>("/workbench/daily-note", { content })).data;
+export const getDashboardTasks = async () => (await api.get<DashboardTask[]>("/dashboard/tasks/today")).data;
+export const createDashboardTask = async (data: { title: string; due_date: string; priority: TaskPriority; customer_id?: number }) => (await api.post<DashboardTask>("/dashboard/tasks", data)).data;
+export const completeDashboardTask = async (id: number) => (await api.post<DashboardTask>(`/dashboard/tasks/${id}/complete`)).data;
+export const deleteDashboardTask = async (id: number) => { await api.delete(`/dashboard/tasks/${id}`); };
 export const getBusinessAnalytics = async (params: { period: AnalyticsPeriod; start_date?: string; end_date?: string }) => (
   await api.get<BusinessAnalyticsOverview>("/analytics/overview", { params })
 ).data;

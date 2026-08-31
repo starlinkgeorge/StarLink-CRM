@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload
@@ -8,6 +8,9 @@ from app.models.followup import FollowUp
 from app.models.inquiry import Inquiry, InquiryStatus
 from app.models.opportunity import Opportunity, OpportunityReminderStatus, OpportunitySalesStage
 from app.models.user import User, UserRole
+from app.models.task import Task
+from app.schemas.dashboard import DashboardTaskCreate, DashboardTaskRead
+from app.services.errors import ForbiddenError, NotFoundError
 from app.services.access_service import customer_scope
 from app.services.followup_reminder_service import (
     list_customer_followup_reminders,
@@ -24,6 +27,64 @@ def _serialize_followup(followup: FollowUp, customer_name: str) -> dict:
         "content": followup.content,
         "next_followup_date": followup.next_followup_date,
     }
+
+
+def _ensure_dashboard_task_admin(user: User) -> None:
+    if user.role is not UserRole.ADMIN:
+        raise ForbiddenError("Only Admin accounts can manage dashboard tasks.")
+
+
+def _task_read(task: Task, customer_name: str | None) -> DashboardTaskRead:
+    return DashboardTaskRead(
+        id=task.id, title=task.title, due_date=task.due_date, priority=task.priority,
+        status=task.status, customer_id=task.customer_id, customer_name=customer_name,
+        created_by_id=task.created_by_id, created_at=task.created_at, completed_at=task.completed_at,
+    )
+
+
+def get_today_tasks(session: Session, user: User) -> list[DashboardTaskRead]:
+    _ensure_dashboard_task_admin(user)
+    today = shanghai_today()
+    priority_order = {"high": 0, "medium": 1, "low": 2}
+    rows = session.execute(
+        select(Task, Customer.company_name)
+        .outerjoin(Customer, Customer.id == Task.customer_id)
+        .where(Task.created_by_id == user.id, Task.status == "pending", Task.due_date <= today)
+        .order_by(Task.due_date.asc(), Task.id.asc())
+    ).all()
+    result = [_task_read(task, company_name) for task, company_name in rows]
+    return sorted(result, key=lambda task: (task.due_date >= today, priority_order[task.priority], task.due_date, task.id))
+
+
+def create_dashboard_task(session: Session, payload: DashboardTaskCreate, user: User) -> DashboardTaskRead:
+    _ensure_dashboard_task_admin(user)
+    if payload.customer_id is not None and session.get(Customer, payload.customer_id) is None:
+        raise NotFoundError("Customer not found.")
+    task = Task(**payload.model_dump(), created_by_id=user.id, status="pending")
+    session.add(task); session.commit(); session.refresh(task)
+    customer = session.get(Customer, task.customer_id) if task.customer_id else None
+    return _task_read(task, customer.company_name if customer else None)
+
+
+def complete_dashboard_task(session: Session, task_id: int, user: User) -> DashboardTaskRead:
+    _ensure_dashboard_task_admin(user)
+    task = session.scalar(select(Task).where(Task.id == task_id, Task.created_by_id == user.id))
+    if task is None:
+        raise NotFoundError("Task not found.")
+    task.status = "completed"
+    task.completed_at = datetime.now(timezone.utc)
+    session.commit(); session.refresh(task)
+    customer = session.get(Customer, task.customer_id) if task.customer_id else None
+    return _task_read(task, customer.company_name if customer else None)
+
+
+def delete_dashboard_task(session: Session, task_id: int, user: User) -> None:
+    _ensure_dashboard_task_admin(user)
+    task = session.scalar(select(Task).where(Task.id == task_id, Task.created_by_id == user.id))
+    if task is None:
+        raise NotFoundError("Task not found.")
+    session.delete(task)
+    session.commit()
 
 
 def get_dashboard_stats(session: Session, user: User) -> dict:

@@ -85,15 +85,11 @@ export interface SystemSettings {
 }
 export type TaskPriority = "high" | "medium" | "low";
 export type TaskStatus = "pending" | "completed";
-export interface WorkbenchTask {
+export interface DashboardTask {
   id: number; title: string; due_date: string; priority: TaskPriority; status: TaskStatus;
   customer_id: number | null; customer_name: string | null; created_by_id: number;
   created_at: string; completed_at: string | null;
 }
-export interface DailyWorkNote { work_date: string; content: string; updated_at: string; }
-export type WorkbenchPeriod = "today" | "week" | "month";
-export interface WorkbenchMetric { metric_group: string; metric_key: string; completed_value: number | string; target_value: number | string; }
-export interface WorkbenchToday { today: string; period: WorkbenchPeriod; metrics: WorkbenchMetric[]; tasks: WorkbenchTask[]; daily_note: DailyWorkNote | null; }
 
 export interface User { id: number; name: string; email: string; role: UserRole; created_at: string; updated_at: string; }
 export interface Customer {

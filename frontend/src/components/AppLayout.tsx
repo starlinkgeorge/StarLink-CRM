@@ -4,7 +4,6 @@ import { useAuth } from "../store/auth";
 
 const navItems = [
   ["/", "仪表盘"],
-  ["/workbench", "每日工作台"],
   ["/analytics", "经营分析"],
   ["/inquiries", "Alibaba 询盘"],
   ["/customers", "客户管理"],

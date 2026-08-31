@@ -23,7 +23,6 @@ import { SettingsPage } from "./pages/SettingsPage";
 import { OrdersPage } from "./pages/OrdersPage";
 import { OrderDetailPage } from "./pages/OrderDetailPage";
 import { AuthProvider } from "./store/auth";
-import { WorkbenchPage } from "./pages/WorkbenchPage";
 
 function LegacyCustomerQuotationCreateRedirect() {
   const { customerId } = useParams();
@@ -35,7 +34,6 @@ export function App() {
     <Route path="/login" element={<LoginPage />} />
     <Route element={<ProtectedRoute />}><Route element={<AppLayout />}>
       <Route path="/" element={<DashboardPage />} />
-      <Route path="/workbench" element={<WorkbenchPage />} />
       <Route path="/analytics" element={<BusinessAnalyticsPage />} />
       <Route path="/followup-reminders" element={<FollowupRemindersPage />} />
       <Route path="/inquiries" element={<InquiriesPage />} /><Route path="/inquiries/:id" element={<InquiryDetailPage />} />
