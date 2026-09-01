@@ -2,7 +2,6 @@ import { BrowserRouter, Navigate, Route, Routes, useParams } from "react-router-
 import { AppLayout } from "./components/AppLayout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { CustomerDetailPage } from "./pages/CustomerDetailPage";
-import { CustomerClassificationPage } from "./pages/CustomerClassificationPage";
 import { CustomerArchivePage } from "./pages/CustomerArchivePage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { BusinessAnalyticsPage } from "./pages/BusinessAnalyticsPage";
@@ -34,7 +33,6 @@ export function App() {
       <Route path="/analytics" element={<BusinessAnalyticsPage />} />
       <Route path="/followup-reminders" element={<FollowupRemindersPage />} />
       <Route path="/customers" element={<CustomerArchivePage />} /><Route path="/customers/new" element={<NewCustomerPage />} /><Route path="/customers/:customerId/quotations/new" element={<LegacyCustomerQuotationCreateRedirect />} /><Route path="/customers/:id" element={<CustomerDetailPage />} />
-      <Route path="/customer-classification" element={<CustomerClassificationPage />} />
       <Route path="/opportunities" element={<OpportunitiesPage />} /><Route path="/opportunities/:id" element={<OpportunityDetailPage />} />
       <Route path="/products" element={<ProductsPage />} /><Route path="/products/:id" element={<ProductDetailPage />} />
       <Route path="/quotations" element={<QuotationsPage />} /><Route path="/quotations/new" element={<QuotationCreatePage />} /><Route path="/quotations/:id" element={<QuotationDetailPage />} />

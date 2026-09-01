@@ -76,9 +76,6 @@ export const removeTag = async (customerId: number, tagId: number) => (await api
 export const updateCustomerScore = async (customerId: number, data: { score: number; reason?: string }) => (await api.put<Customer>(`/customers/${customerId}/score`, data)).data;
 export const getCustomerScoreHistory = async (customerId: number) => (await api.get<CustomerScoreHistory[]>(`/customers/${customerId}/score-history`)).data;
 export const getCustomerCategories = async (activeOnly = false) => (await api.get<CustomerCategory[]>("/customer-categories", { params: { active_only: activeOnly } })).data;
-export const createCustomerCategory = async (data: { name: string; description?: string; color?: string; sort_order?: number; is_active?: boolean }) => (await api.post<CustomerCategory>("/customer-categories", data)).data;
-export const updateCustomerCategory = async (id: number, data: Partial<{ name: string; description: string; color: string; sort_order: number; is_active: boolean }>) => (await api.put<CustomerCategory>(`/customer-categories/${id}`, data)).data;
-export const updateTag = async (id: number, data: Partial<{ name: string; description: string; color: string; is_active: boolean }>) => (await api.put<Tag>(`/tags/${id}`, data)).data;
 
 export type AlibabaInquiryPayload = {
   company_name: string; contact_name: string; country?: string; email?: string; phone?: string;
