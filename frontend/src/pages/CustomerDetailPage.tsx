@@ -2,9 +2,7 @@ import axios from "axios";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
-import { StatusBadge } from "../components/StatusBadge";
 import { CustomerArchiveProfile } from "../components/CustomerArchiveProfile";
-import { FollowupReminderBadge } from "../components/FollowupReminderBadge";
 import {
   assignTag,
   createQuotation,
@@ -19,13 +17,11 @@ import {
   removeTag,
   updateFollowup,
   updateCustomerScore,
-  updateCustomer,
   uploadFollowupAttachment,
 } from "../services/crm";
 import { useAuth } from "../store/auth";
 import type { CustomerActivity, CustomerCenter, CustomerScoreHistory, CustomerStatus, FollowUp, FollowUpType, OpportunityDealStage, OpportunityListItem, Order, QuotationListItem, QuotationStatus, Tag } from "../types";
 
-const stages: CustomerStatus[] = ["Lead", "Contacted", "Quotation", "Negotiation", "Won", "Lost"];
 const stageText: Record<CustomerStatus, string> = {
   Lead: "新线索",
   Contacted: "已联系",
@@ -41,6 +37,7 @@ const opportunityStageText: Record<OpportunityDealStage, string> = {
 const quotationStatusText: Record<QuotationStatus, string> = {
   Draft: "草稿", Sent: "已发送", Accepted: "已接受", Rejected: "已拒绝", Expired: "已过期",
 };
+type DetailTab = "followups" | "opportunities" | "quotations" | "orders" | "contacts" | "attachments";
 
 function localDateString() {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -59,6 +56,19 @@ function ReminderBadge({ followupDate }: { followupDate: string }) {
     return <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">今日待跟进</span>;
   }
   return <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">计划跟进 · {followupDate}</span>;
+}
+
+function followupCountdown(followupDate: string) {
+  const today = localDateString();
+  const toUtcMillis = (value: string) => {
+    const [year, month, day] = value.split("-").map(Number);
+    return Date.UTC(year, month - 1, day);
+  };
+  const millis = toUtcMillis(followupDate) - toUtcMillis(today);
+  const days = Math.round(millis / 86_400_000);
+  if (days < 0) return `已逾期 ${Math.abs(days)} 天`;
+  if (days === 0) return "今天需要跟进";
+  return `还有 ${days} 天`;
 }
 
 function ActivityItem({ activity }: { activity: CustomerActivity }) {
@@ -125,6 +135,8 @@ export function CustomerDetailPage() {
   const [saving, setSaving] = useState(false);
   const [creatingQuotation, setCreatingQuotation] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [activeTab, setActiveTab] = useState<DetailTab>("followups");
+  const [profileEditRequest, setProfileEditRequest] = useState(0);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -152,9 +164,6 @@ export function CustomerDetailPage() {
   }, [load]);
 
   const editable = user?.role !== "Viewer";
-  // V1 derives its cadence from the archive's follow-up date and stage.
-  // The legacy manual next_followup_date remains visible in historical records.
-  const currentReminder = customer?.next_followup_date;
 
   async function addFollowup(event: FormEvent) {
     event.preventDefault();
@@ -246,16 +255,6 @@ export function CustomerDetailPage() {
     }
   }
 
-  async function changeStage(salesStage: CustomerStatus) {
-    if (!customer) return;
-    try {
-      await updateCustomer(customer.id, { sales_stage: salesStage });
-      await load();
-    } catch {
-      setError("无法更新客户阶段。");
-    }
-  }
-
   async function saveScore(event: FormEvent) {
     event.preventDefault();
     if (!customer || scoreInput === "") return;
@@ -316,206 +315,70 @@ export function CustomerDetailPage() {
     followup.attachments.map((attachment) => ({ attachment, followup })),
   );
 
+  const suggestedFollowupDate = customer.suggested_followup_date;
+  const tabItems: { id: DetailTab; label: string; count: number }[] = [
+    { id: "followups", label: "跟进记录", count: customer.followups.length },
+    { id: "opportunities", label: "商机", count: opportunities.length },
+    { id: "quotations", label: "报价", count: quotations.length },
+    { id: "orders", label: "订单", count: orders.length },
+    { id: "contacts", label: "联系人", count: customer.contacts.length },
+    { id: "attachments", label: "附件", count: attachments.length },
+  ];
+
   return (
     <>
       <Link to="/customers" className="text-sm text-blue-700">← 返回客户列表</Link>
-      <div className="mt-4 flex flex-wrap items-start justify-between gap-3">
+      <header className="mt-3 flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-sm text-slate-500">客户中心 · {customer.country ?? "未填写国家/地区"}</p>
-          <div className="flex flex-wrap items-center gap-2"><h2 className="text-3xl font-bold">{customer.company_name}</h2>{customer.is_cold_customer && <span className="rounded-full bg-orange-100 px-3 py-1 text-sm font-semibold text-orange-800">冷客户</span>}</div>
-          <p className="mt-1 text-slate-600">{customer.contact_name ?? "未设置主联系人"}</p>
+          <div className="flex flex-wrap items-center gap-2"><h2 className="text-2xl font-bold text-slate-950">{customer.company_name}</h2>{customer.is_cold_customer && <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-semibold text-orange-800">冷客户</span>}</div>
+          <p className="mt-0.5 text-sm text-slate-600">{customer.contact_name ?? "未设置主联系人"}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {editable && <Link to={`/orders/new?customer_id=${customer.id}`} className="rounded border border-emerald-600 px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-50">新建订单</Link>}
           {editable && <button type="button" onClick={() => void createCustomerQuotation()} disabled={creatingQuotation} className="rounded bg-blue-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60">{creatingQuotation ? "正在创建…" : "创建报价"}</button>}
-          <StatusBadge status={customer.sales_stage} />
-          {editable && (
-            <select
-              value={customer.sales_stage}
-              onChange={(event) => void changeStage(event.target.value as CustomerStatus)}
-              className="rounded border px-2 py-1 text-sm"
-            >
-              {stages.map((stage) => <option key={stage} value={stage}>{stageText[stage]}</option>)}
-            </select>
-          )}
+          {editable && <button type="button" onClick={() => setProfileEditRequest((value) => value + 1)} className="rounded border border-blue-600 px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-50">编辑客户档案</button>}
         </div>
-      </div>
+      </header>
 
-      {error && <p className="mt-4 text-sm text-rose-600">{error}</p>}
+      {error && <p className="mt-3 text-sm text-rose-600">{error}</p>}
 
-      <section className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <article className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200"><p className="text-sm text-slate-500">联系人</p><p className="mt-1 text-2xl font-bold">{customer.contacts.length}</p></article>
-        <article className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200"><p className="text-sm text-slate-500">商机</p><p className="mt-1 text-2xl font-bold">{opportunities.length}</p></article>
-        <article className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200"><p className="text-sm text-slate-500">报价</p><p className="mt-1 text-2xl font-bold">{quotations.length}</p></article>
-        <article className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200"><p className="text-sm text-slate-500">跟进记录</p><p className="mt-1 text-2xl font-bold">{customer.followups.length}</p></article>
-        <article className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200"><p className="text-sm text-slate-500">客户附件</p><p className="mt-1 text-2xl font-bold">{attachments.length}</p></article>
+      <section className="mt-4 flex flex-wrap divide-x divide-slate-200 overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
+        {tabItems.map((item) => <div key={item.id} className="min-w-28 flex-1 px-4 py-2 text-center"><span className="text-xs text-slate-500">{item.label}</span><span className="ml-2 text-lg font-bold text-slate-800">{item.count}</span></div>)}
       </section>
 
-      <section className="mt-5 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      <section className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-white px-4 py-3 shadow-sm ring-1 ring-slate-200">
+        <h3 className="text-sm font-semibold">跟进提醒</h3>
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          <span className="text-slate-600">下次建议跟进：<strong className="text-slate-900">{suggestedFollowupDate ?? "—"}</strong></span>
+          {suggestedFollowupDate && <span className={suggestedFollowupDate < localDateString() ? "font-medium text-rose-700" : "font-medium text-blue-700"}>{followupCountdown(suggestedFollowupDate)}</span>}
+        </div>
+      </section>
+
+      <section className="mt-4">
+        <CustomerArchiveProfile customer={customer} editable={editable} onSaved={load} editRequest={profileEditRequest} showEditAction={false} />
+      </section>
+
+      <section className="mt-3 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,0.8fr)]">
           <div>
-            <h3 className="text-sm font-semibold">跟进提醒</h3>
-            <p className="mt-1 text-sm text-slate-500">按最近跟进日期和跟进阶段自动计算（中国时间）</p>
+            <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-semibold">客户评分</h3><span className="text-sm text-slate-600">{customer.customer_score} / 100（{customer.level}）</span></div>
+            {editable && <form onSubmit={saveScore} className="mt-2 flex flex-wrap gap-2"><input type="number" min="0" max="100" value={scoreInput} onChange={(event) => setScoreInput(event.target.value)} className="w-24 rounded border px-2 py-1 text-sm" /><input value={scoreReason} onChange={(event) => setScoreReason(event.target.value)} maxLength={500} placeholder="评分原因（可选）" className="min-w-48 flex-1 rounded border px-2 py-1 text-sm" /><button disabled={saving} className="rounded bg-blue-600 px-3 py-1 text-sm font-semibold text-white disabled:opacity-60">保存评分</button></form>}
+            {scoreHistory.length > 0 && <p className="mt-2 text-xs text-slate-500">最近评分：{scoreHistory.slice(0, 3).map((item) => `${item.new_score}分（${new Date(item.created_at).toLocaleDateString()}）`).join(" · ")}</p>}
           </div>
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            {customer.suggested_followup_date && <span className="text-sm text-slate-600">建议：{customer.suggested_followup_date}</span>}
-            <FollowupReminderBadge status={customer.calculated_followup_reminder_status} label={customer.calculated_followup_reminder_label} />
-            {currentReminder && <span className="text-xs text-slate-400">手工计划：{currentReminder}</span>}
-          </div>
+          <div className="border-t pt-3 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0"><h3 className="text-sm font-semibold">客户标签</h3><div className="mt-2 flex flex-wrap gap-2">{customer.tags.map((tag) => <span key={tag.id} className="rounded-full bg-blue-50 px-2 py-1 text-xs text-blue-700">{tag.name}{editable && <button type="button" aria-label={`移除标签 ${tag.name}`} onClick={() => void removeTag(customer.id, tag.id).then(load)} className="ml-1 text-blue-500">×</button>}</span>)}{!customer.tags.length && <span className="text-sm text-slate-500">暂未添加标签</span>}</div>{editable && <form onSubmit={addTag} className="mt-2 flex flex-wrap gap-2"><select value={tagId} onChange={(event) => setTagId(event.target.value)} className="rounded border px-2 py-1 text-sm"><option value="">选择已有标签</option>{tags.filter((tag) => !customer.tags.some((current) => current.id === tag.id)).map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}</select><input value={newTag} onChange={(event) => setNewTag(event.target.value)} placeholder="或新建标签" className="min-w-32 rounded border px-2 py-1 text-sm" /><button className="rounded border px-3 py-1 text-sm">添加</button></form>}</div>
         </div>
+        {customer.original_inquiry && <details className="mt-3 border-t pt-3 text-sm"><summary className="cursor-pointer font-medium text-slate-700">原始询盘内容</summary><p className="mt-2 whitespace-pre-wrap text-slate-600">{customer.original_inquiry}</p></details>}
       </section>
 
-      <section className="mt-7">
-        <CustomerArchiveProfile customer={customer} editable={editable} onSaved={load} />
-      </section>
-
-      <section className="mt-7 grid gap-5 lg:grid-cols-2">
-        <article className="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-          <h3 className="font-bold">客户档案</h3>
-          <dl className="mt-4 grid grid-cols-2 gap-4 text-sm">
-            <div><dt className="text-slate-500">客户分类</dt><dd>{customer.category?.name ?? "—"}</dd></div>
-            <div><dt className="text-slate-500">客户评分</dt><dd className="font-semibold">{customer.customer_score} / 100（{customer.level}）</dd></div>
-            <div><dt className="text-slate-500">等级</dt><dd>{customer.level}</dd></div>
-            <div><dt className="text-slate-500">客户类型</dt><dd>{customer.customer_type ?? "—"}</dd></div>
-            <div><dt className="text-slate-500">来源</dt><dd>{customer.source ?? "—"}</dd></div>
-            <div><dt className="text-slate-500">来源平台</dt><dd>{customer.source_platform ?? "—"}</dd></div>
-            <div><dt className="text-slate-500">感兴趣产品</dt><dd>{customer.interested_product ?? "—"}</dd></div>
-            <div><dt className="text-slate-500">邮箱</dt><dd>{customer.email ?? "—"}</dd></div>
-            <div><dt className="text-slate-500">电话</dt><dd>{customer.phone ?? "—"}</dd></div>
-            <div><dt className="text-slate-500">WhatsApp</dt><dd>{customer.whatsapp ?? "—"}</dd></div>
-            <div>
-              <dt className="text-slate-500">网站</dt>
-              <dd>{customer.website ? <a href={customer.website} target="_blank" rel="noreferrer" className="text-blue-700 hover:underline">{customer.website}</a> : "—"}</dd>
-            </div>
-            <div><dt className="text-slate-500">创建时间</dt><dd>{new Date(customer.created_at).toLocaleString()}</dd></div>
-            <div><dt className="text-slate-500">最近更新</dt><dd>{new Date(customer.updated_at).toLocaleString()}</dd></div>
-          </dl>
-          {customer.original_inquiry && (
-            <div className="mt-4 rounded-lg bg-slate-50 p-3 text-sm">
-              <p className="font-medium text-slate-700">原始询盘内容</p>
-              <p className="mt-1 whitespace-pre-wrap text-slate-600">{customer.original_inquiry}</p>
-            </div>
-          )}
-          {editable && (
-            <form onSubmit={saveScore} className="mt-5 rounded-lg bg-slate-50 p-3">
-              <p className="text-sm font-semibold">更新客户等级评分</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <input type="number" min="0" max="100" value={scoreInput} onChange={(event) => setScoreInput(event.target.value)} className="w-28 rounded border px-2 py-1 text-sm" />
-                <input value={scoreReason} onChange={(event) => setScoreReason(event.target.value)} maxLength={500} placeholder="评分原因（可选）" className="min-w-52 flex-1 rounded border px-2 py-1 text-sm" />
-                <button disabled={saving} className="rounded bg-blue-600 px-3 py-1 text-sm font-semibold text-white disabled:opacity-60">保存评分</button>
-              </div>
-              <p className="mt-1 text-xs text-slate-500">80-100 自动为 A，50-79 为 B，0-49 为 C。</p>
-            </form>
-          )}
-          {scoreHistory.length > 0 && (
-            <div className="mt-4 text-xs text-slate-500">
-              最近评分：{scoreHistory.slice(0, 3).map((item) => `${item.new_score}分（${new Date(item.created_at).toLocaleDateString()}）`).join(" · ")}
-            </div>
-          )}
-
-          <h4 className="mt-6 text-sm font-semibold">客户标签</h4>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {customer.tags.map((tag) => (
-              <span key={tag.id} className="rounded-full bg-blue-50 px-3 py-1 text-sm text-blue-700">
-                {tag.name}
-                {editable && (
-                  <button
-                    type="button"
-                    aria-label={`移除标签 ${tag.name}`}
-                    onClick={() => void removeTag(customer.id, tag.id).then(load)}
-                    className="ml-2 text-blue-500"
-                  >×</button>
-                )}
-              </span>
-            ))}
-            {!customer.tags.length && <span className="text-sm text-slate-500">暂未添加标签</span>}
-          </div>
-          {editable && (
-            <form onSubmit={addTag} className="mt-3 flex flex-wrap gap-2">
-              <select value={tagId} onChange={(event) => setTagId(event.target.value)} className="rounded border px-2 py-1 text-sm">
-                <option value="">选择已有标签</option>
-                {tags.filter((tag) => !customer.tags.some((current) => current.id === tag.id)).map((tag) => (
-                  <option key={tag.id} value={tag.id}>{tag.name}</option>
-                ))}
-              </select>
-              <input value={newTag} onChange={(event) => setNewTag(event.target.value)} placeholder="或新建标签" className="rounded border px-2 py-1 text-sm" />
-              <button className="rounded border px-3 py-1 text-sm">添加</button>
-            </form>
-          )}
-        </article>
-
-        <article className="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-          <h3 className="font-bold">联系人</h3>
-          <div className="mt-4 space-y-3">
-            {customer.contacts.length ? customer.contacts.map((contact) => (
-              <div key={contact.id} className="rounded-lg bg-slate-50 p-3 text-sm">
-                <p className="font-semibold">{contact.name}</p>
-                <p className="text-slate-500">{contact.position ?? "未填写职位"}</p>
-                <p className="mt-1 text-slate-600">{contact.email ?? "未填写邮箱"}</p>
-                <p className="text-slate-600">{contact.phone ?? contact.whatsapp ?? "未填写电话"}</p>
-              </div>
-            )) : <p className="text-sm text-slate-500">暂无其他联系人。</p>}
-          </div>
-        </article>
-      </section>
-
-      <section className="mt-5 rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+      <section className="mt-4 overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
+        <div className="flex overflow-x-auto border-b border-slate-200 px-2">
+          {tabItems.map((item) => <button key={item.id} type="button" onClick={() => setActiveTab(item.id)} className={`whitespace-nowrap border-b-2 px-3 py-3 text-sm font-medium ${activeTab === item.id ? "border-blue-600 text-blue-700" : "border-transparent text-slate-500 hover:text-slate-800"}`}>{item.label}<span className="ml-1 text-xs">{item.count}</span></button>)}
+        </div>
+        <div className="p-4">
+          {activeTab === "followups" && <>
         <div className="flex items-center justify-between">
-          <h3 className="font-bold">商机</h3>
-          <Link to="/opportunities" className="text-sm text-blue-700">查看全部商机</Link>
-        </div>
-        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {opportunities.map((opportunity) => (
-            <Link key={opportunity.id} to={`/opportunities/${opportunity.id}`} className="rounded-lg bg-slate-50 p-4 hover:bg-blue-50">
-              <div className="flex items-start justify-between gap-2"><strong>{opportunity.name}</strong><span className="whitespace-nowrap rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700">{opportunityStageText[opportunity.deal_stage]}</span></div>
-              <p className="mt-2 truncate text-sm text-slate-600">{opportunity.interested_product ?? "未填写产品需求"}</p>
-              <p className="mt-2 text-sm font-medium">{opportunity.amount ? `${opportunity.currency} ${Number(opportunity.amount).toLocaleString()}` : "金额未填写"}</p>
-              <p className="mt-1 text-xs text-slate-500">成交概率：{opportunity.probability}% · 创建于 {new Date(opportunity.created_at).toLocaleDateString()}</p>
-            </Link>
-          ))}
-          {!opportunities.length && <p className="text-sm text-slate-500">该客户暂无商机。</p>}
-        </div>
-      </section>
-
-      <section className="mt-5 rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-        <div className="flex items-center justify-between gap-3"><div><h3 className="font-bold">订单</h3><p className="mt-1 text-sm text-slate-500">订单、履约状态和订单利润统一在订单管理中维护。</p></div><Link to={`/orders?customer_id=${customer.id}`} className="text-sm text-blue-700">查看全部 →</Link></div>
-        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {orders.map((order) => <Link key={order.id} to={`/orders/${order.id}`} className="rounded-lg bg-slate-50 p-4 hover:bg-blue-50"><div className="flex items-center justify-between gap-2"><strong>{order.order_no}</strong><span className="text-sm text-slate-600">{order.currency} {order.order_amount}</span></div><p className="mt-2 text-sm text-slate-600">{order.order_date} · {order.payment_status}</p><p className="mt-1 text-sm">{order.profit_accounting_status === "Pending" ? "利润：待核算" : `利润：¥${order.profit}`}</p></Link>)}
-          {!orders.length && <p className="text-sm text-slate-500">该客户暂无订单。</p>}
-        </div>
-      </section>
-
-      <section className="mt-5 rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-        <div className="flex items-center justify-between gap-3">
-          <div><h3 className="font-bold">报价</h3><p className="mt-1 text-sm text-slate-500">客户所有报价及其当前状态</p></div>
-          <Link to="/quotations" className="text-sm text-blue-700">查看全部报价</Link>
-        </div>
-        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {quotations.map((quotation) => (
-            <article key={quotation.id} className="rounded-lg bg-slate-50 p-4">
-              <div className="flex items-start justify-between gap-2"><Link to={`/quotations/${quotation.id}`} className="font-semibold text-blue-700">{quotation.quotation_number}</Link><span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs">{quotationStatusText[quotation.status]}</span></div>
-              <p className="mt-2 text-sm">{quotation.currency} {Number(quotation.total_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-              {quotation.opportunity_id && <Link to={`/opportunities/${quotation.opportunity_id}`} className="mt-2 inline-block text-sm text-blue-700">{quotation.opportunity_name ?? "关联商机"}</Link>}
-              <p className="mt-2 text-xs text-slate-500">日期：{new Date(quotation.created_at).toLocaleDateString()}</p>
-            </article>
-          ))}
-          {!quotations.length && <p className="text-sm text-slate-500">暂无报价；可点击页面顶部“创建报价”。</p>}
-        </div>
-      </section>
-
-      <section className="mt-5 rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-        <div className="flex items-center justify-between gap-3"><div><h3 className="font-bold">客户附件</h3><p className="mt-1 text-sm text-slate-500">来自跟进记录的文件，统一在客户中心查看。</p></div><span className="text-sm text-slate-500">共 {attachments.length} 个</span></div>
-        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {attachments.map(({ attachment, followup }) => (
-            <article key={attachment.id} className="rounded-lg bg-slate-50 p-3 text-sm"><button type="button" onClick={() => void openFollowupFile(followup.id, attachment.id)} className="font-medium text-blue-700">{attachment.file_name}</button><p className="mt-1 text-slate-500">{followup.type} · {followup.followup_date}</p><p className="text-xs text-slate-500">{Math.ceil(attachment.size_bytes / 1024)} KB · {new Date(attachment.created_at).toLocaleString()}</p></article>
-          ))}
-          {!attachments.length && <p className="text-sm text-slate-500">暂无客户附件。</p>}
-        </div>
-      </section>
-
-      <section className="mt-5 rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-        <div className="flex items-center justify-between">
-          <h3 className="font-bold">客户活动时间线</h3>
+          <h3 className="font-bold">跟进记录</h3>
           <span className="text-sm text-slate-500">共 {timeline.length} 条活动</span>
         </div>
         {editable && (
@@ -582,6 +445,13 @@ export function CustomerDetailPage() {
         <div className="mt-5 space-y-4">
           {timeline.map((activity) => <ActivityItem key={activity.event_id} activity={activity} />)}
           {!timeline.length && <p className="text-sm text-slate-500">暂无客户活动。</p>}
+        </div>
+          </>}
+          {activeTab === "opportunities" && <><div className="flex items-center justify-between"><h3 className="font-bold">商机</h3><Link to="/opportunities" className="text-sm text-blue-700">查看全部商机</Link></div><div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{opportunities.map((opportunity) => <Link key={opportunity.id} to={`/opportunities/${opportunity.id}`} className="rounded-lg bg-slate-50 p-3 hover:bg-blue-50"><div className="flex items-start justify-between gap-2"><strong>{opportunity.name}</strong><span className="whitespace-nowrap rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700">{opportunityStageText[opportunity.deal_stage]}</span></div><p className="mt-2 truncate text-sm text-slate-600">{opportunity.interested_product ?? "未填写产品需求"}</p><p className="mt-2 text-sm font-medium">{opportunity.amount ? `${opportunity.currency} ${Number(opportunity.amount).toLocaleString()}` : "金额未填写"}</p><p className="mt-1 text-xs text-slate-500">成交概率：{opportunity.probability}% · 创建于 {new Date(opportunity.created_at).toLocaleDateString()}</p></Link>)}{!opportunities.length && <p className="text-sm text-slate-500">该客户暂无商机。</p>}</div></>}
+          {activeTab === "quotations" && <><div className="flex items-center justify-between"><h3 className="font-bold">报价</h3><Link to="/quotations" className="text-sm text-blue-700">查看全部报价</Link></div><div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{quotations.map((quotation) => <article key={quotation.id} className="rounded-lg bg-slate-50 p-3"><div className="flex items-start justify-between gap-2"><Link to={`/quotations/${quotation.id}`} className="font-semibold text-blue-700">{quotation.quotation_number}</Link><span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs">{quotationStatusText[quotation.status]}</span></div><p className="mt-2 text-sm">{quotation.currency} {Number(quotation.total_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>{quotation.opportunity_id && <Link to={`/opportunities/${quotation.opportunity_id}`} className="mt-2 inline-block text-sm text-blue-700">{quotation.opportunity_name ?? "关联商机"}</Link>}<p className="mt-2 text-xs text-slate-500">日期：{new Date(quotation.created_at).toLocaleDateString()}</p></article>)}{!quotations.length && <p className="text-sm text-slate-500">暂无报价；可点击页面顶部“创建报价”。</p>}</div></>}
+          {activeTab === "orders" && <><div className="flex items-center justify-between gap-3"><div><h3 className="font-bold">订单</h3><p className="mt-1 text-sm text-slate-500">订单、履约状态和订单利润统一在订单管理中维护。</p></div><Link to={`/orders?customer_id=${customer.id}`} className="text-sm text-blue-700">查看全部 →</Link></div><div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{orders.map((order) => <Link key={order.id} to={`/orders/${order.id}`} className="rounded-lg bg-slate-50 p-3 hover:bg-blue-50"><div className="flex items-center justify-between gap-2"><strong>{order.order_no}</strong><span className="text-sm text-slate-600">{order.currency} {order.order_amount}</span></div><p className="mt-2 text-sm text-slate-600">{order.order_date} · {order.payment_status}</p><p className="mt-1 text-sm">{order.profit_accounting_status === "Pending" ? "利润：待核算" : `利润：¥${order.profit}`}</p></Link>)}{!orders.length && <p className="text-sm text-slate-500">该客户暂无订单。</p>}</div></>}
+          {activeTab === "contacts" && <><h3 className="font-bold">联系人</h3><div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{customer.contacts.length ? customer.contacts.map((contact) => <div key={contact.id} className="rounded-lg bg-slate-50 p-3 text-sm"><p className="font-semibold">{contact.name}</p><p className="text-slate-500">{contact.position ?? "未填写职位"}</p><p className="mt-1 text-slate-600">{contact.email ?? "未填写邮箱"}</p><p className="text-slate-600">{contact.phone ?? contact.whatsapp ?? "未填写电话"}</p></div>) : <p className="text-sm text-slate-500">暂无其他联系人。</p>}</div></>}
+          {activeTab === "attachments" && <><div className="flex items-center justify-between gap-3"><div><h3 className="font-bold">客户附件</h3><p className="mt-1 text-sm text-slate-500">来自跟进记录的文件。</p></div><span className="text-sm text-slate-500">共 {attachments.length} 个</span></div><div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{attachments.map(({ attachment, followup }) => <article key={attachment.id} className="rounded-lg bg-slate-50 p-3 text-sm"><button type="button" onClick={() => void openFollowupFile(followup.id, attachment.id)} className="font-medium text-blue-700">{attachment.file_name}</button><p className="mt-1 text-slate-500">{followup.type} · {followup.followup_date}</p><p className="text-xs text-slate-500">{Math.ceil(attachment.size_bytes / 1024)} KB · {new Date(attachment.created_at).toLocaleString()}</p></article>)}{!attachments.length && <p className="text-sm text-slate-500">暂无客户附件。</p>}</div></>}
         </div>
       </section>
     </>

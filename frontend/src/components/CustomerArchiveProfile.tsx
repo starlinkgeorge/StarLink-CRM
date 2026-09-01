@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
+import { useEffect, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
 
 import { updateCustomer, type CustomerCreatePayload } from "../services/crm";
 import { customerArchiveOptions } from "../constants/customerArchiveOptions";
@@ -8,6 +8,8 @@ type Props = {
   customer: CustomerCenter;
   editable: boolean;
   onSaved: () => Promise<void> | void;
+  editRequest?: number;
+  showEditAction?: boolean;
 };
 
 type FieldKey = keyof CustomerCreatePayload;
@@ -52,17 +54,21 @@ function Value({ value }: { value: string | number | null | undefined }) {
 }
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
-  return <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-    <h3 className="text-base font-bold text-slate-900">{title}</h3>
+  return <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <h3 className="text-sm font-bold text-slate-900">{title}</h3>
     {children}
   </section>;
 }
 
-export function CustomerArchiveProfile({ customer, editable, onSaved }: Props) {
+export function CustomerArchiveProfile({ customer, editable, onSaved, editRequest = 0, showEditAction = true }: Props) {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<CustomerCreatePayload>(() => initialForm(customer));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (editRequest > 0 && editable) setEditing(true);
+  }, [editRequest, editable]);
 
   const updateText = (key: FieldKey) => (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setForm((current) => ({ ...current, [key]: event.target.value }));
@@ -132,14 +138,13 @@ export function CustomerArchiveProfile({ customer, editable, onSaved }: Props) {
     </form>;
   }
 
-  return <div className="space-y-4">
-    <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-bold">客户档案</h2><p className="text-sm text-slate-500">客户档案表字段</p></div>{editable && <button type="button" onClick={() => setEditing(true)} className="rounded border border-blue-600 px-4 py-2 font-semibold text-blue-700">编辑客户档案</button>}</div>
-    <div className="grid gap-4 xl:grid-cols-2">
-      <Section title="基础信息"><dl className="mt-3 grid gap-x-5 gap-y-3 sm:grid-cols-2"><dt>获得客户时间</dt><dd><Value value={dateInput(customer.customer_acquired_at)} /></dd><dt>来源</dt><dd><Value value={customer.source} /></dd><dt>客户名</dt><dd><Value value={customer.contact_name} /></dd><dt>公司名</dt><dd><Value value={customer.company_name} /></dd><dt>职位</dt><dd><Value value={customer.position} /></dd><dt>国家</dt><dd><Value value={customer.country} /></dd></dl></Section>
-      <Section title="联系方式"><dl className="mt-3 grid gap-x-5 gap-y-3 sm:grid-cols-2"><dt>WhatsApp</dt><dd><Value value={customer.whatsapp} /></dd><dt>邮箱</dt><dd className="break-all"><Value value={customer.email} /></dd><dt>电话</dt><dd><Value value={customer.phone} /></dd></dl></Section>
-      <Section title="业务与评分"><dl className="mt-3 grid gap-x-5 gap-y-3 sm:grid-cols-2"><dt>客户类型</dt><dd><Value value={customer.customer_type} /></dd><dt>兴趣产品</dt><dd><Value value={customer.interested_product} /></dd><dt>客户等级</dt><dd><Value value={customer.customer_level_value} /></dd><dt>客户体量</dt><dd><Value value={customer.customer_size} /></dd><dt>客户总分</dt><dd><Value value={customer.customer_total_score} /></dd><dt>跟进阶段</dt><dd><Value value={customer.followup_stage} /></dd></dl></Section>
-      <Section title="跟进状态"><dl className="mt-3 grid gap-x-5 gap-y-3 sm:grid-cols-2"><dt>自动阶段判断</dt><dd><Value value={customer.automatic_stage_judgement} /></dd><dt>最近跟进日期</dt><dd><Value value={dateInput(customer.latest_followup_date)} /></dd></dl></Section>
+  return <div className="space-y-3">
+    <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-bold">客户档案</h2><p className="text-sm text-slate-500">核心资料与联系方式</p></div>{showEditAction && editable && <button type="button" onClick={() => setEditing(true)} className="rounded border border-blue-600 px-3 py-1.5 text-sm font-semibold text-blue-700">编辑客户档案</button>}</div>
+    <div className="grid gap-3 xl:grid-cols-3">
+      <Section title="基础信息"><dl className="mt-3 grid gap-x-4 gap-y-2 text-sm sm:grid-cols-2"><dt>获得客户时间</dt><dd><Value value={dateInput(customer.customer_acquired_at)} /></dd><dt>来源</dt><dd><Value value={customer.source} /></dd><dt>来源平台</dt><dd><Value value={customer.source_platform} /></dd><dt>客户名</dt><dd><Value value={customer.contact_name} /></dd><dt>职位</dt><dd><Value value={customer.position} /></dd><dt>国家</dt><dd><Value value={customer.country} /></dd></dl></Section>
+      <Section title="联系方式"><dl className="mt-3 grid gap-x-4 gap-y-2 text-sm sm:grid-cols-2"><dt>WhatsApp</dt><dd><Value value={customer.whatsapp} /></dd><dt>邮箱</dt><dd className="break-all"><Value value={customer.email} /></dd><dt>电话</dt><dd><Value value={customer.phone} /></dd><dt>网站</dt><dd className="break-all"><Value value={customer.website} /></dd></dl></Section>
+      <Section title="业务信息"><dl className="mt-3 grid gap-x-4 gap-y-2 text-sm sm:grid-cols-2"><dt>客户分类</dt><dd><Value value={customer.category?.name} /></dd><dt>客户类型</dt><dd><Value value={customer.customer_type} /></dd><dt>兴趣产品</dt><dd><Value value={customer.interested_product} /></dd><dt>客户等级</dt><dd><Value value={customer.customer_level_value} /></dd><dt>客户体量</dt><dd><Value value={customer.customer_size} /></dd><dt>客户总分</dt><dd><Value value={customer.customer_total_score} /></dd><dt>跟进阶段</dt><dd><Value value={customer.followup_stage} /></dd><dt>最近跟进</dt><dd><Value value={dateInput(customer.latest_followup_date)} /></dd></dl></Section>
+      <div className="xl:col-span-3"><Section title="备注"><p className="mt-2 whitespace-pre-wrap text-sm"><Value value={customer.notes} /></p></Section></div>
     </div>
-    <Section title="备注"><p className="mt-3 whitespace-pre-wrap text-sm"><Value value={customer.notes} /></p></Section>
   </div>;
 }
