@@ -29,6 +29,7 @@ from app.models.quotation import Quotation, QuotationItem, QuotationStatus, Quot
 from app.models.order import Order, OrderPaymentStatus, OrderProductionStatus, OrderShippingStatus
 from app.models.system_setting import SystemSetting
 from app.models.task import Task
+from app.models.sales_goal import AnnualSalesTarget, OtherSalesAmount
 from app.models.user import User, UserRole
 
 __all__ = [
@@ -43,4 +44,5 @@ __all__ = [
     "Order", "OrderPaymentStatus", "OrderProductionStatus", "OrderShippingStatus",
     "SystemSetting",
     "Task",
+    "AnnualSalesTarget", "OtherSalesAmount",
 ]

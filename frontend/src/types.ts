@@ -90,6 +90,10 @@ export interface DashboardTask {
   customer_id: number | null; customer_name: string | null; created_by_id: number;
   created_at: string; completed_at: string | null;
 }
+export interface SalesTargetPeriod { key: "month" | "quarter" | "half_year" | "year"; label: string; actual_amount: string; target_amount: string; completion_percent: string | null; remaining_amount: string; }
+export interface SalesCurrencyBreakdown { currency: string; crm_order_amount: string; manual_amount: string; actual_amount: string; }
+export interface SalesTargetProgress { year: number; currency: string; annual_target: { target_year: number; currency: string; target_amount: string } | null; periods: SalesTargetPeriod[]; annual_analysis: { crm_order_amount: string; manual_amount: string; actual_total_amount: string; completion_percent: string | null; time_progress_percent: string; pace_percent: string | null; pace_label: string; remaining_amount: string; monthly_required_amount: string; }; currency_breakdown: SalesCurrencyBreakdown[]; }
+export interface OtherSalesAmount { id: number; sale_date: string; amount: string; currency: string; note: string; created_at: string; }
 
 export interface User { id: number; name: string; email: string; role: UserRole; created_at: string; updated_at: string; }
 export interface Customer {

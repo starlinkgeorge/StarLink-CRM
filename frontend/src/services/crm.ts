@@ -1,5 +1,5 @@
 import api from "./api";
-import type { AlibabaInquiryResult, AlibabaIntegrationStatus, AnalyticsPeriod, BusinessAnalyticsOverview, CalculatedFollowupReminderStatus, Customer, CustomerActivity, CustomerCategory, CustomerCenter, CustomerDetail, CustomerFollowupReminderPage, CustomerPage, CustomerScoreHistory, DashboardStats, DashboardTask, FollowUp, FollowUpAttachment, Inquiry, InquiryConversion, InquiryPage, InquiryStatus, OpportunityDealPipeline, OpportunityDealStage, OpportunityDetail, OpportunityListItem, OpportunityPage, OpportunityPipeline, OpportunitySalesStage, OpportunityStage, Order, OrderPage, OrderProfitAnalytics, OrderProfitPeriod, Product, ProductCategory, ProductPage, QuotationDetail, QuotationPage, QuotationStatus, SystemSettings, Tag, TaskPriority, WonOrderBackfillPreview, WonOrderBackfillResult } from "../types";
+import type { AlibabaInquiryResult, AlibabaIntegrationStatus, AnalyticsPeriod, BusinessAnalyticsOverview, CalculatedFollowupReminderStatus, Customer, CustomerActivity, CustomerCategory, CustomerCenter, CustomerDetail, CustomerFollowupReminderPage, CustomerPage, CustomerScoreHistory, DashboardStats, DashboardTask, FollowUp, FollowUpAttachment, Inquiry, InquiryConversion, InquiryPage, InquiryStatus, OpportunityDealPipeline, OpportunityDealStage, OpportunityDetail, OpportunityListItem, OpportunityPage, OpportunityPipeline, OpportunitySalesStage, OpportunityStage, Order, OrderPage, OrderProfitAnalytics, OrderProfitPeriod, OtherSalesAmount, Product, ProductCategory, ProductPage, QuotationDetail, QuotationPage, QuotationStatus, SalesTargetProgress, SystemSettings, Tag, TaskPriority, WonOrderBackfillPreview, WonOrderBackfillResult } from "../types";
 
 export type CustomerCreatePayload = {
   company_name: string; contact_name?: string; country?: string; email?: string; phone?: string;
@@ -19,6 +19,12 @@ export const getDashboardTasks = async () => (await api.get<DashboardTask[]>("/d
 export const createDashboardTask = async (data: { title: string; due_date: string; priority: TaskPriority; customer_id?: number }) => (await api.post<DashboardTask>("/dashboard/tasks", data)).data;
 export const completeDashboardTask = async (id: number) => (await api.post<DashboardTask>(`/dashboard/tasks/${id}/complete`)).data;
 export const deleteDashboardTask = async (id: number) => { await api.delete(`/dashboard/tasks/${id}`); };
+export const getSalesTargetProgress = async () => (await api.get<SalesTargetProgress>("/dashboard/sales-target-progress")).data;
+export const updateSalesTarget = async (year: number, target_amount: string) => (await api.put(`/dashboard/sales-targets/${year}`, { target_amount })).data;
+export const getOtherSales = async (year: number) => (await api.get<OtherSalesAmount[]>("/dashboard/other-sales", { params: { year } })).data;
+export const createOtherSale = async (data: { sale_date: string; amount: string; currency: string; note: string }) => (await api.post<OtherSalesAmount>("/dashboard/other-sales", data)).data;
+export const updateOtherSale = async (id: number, data: { sale_date: string; amount: string; currency: string; note: string }) => (await api.put<OtherSalesAmount>(`/dashboard/other-sales/${id}`, data)).data;
+export const deleteOtherSale = async (id: number) => { await api.delete(`/dashboard/other-sales/${id}`); };
 export const getBusinessAnalytics = async (params: { period: AnalyticsPeriod; start_date?: string; end_date?: string }) => (
   await api.get<BusinessAnalyticsOverview>("/analytics/overview", { params })
 ).data;
