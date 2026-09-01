@@ -1,5 +1,5 @@
 import api from "./api";
-import type { AlibabaInquiryResult, AlibabaIntegrationStatus, AnalyticsPeriod, BusinessAnalyticsOverview, CalculatedFollowupReminderStatus, Customer, CustomerActivity, CustomerCategory, CustomerCenter, CustomerDetail, CustomerFollowupReminderPage, CustomerPage, CustomerScoreHistory, DashboardStats, DashboardTask, FollowUp, FollowUpAttachment, OpportunityDealStage, OpportunityDetail, OpportunityListItem, OpportunityPage, OpportunitySalesStage, OpportunityStage, Order, OrderPage, OrderProfitAnalytics, OrderProfitPeriod, OtherSalesAmount, Product, ProductCategory, ProductPage, QuotationDetail, QuotationPage, QuotationStatus, SalesTargetProgress, SystemSettings, Tag, TaskPriority, WonOrderBackfillPreview, WonOrderBackfillResult } from "../types";
+import type { AlibabaInquiryResult, AlibabaIntegrationStatus, AnalyticsPeriod, BusinessAnalyticsOverview, CalculatedFollowupReminderStatus, Customer, CustomerActivity, CustomerCategory, CustomerCenter, CustomerDetail, CustomerFollowupReminderPage, CustomerPage, CustomerScoreHistory, DashboardStats, DashboardTask, FollowUp, FollowUpAttachment, MailMessage, MailMessagePage, OpportunityDealStage, OpportunityDetail, OpportunityListItem, OpportunityPage, OpportunitySalesStage, OpportunityStage, Order, OrderPage, OrderProfitAnalytics, OrderProfitPeriod, OtherSalesAmount, Product, ProductCategory, ProductPage, QuotationDetail, QuotationPage, QuotationStatus, SalesTargetProgress, SystemSettings, Tag, TaskPriority, WonOrderBackfillPreview, WonOrderBackfillResult } from "../types";
 
 export type CustomerCreatePayload = {
   company_name: string; contact_name?: string; country?: string; email?: string; phone?: string;
@@ -13,6 +13,16 @@ export type CustomerCreatePayload = {
 };
 
 export const getDashboardStats = async () => (await api.get<DashboardStats>("/dashboard/stats")).data;
+export const getMailMessages = async (params: { folder?: "inbox" | "sent" | "all"; customer_id?: number; query?: string; limit?: number; offset?: number } = {}) => (await api.get<MailMessagePage>("/mail/messages", { params })).data;
+export const getMailMessage = async (id: number) => (await api.get<MailMessage>(`/mail/messages/${id}`)).data;
+export const syncMail = async () => (await api.post<{ imported: number; skipped: number; folders: string[] }>("/mail/sync")).data;
+export const sendMail = async (data: { to_emails: string; subject: string; body: string; customer_id?: number; reply_to_id?: number; files?: File[] }) => {
+  const form = new FormData(); form.append("to_emails", data.to_emails); form.append("subject", data.subject); form.append("body", data.body);
+  if (data.customer_id) form.append("customer_id", String(data.customer_id)); if (data.reply_to_id) form.append("reply_to_id", String(data.reply_to_id));
+  data.files?.forEach((file) => form.append("files", file));
+  return (await api.post<MailMessage>("/mail/send", form)).data;
+};
+export const downloadMailAttachment = async (messageId: number, attachmentId: number) => (await api.get<Blob>(`/mail/messages/${messageId}/attachments/${attachmentId}`, { responseType: "blob" })).data;
 export const getSystemSettings = async () => (await api.get<SystemSettings>("/settings")).data;
 export const updateSystemSettings = async (data: SystemSettings) => (await api.put<SystemSettings>("/settings", data)).data;
 export const getDashboardTasks = async () => (await api.get<DashboardTask[]>("/dashboard/tasks/today")).data;

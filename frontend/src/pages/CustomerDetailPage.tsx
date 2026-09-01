@@ -10,12 +10,13 @@ import {
   deleteFollowupAttachment,
   downloadFollowupAttachment,
   getCustomerCenter,
+  getMailMessages,
   getOrders,
   updateFollowup,
   uploadFollowupAttachment,
 } from "../services/crm";
 import { useAuth } from "../store/auth";
-import type { CustomerActivity, CustomerCenter, CustomerStatus, FollowUp, FollowUpType, OpportunityDealStage, OpportunityListItem, Order, QuotationListItem, QuotationStatus } from "../types";
+import type { CustomerActivity, CustomerCenter, CustomerStatus, FollowUp, FollowUpType, MailMessage, OpportunityDealStage, OpportunityListItem, Order, QuotationListItem, QuotationStatus } from "../types";
 
 const stageText: Record<CustomerStatus, string> = {
   Lead: "新线索",
@@ -32,7 +33,7 @@ const opportunityStageText: Record<OpportunityDealStage, string> = {
 const quotationStatusText: Record<QuotationStatus, string> = {
   Draft: "草稿", Sent: "已发送", Accepted: "已接受", Rejected: "已拒绝", Expired: "已过期",
 };
-type DetailTab = "followups" | "opportunities" | "quotations" | "orders" | "contacts" | "attachments";
+type DetailTab = "followups" | "opportunities" | "quotations" | "orders" | "contacts" | "attachments" | "emails";
 
 function localDateString() {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -124,21 +125,24 @@ export function CustomerDetailPage() {
   const [saving, setSaving] = useState(false);
   const [creatingQuotation, setCreatingQuotation] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [emails, setEmails] = useState<MailMessage[]>([]);
   const [activeTab, setActiveTab] = useState<DetailTab>("followups");
   const [profileEditRequest, setProfileEditRequest] = useState(0);
 
   const load = useCallback(async () => {
     if (!id) return;
     try {
-      const [center, orderPage] = await Promise.all([
+      const [center, orderPage, mailPage] = await Promise.all([
         getCustomerCenter(id),
         getOrders({ limit: 20, offset: 0, customer_id: Number(id) }),
+        getMailMessages({ customer_id: Number(id), folder: "all", limit: 100 }),
       ]);
       setCustomer(center);
       setTimeline(center.activities);
       setOpportunities(center.opportunities);
       setQuotations(center.quotations);
       setOrders(orderPage.items);
+      setEmails(mailPage.items);
       setError("");
     } catch {
       setError("无法加载客户详情。");
@@ -269,6 +273,7 @@ export function CustomerDetailPage() {
     { id: "orders", label: "订单", count: orders.length },
     { id: "contacts", label: "联系人", count: customer.contacts.length },
     { id: "attachments", label: "附件", count: attachments.length },
+    { id: "emails", label: "邮件", count: emails.length },
   ];
 
   return (
@@ -388,6 +393,7 @@ export function CustomerDetailPage() {
           {activeTab === "orders" && <><div className="flex items-center justify-between gap-3"><div><h3 className="font-bold">订单</h3><p className="mt-1 text-sm text-slate-500">订单、履约状态和订单利润统一在订单管理中维护。</p></div><Link to={`/orders?customer_id=${customer.id}`} className="text-sm text-blue-700">查看全部 →</Link></div><div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{orders.map((order) => <Link key={order.id} to={`/orders/${order.id}`} className="rounded-lg bg-slate-50 p-3 hover:bg-blue-50"><div className="flex items-center justify-between gap-2"><strong>{order.order_no}</strong><span className="text-sm text-slate-600">{order.currency} {order.order_amount}</span></div><p className="mt-2 text-sm text-slate-600">{order.order_date} · {order.payment_status}</p><p className="mt-1 text-sm">{order.profit_accounting_status === "Pending" ? "利润：待核算" : `利润：¥${order.profit}`}</p></Link>)}{!orders.length && <p className="text-sm text-slate-500">该客户暂无订单。</p>}</div></>}
           {activeTab === "contacts" && <><h3 className="font-bold">联系人</h3><div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{customer.contacts.length ? customer.contacts.map((contact) => <div key={contact.id} className="rounded-lg bg-slate-50 p-3 text-sm"><p className="font-semibold">{contact.name}</p><p className="text-slate-500">{contact.position ?? "未填写职位"}</p><p className="mt-1 text-slate-600">{contact.email ?? "未填写邮箱"}</p><p className="text-slate-600">{contact.phone ?? contact.whatsapp ?? "未填写电话"}</p></div>) : <p className="text-sm text-slate-500">暂无其他联系人。</p>}</div></>}
           {activeTab === "attachments" && <><div className="flex items-center justify-between gap-3"><div><h3 className="font-bold">客户附件</h3><p className="mt-1 text-sm text-slate-500">来自跟进记录的文件。</p></div><span className="text-sm text-slate-500">共 {attachments.length} 个</span></div><div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{attachments.map(({ attachment, followup }) => <article key={attachment.id} className="rounded-lg bg-slate-50 p-3 text-sm"><button type="button" onClick={() => void openFollowupFile(followup.id, attachment.id)} className="font-medium text-blue-700">{attachment.file_name}</button><p className="mt-1 text-slate-500">{followup.type} · {followup.followup_date}</p><p className="text-xs text-slate-500">{Math.ceil(attachment.size_bytes / 1024)} KB · {new Date(attachment.created_at).toLocaleString()}</p></article>)}{!attachments.length && <p className="text-sm text-slate-500">暂无客户附件。</p>}</div></>}
+          {activeTab === "emails" && <><div className="flex items-center justify-between"><div><h3 className="font-bold">邮件</h3><p className="mt-1 text-sm text-slate-500">已自动匹配到该客户的邮件往来。</p></div><Link to="/mail" className="text-sm text-blue-700">打开邮件中心 →</Link></div><div className="mt-4 space-y-2">{emails.map((message) => <Link key={message.id} to="/mail" className="block rounded-lg bg-slate-50 p-3 hover:bg-blue-50"><div className="flex flex-wrap justify-between gap-2"><strong>{message.subject || "(无主题)"}</strong><span className="text-xs text-slate-500">{message.sent_at ? new Date(message.sent_at).toLocaleString() : "—"}</span></div><p className="mt-1 text-sm text-slate-600">{message.direction === "incoming" ? `发件人：${message.from_email}` : `收件人：${message.to_emails.join(", ")}`}</p><p className="mt-1 truncate text-sm text-slate-500">{message.body_text || "无正文"}</p></Link>)}{!emails.length && <p className="text-sm text-slate-500">该客户暂无已关联邮件。</p>}</div></>}
         </div>
       </section>
     </>

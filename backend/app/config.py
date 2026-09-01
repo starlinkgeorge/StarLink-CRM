@@ -39,6 +39,14 @@ def get_settings() -> dict[str, str]:
         ),
         "file_storage_backend": getenv("FILE_STORAGE_BACKEND", "local").strip().lower(),
         "blob_read_write_token": getenv("BLOB_READ_WRITE_TOKEN", ""),
+        # QQ/Foxmail access credentials are intentionally environment-only.
+        "mail_imap_host": getenv("MAIL_IMAP_HOST", "imap.qq.com").strip(),
+        "mail_imap_port": getenv("MAIL_IMAP_PORT", "993").strip(),
+        "mail_imap_sent_folder": getenv("MAIL_IMAP_SENT_FOLDER", "Sent Messages").strip(),
+        "mail_smtp_host": getenv("MAIL_SMTP_HOST", "smtp.qq.com").strip(),
+        "mail_smtp_port": getenv("MAIL_SMTP_PORT", "465").strip(),
+        "mail_username": getenv("MAIL_USERNAME", "").strip(),
+        "mail_auth_code": getenv("MAIL_AUTH_CODE", ""),
         "product_image_base_url": getenv("PRODUCT_IMAGE_BASE_URL", "").strip().rstrip("/"),
         # Public business contact details have safe defaults so quotation exports
         # stay customer-ready when a deployment omits optional contact variables.

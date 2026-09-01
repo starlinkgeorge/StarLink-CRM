@@ -7,6 +7,7 @@ const navItems = [
   ["/analytics", "经营分析"],
   ["/customers", "客户管理"],
   ["/followup-reminders", "跟进提醒"],
+  ["/mail", "邮件中心"],
   ["/opportunities", "商机管理"],
   ["/products", "产品库"],
   ["/quotations", "报价管理"],

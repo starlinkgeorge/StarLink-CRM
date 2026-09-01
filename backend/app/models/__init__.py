@@ -29,6 +29,7 @@ from app.models.order import Order, OrderPaymentStatus, OrderProductionStatus, O
 from app.models.system_setting import SystemSetting
 from app.models.task import Task
 from app.models.sales_goal import AnnualSalesTarget, OtherSalesAmount
+from app.models.mail import EmailAttachment, EmailMessage
 from app.models.user import User, UserRole
 
 __all__ = [
@@ -44,4 +45,5 @@ __all__ = [
     "SystemSetting",
     "Task",
     "AnnualSalesTarget", "OtherSalesAmount",
+    "EmailAttachment", "EmailMessage",
 ]
