@@ -4,23 +4,18 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { CustomerArchiveProfile } from "../components/CustomerArchiveProfile";
 import {
-  assignTag,
   createQuotation,
   createFollowup,
-  createTag,
   deleteFollowup,
   deleteFollowupAttachment,
   downloadFollowupAttachment,
   getCustomerCenter,
   getOrders,
-  getTags,
-  removeTag,
   updateFollowup,
-  updateCustomerScore,
   uploadFollowupAttachment,
 } from "../services/crm";
 import { useAuth } from "../store/auth";
-import type { CustomerActivity, CustomerCenter, CustomerScoreHistory, CustomerStatus, FollowUp, FollowUpType, OpportunityDealStage, OpportunityListItem, Order, QuotationListItem, QuotationStatus, Tag } from "../types";
+import type { CustomerActivity, CustomerCenter, CustomerStatus, FollowUp, FollowUpType, OpportunityDealStage, OpportunityListItem, Order, QuotationListItem, QuotationStatus } from "../types";
 
 const stageText: Record<CustomerStatus, string> = {
   Lead: "新线索",
@@ -117,8 +112,6 @@ export function CustomerDetailPage() {
   const [timeline, setTimeline] = useState<CustomerActivity[]>([]);
   const [opportunities, setOpportunities] = useState<OpportunityListItem[]>([]);
   const [quotations, setQuotations] = useState<QuotationListItem[]>([]);
-  const [tags, setTags] = useState<Tag[]>([]);
-  const [scoreHistory, setScoreHistory] = useState<CustomerScoreHistory[]>([]);
   const [error, setError] = useState("");
   const [content, setContent] = useState("");
   const [type, setType] = useState<FollowUpType>("Email");
@@ -128,10 +121,6 @@ export function CustomerDetailPage() {
   const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
   const [attachmentInputKey, setAttachmentInputKey] = useState(0);
   const [editingFollowupId, setEditingFollowupId] = useState<number | null>(null);
-  const [tagId, setTagId] = useState("");
-  const [newTag, setNewTag] = useState("");
-  const [scoreInput, setScoreInput] = useState("");
-  const [scoreReason, setScoreReason] = useState("");
   const [saving, setSaving] = useState(false);
   const [creatingQuotation, setCreatingQuotation] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -149,8 +138,6 @@ export function CustomerDetailPage() {
       setTimeline(center.activities);
       setOpportunities(center.opportunities);
       setQuotations(center.quotations);
-      setScoreHistory(center.score_history);
-      setScoreInput(String(center.customer_score));
       setOrders(orderPage.items);
       setError("");
     } catch {
@@ -160,7 +147,6 @@ export function CustomerDetailPage() {
 
   useEffect(() => {
     void load();
-    getTags().then(setTags).catch(() => undefined);
   }, [load]);
 
   const editable = user?.role !== "Viewer";
@@ -255,46 +241,6 @@ export function CustomerDetailPage() {
     }
   }
 
-  async function saveScore(event: FormEvent) {
-    event.preventDefault();
-    if (!customer || scoreInput === "") return;
-    const score = Number(scoreInput);
-    if (!Number.isInteger(score) || score < 0 || score > 100) {
-      setError("评分必须是 0 到 100 的整数。");
-      return;
-    }
-    setSaving(true);
-    try {
-      await updateCustomerScore(customer.id, { score, reason: scoreReason.trim() || undefined });
-      setScoreReason("");
-      await load();
-    } catch (err) {
-      setError(axios.isAxiosError(err) ? err.response?.data?.detail ?? "无法保存客户评分。" : "无法保存客户评分。");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function addTag(event: FormEvent) {
-    event.preventDefault();
-    if (!customer) return;
-    try {
-      let selected = tagId ? tags.find((tag) => tag.id === Number(tagId)) : undefined;
-      if (!selected && newTag.trim()) {
-        selected = await createTag(newTag.trim());
-        setTags(await getTags());
-        setNewTag("");
-      }
-      if (selected) {
-        await assignTag(customer.id, selected.id);
-        setTagId("");
-        await load();
-      }
-    } catch {
-      setError("无法添加标签。");
-    }
-  }
-
   async function createCustomerQuotation() {
     if (!customer || !editable || creatingQuotation) return;
     setCreatingQuotation(true);
@@ -359,17 +305,7 @@ export function CustomerDetailPage() {
         <CustomerArchiveProfile customer={customer} editable={editable} onSaved={load} editRequest={profileEditRequest} showEditAction={false} />
       </section>
 
-      <section className="mt-3 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,0.8fr)]">
-          <div>
-            <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-semibold">客户评分</h3><span className="text-sm text-slate-600">{customer.customer_score} / 100（{customer.level}）</span></div>
-            {editable && <form onSubmit={saveScore} className="mt-2 flex flex-wrap gap-2"><input type="number" min="0" max="100" value={scoreInput} onChange={(event) => setScoreInput(event.target.value)} className="w-24 rounded border px-2 py-1 text-sm" /><input value={scoreReason} onChange={(event) => setScoreReason(event.target.value)} maxLength={500} placeholder="评分原因（可选）" className="min-w-48 flex-1 rounded border px-2 py-1 text-sm" /><button disabled={saving} className="rounded bg-blue-600 px-3 py-1 text-sm font-semibold text-white disabled:opacity-60">保存评分</button></form>}
-            {scoreHistory.length > 0 && <p className="mt-2 text-xs text-slate-500">最近评分：{scoreHistory.slice(0, 3).map((item) => `${item.new_score}分（${new Date(item.created_at).toLocaleDateString()}）`).join(" · ")}</p>}
-          </div>
-          <div className="border-t pt-3 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0"><h3 className="text-sm font-semibold">客户标签</h3><div className="mt-2 flex flex-wrap gap-2">{customer.tags.map((tag) => <span key={tag.id} className="rounded-full bg-blue-50 px-2 py-1 text-xs text-blue-700">{tag.name}{editable && <button type="button" aria-label={`移除标签 ${tag.name}`} onClick={() => void removeTag(customer.id, tag.id).then(load)} className="ml-1 text-blue-500">×</button>}</span>)}{!customer.tags.length && <span className="text-sm text-slate-500">暂未添加标签</span>}</div>{editable && <form onSubmit={addTag} className="mt-2 flex flex-wrap gap-2"><select value={tagId} onChange={(event) => setTagId(event.target.value)} className="rounded border px-2 py-1 text-sm"><option value="">选择已有标签</option>{tags.filter((tag) => !customer.tags.some((current) => current.id === tag.id)).map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}</select><input value={newTag} onChange={(event) => setNewTag(event.target.value)} placeholder="或新建标签" className="min-w-32 rounded border px-2 py-1 text-sm" /><button className="rounded border px-3 py-1 text-sm">添加</button></form>}</div>
-        </div>
-        {customer.original_inquiry && <details className="mt-3 border-t pt-3 text-sm"><summary className="cursor-pointer font-medium text-slate-700">原始询盘内容</summary><p className="mt-2 whitespace-pre-wrap text-slate-600">{customer.original_inquiry}</p></details>}
-      </section>
+      {customer.original_inquiry && <details className="mt-3 rounded-xl bg-white p-4 text-sm shadow-sm ring-1 ring-slate-200"><summary className="cursor-pointer font-medium text-slate-700">原始询盘内容</summary><p className="mt-2 whitespace-pre-wrap text-slate-600">{customer.original_inquiry}</p></details>}
 
       <section className="mt-4 overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
         <div className="flex overflow-x-auto border-b border-slate-200 px-2">
