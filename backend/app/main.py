@@ -10,7 +10,6 @@ from app.api import (
     dashboard,
     followups,
     followup_reminders,
-    inquiries,
     integrations,
     opportunities,
     orders,
@@ -49,7 +48,6 @@ app.include_router(tags.router, prefix=settings["api_prefix"])
 app.include_router(contacts.router, prefix=settings["api_prefix"])
 app.include_router(followups.router, prefix=settings["api_prefix"])
 app.include_router(followup_reminders.router, prefix=settings["api_prefix"])
-app.include_router(inquiries.router, prefix=settings["api_prefix"])
 app.include_router(integrations.router, prefix=settings["api_prefix"])
 app.include_router(opportunities.router, prefix=settings["api_prefix"])
 app.include_router(orders.router, prefix=settings["api_prefix"])

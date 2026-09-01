@@ -146,23 +146,3 @@ class OpportunityPage(BaseModel):
     total: int
     limit: int
     offset: int
-
-
-class OpportunityPipelineColumn(BaseModel):
-    sales_stage: OpportunitySalesStage
-    count: int
-    opportunities: list[OpportunityListItem]
-
-
-class OpportunityPipeline(BaseModel):
-    columns: list[OpportunityPipelineColumn]
-
-
-class OpportunityDealPipelineColumn(BaseModel):
-    deal_stage: OpportunityDealStage
-    count: int
-    opportunities: list[OpportunityListItem]
-
-
-class OpportunityDealPipeline(BaseModel):
-    columns: list[OpportunityDealPipelineColumn]

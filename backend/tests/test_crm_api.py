@@ -1863,14 +1863,6 @@ def test_v7_sales_pipeline_keeps_legacy_stage_compatible(client: TestClient) -> 
         ("Contacted", "Quotation Sent"),
     }
 
-    pipeline = client.get("/api/v1/opportunities/pipeline", headers=admin_token)
-    assert pipeline.status_code == 200
-    quotation_column = next(
-        item for item in pipeline.json()["columns"] if item["sales_stage"] == "Quotation Sent"
-    )
-    assert quotation_column["count"] == 1
-    assert quotation_column["opportunities"][0]["id"] == opportunity["id"]
-
     dashboard = client.get("/api/v1/dashboard/stats", headers=admin_token)
     assert dashboard.status_code == 200
     stats = dashboard.json()
@@ -1882,103 +1874,6 @@ def test_v7_sales_pipeline_keeps_legacy_stage_compatible(client: TestClient) -> 
     assert quotation_stage["count"] == 1
     assert Decimal(stats["opportunity_total_amounts"][0]["amount"]) == Decimal("4800.00")
     assert stats["pending_followup_customer_count"] == 0
-
-
-def test_v8_inquiry_lifecycle_conversion_and_dashboard(client: TestClient) -> None:
-    admin_token = login(client, "admin@example.com", "AdminPass123!")
-    created = client.post(
-        "/api/v1/inquiries",
-        json={
-            "company_name": "Bright Star Kindergarten",
-            "contact_name": "Alice Buyer",
-            "country": "United States",
-            "email": "alice@brightstar.example",
-            "whatsapp": "+1 202 555 0100",
-            "source": "Alibaba",
-            "source_platform": "Alibaba International",
-            "interested_product": "Montessori practical life furniture",
-            "inquiry_content": "Please quote for a new preschool classroom.",
-        },
-        headers=admin_token,
-    )
-    assert created.status_code == 201
-    inquiry = created.json()
-    assert inquiry["status"] == "New"
-    assert inquiry["source_platform"] == "Alibaba International"
-
-    listing = client.get(
-        "/api/v1/inquiries",
-        params={"q": "Bright Star", "source": "Alibaba", "status": "New"},
-        headers=admin_token,
-    )
-    assert listing.status_code == 200
-    assert listing.json()["total"] == 1
-
-    processing = client.put(
-        f"/api/v1/inquiries/{inquiry['id']}",
-        json={"status": "Processing"},
-        headers=admin_token,
-    )
-    assert processing.status_code == 200
-    assert processing.json()["status"] == "Processing"
-
-    before_conversion = client.get("/api/v1/dashboard/stats", headers=admin_token)
-    assert before_conversion.status_code == 200
-    assert before_conversion.json()["today_inquiry_count"] == 1
-    assert before_conversion.json()["pending_inquiry_count"] == 1
-    assert before_conversion.json()["inquiry_source_stats"] == [
-        {"source": "Alibaba", "count": 1}
-    ]
-
-    conversion = client.post(
-        f"/api/v1/inquiries/{inquiry['id']}/convert", headers=admin_token
-    )
-    assert conversion.status_code == 201
-    converted = conversion.json()
-    assert converted["inquiry"]["status"] == "Converted"
-    assert converted["customer"]["source"] == "Alibaba"
-    assert converted["customer"]["source_platform"] == "Alibaba International"
-    assert converted["customer"]["original_inquiry"] == (
-        "Please quote for a new preschool classroom."
-    )
-    assert converted["contact"]["name"] == "Alice Buyer"
-    assert converted["opportunity"]["stage"] == "Lead"
-    assert converted["opportunity"]["sales_stage"] == "New Lead"
-    assert converted["opportunity"]["inquiry_content"] == (
-        "Please quote for a new preschool classroom."
-    )
-
-    duplicate_conversion = client.post(
-        f"/api/v1/inquiries/{inquiry['id']}/convert", headers=admin_token
-    )
-    assert duplicate_conversion.status_code == 409
-
-    after_conversion = client.get("/api/v1/dashboard/stats", headers=admin_token)
-    assert after_conversion.status_code == 200
-    assert after_conversion.json()["pending_inquiry_count"] == 0
-
-    viewer = client.post(
-        "/api/v1/users",
-        json={
-            "name": "Inquiry Viewer",
-            "email": "inquiry-viewer@example.com",
-            "password": "ViewerPass123!",
-            "role": "Viewer",
-        },
-        headers=admin_token,
-    )
-    assert viewer.status_code == 201
-    viewer_token = login(client, "inquiry-viewer@example.com", "ViewerPass123!")
-    assert client.get("/api/v1/inquiries", headers=viewer_token).status_code == 200
-    assert client.post(
-        "/api/v1/inquiries",
-        json={
-            "company_name": "Viewer Cannot Create",
-            "contact_name": "Read Only",
-            "inquiry_content": "No permission.",
-        },
-        headers=viewer_token,
-    ).status_code == 403
 
 
 def test_v9_opportunity_deal_stage_workspace_and_legacy_compatibility(
@@ -2115,12 +2010,3 @@ def test_v9_opportunity_deal_stage_workspace_and_legacy_compatibility(
     )
     assert listing.status_code == 200
     assert listing.json()["total"] == 1
-    pipeline = client.get("/api/v1/opportunities/deal-pipeline", headers=admin_token)
-    assert pipeline.status_code == 200
-    negotiating = next(
-        column
-        for column in pipeline.json()["columns"]
-        if column["deal_stage"] == "Negotiating"
-    )
-    assert negotiating["count"] == 1
-    assert negotiating["opportunities"][0]["id"] == opportunity["id"]

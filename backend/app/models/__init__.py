@@ -13,7 +13,6 @@ from app.models.customer_classification import CustomerCategory, CustomerScoreHi
 from app.models.customer_activity import CustomerStatusHistory
 from app.models.auth import RefreshToken
 from app.models.followup import FollowUp, FollowUpAttachment, FollowUpType
-from app.models.inquiry import Inquiry, InquiryStatus
 from app.models.opportunity import (
     Opportunity,
     OpportunityDealStage,
@@ -35,7 +34,7 @@ from app.models.user import User, UserRole
 __all__ = [
     "Contact", "Customer", "CustomerFollowUpReminderStatus", "CustomerLevel", "CustomerStatus", "CustomerStatusHistory",
     "CustomerTag", "CustomerCategory", "CustomerScoreHistory", "FollowUp",
-    "FollowUpAttachment", "FollowUpType", "Inquiry", "InquiryStatus", "Opportunity",
+    "FollowUpAttachment", "FollowUpType", "Opportunity",
     "OpportunityDealStage", "OpportunityDealStageHistory", "OpportunityReminderStatus", "OpportunitySalesStage",
     "OpportunitySalesStageHistory", "OpportunityStage",
     "OpportunityStageHistory", "OpportunityProduct", "Product", "ProductCategory",

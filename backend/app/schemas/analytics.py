@@ -67,11 +67,6 @@ class AnalyticsQuotedProductItem(BaseModel):
     quotation_amounts: list[AnalyticsCurrencyAmount]
 
 
-class AnalyticsFunnelItem(BaseModel):
-    stage: str
-    count: int
-
-
 class AnalyticsFollowupSummary(BaseModel):
     created_followup_count: int
     overdue_count: int
@@ -99,6 +94,5 @@ class BusinessAnalyticsOverview(BaseModel):
     interested_product_analysis: list[AnalyticsBreakdownItem]
     customer_type_analysis: list[AnalyticsBreakdownItem]
     quoted_products: list[AnalyticsQuotedProductItem]
-    sales_funnel: list[AnalyticsFunnelItem]
     followup_summary: AnalyticsFollowupSummary
     order_profit: AnalyticsOrderProfit

@@ -127,22 +127,14 @@ export function OpportunitiesPage() {
           <p className="text-sm text-slate-500">销售机会管理</p>
           <h2 className="text-3xl font-bold">商机管理</h2>
         </div>
-        <div className="flex gap-3">
-          <Link
-            to="/pipeline"
-            className="rounded-lg border border-blue-600 px-4 py-2 font-semibold text-blue-700"
-          >
-            销售漏斗看板
-          </Link>
-          {user?.role !== "Viewer" && (
+        {user?.role !== "Viewer" && (
             <button
               onClick={() => setShowCreate(!showCreate)}
               className="rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white"
             >
               {showCreate ? "取消新增" : "新增商机"}
             </button>
-          )}
-        </div>
+        )}
       </div>
 
       {showCreate && (

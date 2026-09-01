@@ -8,7 +8,6 @@ from app.models.customer import Contact, Customer, CustomerLevel, CustomerStatus
 from app.models.customer_classification import CustomerCategory, CustomerScoreHistory
 from app.models.customer_activity import CustomerStatusHistory
 from app.models.followup import FollowUp, FollowUpAttachment
-from app.models.inquiry import Inquiry
 from app.models.opportunity import Opportunity
 from app.models.quotation import Quotation
 from app.models.user import User
@@ -291,10 +290,6 @@ def _customer_dependency_counts(session: Session, customer_id: int) -> dict[str,
             .where(FollowUp.customer_id == customer_id)
         )
         or 0,
-        "inquiries": session.scalar(
-            select(func.count()).select_from(Inquiry).where(Inquiry.customer_id == customer_id)
-        )
-        or 0,
         "status_history": session.scalar(
             select(func.count())
             .select_from(CustomerStatusHistory)
@@ -319,7 +314,6 @@ def delete_customer(session: Session, customer_id: int) -> None:
         "quotations": "quotation(s)",
         "followups": "follow-up record(s)",
         "attachments": "attachment(s)",
-        "inquiries": "inquir(y/ies)",
         "status_history": "customer status history record(s)",
         "score_history": "customer score history record(s)",
     }

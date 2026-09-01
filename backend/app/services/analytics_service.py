@@ -25,10 +25,6 @@ from app.models.order import Order
 from app.models.user import User, UserRole
 from app.schemas.analytics import AnalyticsPeriod
 from app.services.access_service import customer_scope
-from app.services.customer_followup_stage_service import (
-    MANUAL_FOLLOWUP_STAGES,
-    normalize_manual_followup_stage,
-)
 from app.services.followup_reminder_service import list_customer_followup_reminders, shanghai_today
 
 
@@ -429,28 +425,6 @@ def _quoted_products(session: Session, user: User, date_range: DateRange) -> lis
     return result
 
 
-def _sales_funnel(session: Session, user: User) -> list[dict[str, object]]:
-    rows = session.execute(
-        select(Customer.followup_stage, func.count(Customer.id))
-        .where(*_customer_filters(user))
-        .group_by(Customer.followup_stage)
-    ).all()
-    counts: dict[str, int] = {stage: 0 for stage in MANUAL_FOLLOWUP_STAGES}
-    counts[OTHER_HISTORICAL_STAGE] = 0
-    counts[UNSET_VALUE] = 0
-    for stored_value, count in rows:
-        if stored_value is None or not str(stored_value).strip():
-            counts[UNSET_VALUE] += count
-            continue
-        normalized = normalize_manual_followup_stage(str(stored_value))
-        if normalized in MANUAL_FOLLOWUP_STAGES:
-            counts[normalized] += count
-        else:
-            counts[OTHER_HISTORICAL_STAGE] += count
-    order = [*MANUAL_FOLLOWUP_STAGES, OTHER_HISTORICAL_STAGE, UNSET_VALUE]
-    return [{"stage": stage, "count": counts[stage]} for stage in order]
-
-
 def _trend_counts(session: Session, user: User, date_range: DateRange) -> list[dict[str, object]]:
     customer_rows = session.execute(
         select(Customer.customer_acquired_at, func.count(Customer.id))
@@ -582,7 +556,6 @@ def get_business_analytics(
             session, user, Customer.customer_type, date_range
         ),
         "quoted_products": _quoted_products(session, user, date_range),
-        "sales_funnel": _sales_funnel(session, user),
         "followup_summary": {
             "created_followup_count": followup_count,
             "overdue_count": followup_summary["overdue_count"],

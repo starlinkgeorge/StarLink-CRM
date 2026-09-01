@@ -5,11 +5,9 @@ import { useAuth } from "../store/auth";
 const navItems = [
   ["/", "仪表盘"],
   ["/analytics", "经营分析"],
-  ["/inquiries", "Alibaba 询盘"],
   ["/customers", "客户管理"],
   ["/followup-reminders", "跟进提醒"],
   ["/opportunities", "商机管理"],
-  ["/pipeline", "销售漏斗"],
   ["/products", "产品库"],
   ["/customer-classification", "客户分类/标签"],
   ["/quotations", "报价管理"],

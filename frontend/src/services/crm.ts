@@ -1,5 +1,5 @@
 import api from "./api";
-import type { AlibabaInquiryResult, AlibabaIntegrationStatus, AnalyticsPeriod, BusinessAnalyticsOverview, CalculatedFollowupReminderStatus, Customer, CustomerActivity, CustomerCategory, CustomerCenter, CustomerDetail, CustomerFollowupReminderPage, CustomerPage, CustomerScoreHistory, DashboardStats, DashboardTask, FollowUp, FollowUpAttachment, Inquiry, InquiryConversion, InquiryPage, InquiryStatus, OpportunityDealPipeline, OpportunityDealStage, OpportunityDetail, OpportunityListItem, OpportunityPage, OpportunityPipeline, OpportunitySalesStage, OpportunityStage, Order, OrderPage, OrderProfitAnalytics, OrderProfitPeriod, OtherSalesAmount, Product, ProductCategory, ProductPage, QuotationDetail, QuotationPage, QuotationStatus, SalesTargetProgress, SystemSettings, Tag, TaskPriority, WonOrderBackfillPreview, WonOrderBackfillResult } from "../types";
+import type { AlibabaInquiryResult, AlibabaIntegrationStatus, AnalyticsPeriod, BusinessAnalyticsOverview, CalculatedFollowupReminderStatus, Customer, CustomerActivity, CustomerCategory, CustomerCenter, CustomerDetail, CustomerFollowupReminderPage, CustomerPage, CustomerScoreHistory, DashboardStats, DashboardTask, FollowUp, FollowUpAttachment, OpportunityDealStage, OpportunityDetail, OpportunityListItem, OpportunityPage, OpportunitySalesStage, OpportunityStage, Order, OrderPage, OrderProfitAnalytics, OrderProfitPeriod, OtherSalesAmount, Product, ProductCategory, ProductPage, QuotationDetail, QuotationPage, QuotationStatus, SalesTargetProgress, SystemSettings, Tag, TaskPriority, WonOrderBackfillPreview, WonOrderBackfillResult } from "../types";
 
 export type CustomerCreatePayload = {
   company_name: string; contact_name?: string; country?: string; email?: string; phone?: string;
@@ -80,18 +80,6 @@ export const createCustomerCategory = async (data: { name: string; description?:
 export const updateCustomerCategory = async (id: number, data: Partial<{ name: string; description: string; color: string; sort_order: number; is_active: boolean }>) => (await api.put<CustomerCategory>(`/customer-categories/${id}`, data)).data;
 export const updateTag = async (id: number, data: Partial<{ name: string; description: string; color: string; is_active: boolean }>) => (await api.put<Tag>(`/tags/${id}`, data)).data;
 
-export type InquiryPayload = {
-  company_name: string; contact_name: string; country?: string; email?: string; phone?: string;
-  whatsapp?: string; source?: string; source_platform?: string; interested_product?: string;
-  inquiry_content: string; status?: InquiryStatus;
-};
-export type InquiryFilters = { limit: number; offset: number; q?: string; status?: string; source?: string; source_platform?: string };
-export const getInquiries = async (params: InquiryFilters) => (await api.get<InquiryPage>("/inquiries", { params })).data;
-export const getInquiry = async (id: string) => (await api.get<Inquiry>(`/inquiries/${id}`)).data;
-export const createInquiry = async (data: InquiryPayload) => (await api.post<Inquiry>("/inquiries", data)).data;
-export const updateInquiry = async (id: number, data: Partial<InquiryPayload>) => (await api.put<Inquiry>(`/inquiries/${id}`, data)).data;
-export const convertInquiry = async (id: number) => (await api.post<InquiryConversion>(`/inquiries/${id}/convert`)).data;
-
 export type AlibabaInquiryPayload = {
   company_name: string; contact_name: string; country?: string; email?: string; phone?: string;
   whatsapp?: string; inquiry_content?: string; interested_product?: string; source?: string;
@@ -112,8 +100,6 @@ export type OpportunityFilters = {
 };
 export const getOpportunities = async (params: OpportunityFilters) => (await api.get<OpportunityPage>("/opportunities", { params })).data;
 export const getOpportunity = async (id: string) => (await api.get<OpportunityDetail>(`/opportunities/${id}`)).data;
-export const getOpportunityPipeline = async () => (await api.get<OpportunityPipeline>("/opportunities/pipeline")).data;
-export const getOpportunityDealPipeline = async () => (await api.get<OpportunityDealPipeline>("/opportunities/deal-pipeline")).data;
 export const createOpportunity = async (data: OpportunityPayload) => (await api.post<OpportunityListItem>("/opportunities", data)).data;
 export const updateOpportunity = async (id: number, data: Partial<Omit<OpportunityPayload, "customer_id">>) => (await api.put<OpportunityDetail>(`/opportunities/${id}`, data)).data;
 export const deleteOpportunity = async (id: number) => { await api.delete(`/opportunities/${id}`); };

@@ -24,12 +24,8 @@ from app.models.quotation import Quotation, QuotationItem, QuotationStatus
 from app.models.user import User, UserRole
 from app.schemas.opportunity import (
     OpportunityCreate,
-    OpportunityDealPipeline,
-    OpportunityDealPipelineColumn,
     OpportunityDetail,
     OpportunityListItem,
-    OpportunityPipeline,
-    OpportunityPipelineColumn,
     OpportunityUpdate,
 )
 from app.schemas.order import (
@@ -953,7 +949,7 @@ def delete_opportunity(session: Session, opportunity_id: int, user: User) -> Non
     """Remove an opportunity without deleting the related commercial records.
 
     The database cascades the opportunity's own product lines and stage histories.
-    Foreign keys on quotations, follow-ups, and inquiries use ``SET NULL``, so
+    Foreign keys on quotations and follow-ups use ``SET NULL``, so
     deleting an erroneous sales project keeps those original records available.
     """
     _ensure_delete_access(user)
@@ -966,74 +962,6 @@ def delete_opportunity(session: Session, opportunity_id: int, user: User) -> Non
     except Exception:
         session.rollback()
         raise
-
-
-def get_sales_pipeline(session: Session, user: User) -> OpportunityPipeline:
-    """Return all visible opportunities grouped into stable Kanban columns."""
-    filters = []
-    if user.role is UserRole.SALES:
-        filters.append(Opportunity.owner_id == user.id)
-    opportunities = list(
-        session.scalars(
-            select(Opportunity)
-            .where(*filters)
-            .options(joinedload(Opportunity.customer), joinedload(Opportunity.owner))
-            .order_by(
-                Opportunity.expected_close_date.is_(None),
-                Opportunity.expected_close_date.asc(),
-                Opportunity.updated_at.desc(),
-            )
-        )
-    )
-    grouped: dict[OpportunitySalesStage, list[OpportunityListItem]] = {
-        sales_stage: [] for sales_stage in OpportunitySalesStage
-    }
-    for opportunity in opportunities:
-        grouped[_as_sales_stage(opportunity.sales_stage)].append(_list_item(opportunity))
-    return OpportunityPipeline(
-        columns=[
-            OpportunityPipelineColumn(
-                sales_stage=sales_stage,
-                count=len(grouped[sales_stage]),
-                opportunities=grouped[sales_stage],
-            )
-            for sales_stage in OpportunitySalesStage
-        ]
-    )
-
-
-def get_deal_pipeline(session: Session, user: User) -> OpportunityDealPipeline:
-    """Return the six V9 sales stages without changing the V7 pipeline endpoint."""
-    filters = []
-    if user.role is UserRole.SALES:
-        filters.append(Opportunity.owner_id == user.id)
-    opportunities = list(
-        session.scalars(
-            select(Opportunity)
-            .where(*filters)
-            .options(joinedload(Opportunity.customer), joinedload(Opportunity.owner))
-            .order_by(
-                Opportunity.expected_close_date.is_(None),
-                Opportunity.expected_close_date.asc(),
-                Opportunity.updated_at.desc(),
-            )
-        )
-    )
-    grouped: dict[OpportunityDealStage, list[OpportunityListItem]] = {
-        deal_stage: [] for deal_stage in OpportunityDealStage
-    }
-    for opportunity in opportunities:
-        grouped[_as_deal_stage(opportunity.deal_stage)].append(_list_item(opportunity))
-    return OpportunityDealPipeline(
-        columns=[
-            OpportunityDealPipelineColumn(
-                deal_stage=deal_stage,
-                count=len(grouped[deal_stage]),
-                opportunities=grouped[deal_stage],
-            )
-            for deal_stage in OpportunityDealStage
-        ]
-    )
 
 
 def replace_opportunity_products(

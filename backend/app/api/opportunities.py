@@ -8,10 +8,8 @@ from app.models.user import User
 from app.schemas.opportunity import (
     OpportunityCreate,
     OpportunityDetail,
-    OpportunityDealPipeline,
     OpportunityListItem,
     OpportunityPage,
-    OpportunityPipeline,
     OpportunityUpdate,
 )
 from app.schemas.product import OpportunityProductReplace
@@ -90,24 +88,6 @@ def create_opportunity(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(error)) from error
     except ConflictError as error:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
-
-
-@router.get("/pipeline", response_model=OpportunityPipeline)
-def get_sales_pipeline(
-    session: Session = Depends(get_db_session),
-    current_user: User = Depends(get_current_user),
-) -> OpportunityPipeline:
-    """Return the seven V7 sales stages as Kanban columns."""
-    return opportunity_service.get_sales_pipeline(session, current_user)
-
-
-@router.get("/deal-pipeline", response_model=OpportunityDealPipeline)
-def get_deal_pipeline(
-    session: Session = Depends(get_db_session),
-    current_user: User = Depends(get_current_user),
-) -> OpportunityDealPipeline:
-    """Return V9's six user-facing stages for the sales-process board."""
-    return opportunity_service.get_deal_pipeline(session, current_user)
 
 
 @router.get("/{opportunity_id}", response_model=OpportunityDetail)

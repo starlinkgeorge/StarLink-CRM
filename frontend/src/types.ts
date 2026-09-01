@@ -1,21 +1,11 @@
 export type UserRole = "Admin" | "Sales" | "Viewer";
 
-export type InquiryStatus = "New" | "Processing" | "Converted" | "Closed";
 export type OpportunityStage = "Lead" | "Qualified" | "Proposal" | "Negotiation" | "Won" | "Lost";
 export type OpportunitySalesStage = "New Lead" | "Contacted" | "Requirement Confirmed" | "Quotation Sent" | "Negotiation" | "Won" | "Lost";
 export type OpportunityDealStage = "New Inquiry" | "Contacted" | "Quoted" | "Negotiating" | "Won" | "Lost";
 export type OpportunityReminderStatus = "None" | "Quote Follow-up Due" | "Inactive";
 export type CustomerFollowUpReminderStatus = "None" | "Scheduled" | "Today" | "Overdue";
 export type CalculatedFollowupReminderStatus = "overdue" | "today" | "upcoming" | "not_needed" | "unfollowed" | "stage_unset" | "not_applicable";
-export interface Inquiry {
-  id: number; public_id: string; customer_id: number | null; converted_opportunity_id: number | null;
-  company_name: string; contact_name: string; country: string | null; email: string | null;
-  phone: string | null; whatsapp: string | null; source: string; source_platform: string;
-  interested_product: string | null; inquiry_content: string; status: InquiryStatus;
-  created_at: string; updated_at: string;
-}
-export interface InquiryPage { items: Inquiry[]; total: number; limit: number; offset: number; }
-export interface InquiryConversion { inquiry: Inquiry; customer: Customer; contact: Contact; opportunity: Opportunity; }
 export interface Opportunity {
   id: number; public_id: string; customer_id: number;
   owner_id: number | null; name: string; interested_product: string | null;
@@ -51,14 +41,6 @@ export interface OpportunityDetail extends OpportunityListItem {
   order_auto_created: boolean | null;
 }
 export interface OpportunityPage { items: OpportunityListItem[]; total: number; limit: number; offset: number; }
-export interface OpportunityPipelineColumn {
-  sales_stage: OpportunitySalesStage; count: number; opportunities: OpportunityListItem[];
-}
-export interface OpportunityPipeline { columns: OpportunityPipelineColumn[]; }
-export interface OpportunityDealPipelineColumn {
-  deal_stage: OpportunityDealStage; count: number; opportunities: OpportunityListItem[];
-}
-export interface OpportunityDealPipeline { columns: OpportunityDealPipelineColumn[]; }
 export interface AlibabaIntegrationStatus {
   provider: "Alibaba"; connected: boolean; mode: "simulation";
 }
@@ -162,8 +144,6 @@ export interface Tag {
 }
 export interface DashboardStats {
   customer_count: number; followup_count: number; new_customers_today: number; due_followups: number;
-  today_inquiry_count: number; pending_inquiry_count: number;
-  inquiry_source_stats: { source: string; count: number }[];
   today_followup_count: number; overdue_followup_count: number;
   pending_followup_customer_count: number;
   week_followup_count: number;
@@ -207,7 +187,6 @@ export interface AnalyticsQuotedProductItem {
   sku: string; product_name: string; quotation_count: number; total_quantity: string;
   quotation_amounts: AnalyticsCurrencyAmount[];
 }
-export interface AnalyticsFunnelItem { stage: string; count: number; }
 export interface AnalyticsFollowupSummary {
   created_followup_count: number; overdue_count: number; today_count: number;
   upcoming_count: number; unfollowed_count: number;
@@ -232,7 +211,7 @@ export interface BusinessAnalyticsOverview {
   trend: AnalyticsTrendPoint[]; source_analysis: AnalyticsBreakdownItem[];
   country_analysis: AnalyticsBreakdownItem[]; interested_product_analysis: AnalyticsBreakdownItem[];
   customer_type_analysis: AnalyticsBreakdownItem[]; quoted_products: AnalyticsQuotedProductItem[];
-  sales_funnel: AnalyticsFunnelItem[]; followup_summary: AnalyticsFollowupSummary;
+  followup_summary: AnalyticsFollowupSummary;
   order_profit: AnalyticsOrderProfit;
 }
 export interface CustomerFollowupReminderState {

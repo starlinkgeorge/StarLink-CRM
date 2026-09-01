@@ -5,7 +5,6 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.models.customer import Customer, CustomerStatus
 from app.models.followup import FollowUp
-from app.models.inquiry import Inquiry, InquiryStatus
 from app.models.opportunity import Opportunity, OpportunityReminderStatus, OpportunitySalesStage
 from app.models.user import User, UserRole
 from app.models.task import Task
@@ -92,11 +91,6 @@ def get_dashboard_stats(session: Session, user: User) -> dict:
     scope = customer_scope(user)
     if scope is not None:
         filters.append(scope)
-    inquiry_filters = []
-    if user.role is UserRole.SALES:
-        # Keep inquiry counts subject to exactly the same Sales ownership
-        # boundary as the inquiry list and detail APIs.
-        inquiry_filters.append(Inquiry.owner_id == user.id)
     customer_count = session.scalar(select(func.count()).select_from(Customer).where(*filters)) or 0
     followup_count = (
         session.scalar(
@@ -118,25 +112,6 @@ def get_dashboard_stats(session: Session, user: User) -> dict:
         .select_from(Customer)
         .where(*filters, func.date(Customer.created_at) == today)
     ) or 0
-    today_inquiry_count = session.scalar(
-        select(func.count())
-        .select_from(Inquiry)
-        .where(*inquiry_filters, func.date(Inquiry.created_at) == today)
-    ) or 0
-    pending_inquiry_count = session.scalar(
-        select(func.count())
-        .select_from(Inquiry)
-        .where(
-            *inquiry_filters,
-            Inquiry.status.in_((InquiryStatus.NEW.value, InquiryStatus.PROCESSING.value)),
-        )
-    ) or 0
-    inquiry_source_rows = session.execute(
-        select(Inquiry.source, func.count(Inquiry.id))
-        .where(*inquiry_filters)
-        .group_by(Inquiry.source)
-        .order_by(Inquiry.source.asc())
-    ).all()
     due_followups = session.scalar(
         select(func.count()).select_from(FollowUp).join(Customer).where(
             *filters,
@@ -273,11 +248,6 @@ def get_dashboard_stats(session: Session, user: User) -> dict:
         "customer_count": customer_count,
         "followup_count": followup_count,
         "new_customers_today": new_customers_today,
-        "today_inquiry_count": today_inquiry_count,
-        "pending_inquiry_count": pending_inquiry_count,
-        "inquiry_source_stats": [
-            {"source": source, "count": count} for source, count in inquiry_source_rows
-        ],
         "due_followups": due_followups,
         "today_followup_count": len(today_reminders),
         "overdue_followup_count": len(overdue_reminders),
