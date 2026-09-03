@@ -45,10 +45,16 @@ class QuotationOrderDefaultsSettings(BaseModel):
         return value.strip()
 
 
+class EmailSignatureSettings(BaseModel):
+    """One default signature now; JSON settings leave room for future profiles."""
+    html: str = Field(default="", max_length=20000)
+
+
 class SystemSettingsRead(BaseModel):
     followup_rules: FollowupRulesSettings
     company_profile: CompanyProfileSettings
     quotation_order_defaults: QuotationOrderDefaultsSettings
+    email_signature: EmailSignatureSettings = EmailSignatureSettings()
 
 
 class SystemSettingsUpdate(SystemSettingsRead):

@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -17,6 +17,7 @@ class EmailMessage(CreatedAtMixin, Base):
     created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), index=True)
     in_reply_to_id: Mapped[int | None] = mapped_column(ForeignKey("email_messages.id", ondelete="SET NULL"), index=True)
     forwarded_from_id: Mapped[int | None] = mapped_column(ForeignKey("email_messages.id", ondelete="SET NULL"), index=True)
+    mail_folder_id: Mapped[int | None] = mapped_column(ForeignKey("mail_folders.id", ondelete="SET NULL"), index=True)
     folder: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
     direction: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
     sync_key: Mapped[str] = mapped_column(String(512), nullable=False)
@@ -29,9 +30,15 @@ class EmailMessage(CreatedAtMixin, Base):
     to_display: Mapped[str] = mapped_column(Text, nullable=False, server_default="[]")
     cc_display: Mapped[str] = mapped_column(Text, nullable=False, server_default="[]")
     body_text: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
+    html_body: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
+    bcc_emails: Mapped[str] = mapped_column(Text, nullable=False, server_default="[]")
+    thread_key: Mapped[str | None] = mapped_column(String(512), index=True)
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
     has_attachments: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     is_read: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false", index=True)
+    is_starred: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"), index=True)
+    is_draft: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"), index=True)
+    is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"), index=True)
     tracking_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     tracking_token: Mapped[str | None] = mapped_column(String(128), unique=True, index=True)
     first_opened_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -39,6 +46,7 @@ class EmailMessage(CreatedAtMixin, Base):
     open_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
 
     customer: Mapped[Optional["Customer"]] = relationship()
+    mail_folder: Mapped[Optional["MailFolder"]] = relationship(back_populates="messages")
     attachments: Mapped[list["EmailAttachment"]] = relationship(back_populates="message", cascade="all, delete-orphan", order_by="EmailAttachment.id")
     open_events: Mapped[list["EmailOpenEvent"]] = relationship(back_populates="message", cascade="all, delete-orphan", order_by="EmailOpenEvent.id")
 
@@ -54,6 +62,21 @@ class EmailAttachment(CreatedAtMixin, Base):
     size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
 
     message: Mapped[EmailMessage] = relationship(back_populates="attachments")
+
+
+class MailFolder(CreatedAtMixin, Base):
+    """A CRM filing label which never changes a message's IMAP Inbox/Sent role."""
+
+    __tablename__ = "mail_folders"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(120), nullable=False, unique=True)
+    customer_id: Mapped[int | None] = mapped_column(ForeignKey("customers.id", ondelete="SET NULL"), index=True)
+    bound_addresses: Mapped[str] = mapped_column(Text, nullable=False, server_default="[]")
+    created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), index=True)
+
+    customer: Mapped[Optional["Customer"]] = relationship()
+    messages: Mapped[list[EmailMessage]] = relationship(back_populates="mail_folder")
 
 
 class EmailOpenEvent(Base):

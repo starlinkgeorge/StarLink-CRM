@@ -27,7 +27,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.config import get_settings
 from app.db.session import get_session_factory
 from app.models.customer import Contact, Customer
-from app.models.mail import EmailAttachment, EmailMessage as StoredEmailMessage, EmailOpenEvent, MailboxSyncState
+from app.models.mail import EmailAttachment, EmailMessage as StoredEmailMessage, EmailOpenEvent, MailFolder, MailboxSyncState
 from app.models.user import User, UserRole
 from app.services.errors import ConflictError, ForbiddenError, NotFoundError, StorageConfigurationError
 from app.services.storage_service import get_attachment_storage
@@ -46,6 +46,31 @@ class MailConfigurationError(Exception):
 
 class MailSyncInProgressError(ConflictError):
     pass
+
+
+def _json_addresses(values: list[str] | None) -> str:
+    return json.dumps(sorted({value.strip().lower() for value in values or [] if value and value.strip()}))
+
+
+def _safe_html(value: str | None) -> str:
+    """Keep a small business-email HTML subset; strip scriptable markup."""
+    source = value or ""
+    source = re.sub(r"(?is)<(script|style|iframe|object|embed).*?>.*?</\1>", "", source)
+    source = re.sub(r"(?i)\son\w+\s*=\s*(?:\"[^\"]*\"|'[^']*'|[^\s>]+)", "", source)
+    source = re.sub(r"(?i)\s(?:href|src)\s*=\s*(?:\"\s*javascript:[^\"]*\"|'\s*javascript:[^']*'|javascript:[^\s>]+)", "", source)
+    # Rich-text formatting is represented with safe legacy attributes such as
+    # ``font color`` and ``align``.  Arbitrary CSS is deliberately removed.
+    source = re.sub(r"(?i)\sstyle\s*=\s*(?:\"[^\"]*\"|'[^']*'|[^\s>]+)", "", source)
+    allowed = r"(?:a|b|strong|i|em|u|font|span|div|p|br|ul|ol|li|blockquote|h[1-6]|table|thead|tbody|tr|td|th)"
+    source = re.sub(rf"(?is)</?(?!{allowed}(?:\s|/?>))[^>]+>", "", source)
+    return source[:200000]
+
+
+def _thread_key(message) -> str | None:
+    """Use RFC threading headers only; no broad subject-only grouping."""
+    values = " ".join(_header(message.get(name)) for name in ("References", "In-Reply-To", "Message-ID"))
+    ids = re.findall(r"<[^<>\s]{1,500}>", values)
+    return ids[0] if ids else None
 
 
 def _settings() -> dict[str, str]:
@@ -132,6 +157,14 @@ def _body_text(message) -> str:
     return content.strip()[:100000]
 
 
+def _html_body(message) -> str:
+    html_part = next(
+        (part for part in message.walk() if part.get_content_type() == "text/html" and part.get_content_disposition() != "attachment"),
+        None,
+    )
+    return _safe_html(_part_text(html_part)) if html_part is not None else ""
+
+
 def _sent_at(message) -> datetime:
     try:
         value = parsedate_to_datetime(message.get("Date"))
@@ -160,6 +193,20 @@ def _find_customer(session: Session, addresses: list[str]) -> Customer | None:
         .order_by(Customer.id)
         .limit(1)
     )
+
+
+def _matching_mail_folder(session: Session, addresses: list[str]) -> MailFolder | None:
+    wanted = {address.strip().lower() for address in addresses if address}
+    if not wanted:
+        return None
+    for folder in session.scalars(select(MailFolder).order_by(MailFolder.id)):
+        try:
+            bound = {str(value).strip().lower() for value in json.loads(folder.bound_addresses)}
+        except (TypeError, json.JSONDecodeError):
+            continue
+        if wanted & bound:
+            return folder
+    return None
 
 
 def _load_message(session: Session, message_id: int) -> StoredEmailMessage:
@@ -194,18 +241,50 @@ def _query_for_user(session: Session, user: User):
     return statement
 
 
-def list_messages(session: Session, user: User, *, folder: str, customer_id: int | None, query: str | None, limit: int, offset: int) -> tuple[list[StoredEmailMessage], int]:
+def list_messages(session: Session, user: User, *, folder: str, customer_id: int | None, mail_folder_id: int | None, query: str | None, date_from: datetime | None, date_to: datetime | None, has_attachments: bool | None, is_read: bool | None, is_starred: bool | None, limit: int, offset: int) -> tuple[list[StoredEmailMessage], int]:
     statement = _query_for_user(session, user)
     count_statement = _query_for_user(session, user).with_only_columns(func.count(StoredEmailMessage.id)).order_by(None)
+    # Historical rows created before this migration can legitimately read as
+    # NULL on a partially upgraded database; treat them as active defaults.
+    active = StoredEmailMessage.is_deleted.is_not(True)
+    statement = statement.where(active)
+    count_statement = count_statement.where(active)
     if folder == "unread":
         statement = statement.where(StoredEmailMessage.direction == "incoming", StoredEmailMessage.is_read.is_(False))
         count_statement = count_statement.where(StoredEmailMessage.direction == "incoming", StoredEmailMessage.is_read.is_(False))
+    elif folder == "drafts":
+        statement = statement.where(StoredEmailMessage.is_draft.is_(True))
+        count_statement = count_statement.where(StoredEmailMessage.is_draft.is_(True))
+    elif folder == "starred":
+        statement = statement.where(StoredEmailMessage.is_starred)
+        count_statement = count_statement.where(StoredEmailMessage.is_starred)
     elif folder != "all":
+        not_draft = StoredEmailMessage.is_draft.is_not(True)
+        statement = statement.where(not_draft)
+        count_statement = count_statement.where(not_draft)
         statement = statement.where(StoredEmailMessage.folder == folder)
         count_statement = count_statement.where(StoredEmailMessage.folder == folder)
     if customer_id is not None:
         statement = statement.where(StoredEmailMessage.customer_id == customer_id)
         count_statement = count_statement.where(StoredEmailMessage.customer_id == customer_id)
+    if mail_folder_id is not None:
+        statement = statement.where(StoredEmailMessage.mail_folder_id == mail_folder_id)
+        count_statement = count_statement.where(StoredEmailMessage.mail_folder_id == mail_folder_id)
+    if date_from is not None:
+        statement = statement.where(StoredEmailMessage.sent_at >= date_from)
+        count_statement = count_statement.where(StoredEmailMessage.sent_at >= date_from)
+    if date_to is not None:
+        statement = statement.where(StoredEmailMessage.sent_at < date_to)
+        count_statement = count_statement.where(StoredEmailMessage.sent_at < date_to)
+    if has_attachments is not None:
+        statement = statement.where(StoredEmailMessage.has_attachments.is_(has_attachments))
+        count_statement = count_statement.where(StoredEmailMessage.has_attachments.is_(has_attachments))
+    if is_read is not None:
+        statement = statement.where(StoredEmailMessage.is_read.is_(is_read))
+        count_statement = count_statement.where(StoredEmailMessage.is_read.is_(is_read))
+    if is_starred is not None:
+        statement = statement.where(StoredEmailMessage.is_starred.is_(is_starred))
+        count_statement = count_statement.where(StoredEmailMessage.is_starred.is_(is_starred))
     if query:
         pattern = f"%{query.strip()}%"
         filter_clause = or_(
@@ -224,14 +303,99 @@ def list_messages(session: Session, user: User, *, folder: str, customer_id: int
 
 def folder_counts(session: Session, user: User) -> dict[str, int]:
     statement = _query_for_user(session, user).with_only_columns(
-        func.coalesce(func.sum(case((StoredEmailMessage.folder == "inbox", 1), else_=0)), 0).label("inbox"),
-        func.coalesce(func.sum(case((StoredEmailMessage.folder == "sent", 1), else_=0)), 0).label("sent"),
-        func.coalesce(func.sum(case((
-            (StoredEmailMessage.direction == "incoming") & (StoredEmailMessage.is_read.is_(False)), 1
-        ), else_=0)), 0).label("unread"),
+        func.coalesce(func.sum(case(((StoredEmailMessage.folder == "inbox") & (StoredEmailMessage.is_deleted.is_not(True)) & (StoredEmailMessage.is_draft.is_not(True)), 1), else_=0)), 0).label("inbox"),
+        func.coalesce(func.sum(case(((StoredEmailMessage.folder == "sent") & (StoredEmailMessage.is_deleted.is_not(True)) & (StoredEmailMessage.is_draft.is_not(True)), 1), else_=0)), 0).label("sent"),
+        func.coalesce(func.sum(case(((
+            (StoredEmailMessage.direction == "incoming")
+            & (StoredEmailMessage.is_read.is_(False))
+            & (StoredEmailMessage.is_deleted.is_not(True))
+        ), 1), else_=0)), 0).label("unread"),
+        func.coalesce(func.sum(case(((StoredEmailMessage.is_draft.is_(True)) & (StoredEmailMessage.is_deleted.is_not(True)), 1), else_=0)), 0).label("drafts"),
+        func.coalesce(func.sum(case(((StoredEmailMessage.is_starred.is_(True)) & (StoredEmailMessage.is_deleted.is_not(True)), 1), else_=0)), 0).label("starred"),
     )
     row = session.execute(statement).one()
-    return {"inbox": int(row.inbox), "sent": int(row.sent), "unread": int(row.unread)}
+    return {"inbox": int(row.inbox), "sent": int(row.sent), "unread": int(row.unread), "drafts": int(row.drafts), "starred": int(row.starred)}
+
+
+def list_custom_folders(session: Session, user: User) -> list[dict[str, object]]:
+    folder_query = select(MailFolder).order_by(MailFolder.name, MailFolder.id)
+    if user.role is UserRole.SALES:
+        folder_query = folder_query.where(MailFolder.created_by_id == user.id)
+    folders = list(session.scalars(folder_query))
+    result: list[dict[str, object]] = []
+    for folder in folders:
+        visible = _query_for_user(session, user).where(StoredEmailMessage.mail_folder_id == folder.id, StoredEmailMessage.is_deleted.is_not(True)).subquery()
+        count, unread = session.execute(select(func.count(visible.c.id), func.coalesce(func.sum(case(((visible.c.is_read.is_(False)) & (visible.c.direction == "incoming"), 1), else_=0)), 0))).one()
+        try:
+            addresses = json.loads(folder.bound_addresses)
+        except (TypeError, json.JSONDecodeError):
+            addresses = []
+        result.append({"id": folder.id, "name": folder.name, "customer_id": folder.customer_id, "bound_addresses": addresses, "message_count": int(count or 0), "unread_count": int(unread or 0)})
+    return result
+
+
+def save_custom_folder(session: Session, user: User, *, folder_id: int | None, name: str, customer_id: int | None, bound_addresses: list[str]) -> MailFolder:
+    if user.role is UserRole.VIEWER:
+        raise ForbiddenError("Viewer accounts cannot manage mail folders.")
+    folder = session.get(MailFolder, folder_id) if folder_id else None
+    if folder_id and folder is None:
+        raise NotFoundError("Mail folder not found.")
+    if customer_id:
+        customer = session.get(Customer, customer_id)
+        if customer is None:
+            raise NotFoundError("Customer not found.")
+        if user.role is UserRole.SALES and customer.owner_id != user.id:
+            raise ForbiddenError("You may only use folders for your customers.")
+    normalized_name = name.strip()
+    if not normalized_name:
+        raise ConflictError("Folder name is required.")
+    if folder is None:
+        folder = MailFolder(name=normalized_name, customer_id=customer_id, bound_addresses=_json_addresses(bound_addresses), created_by_id=user.id)
+        session.add(folder)
+    else:
+        folder.name = normalized_name
+        folder.customer_id = customer_id
+        folder.bound_addresses = _json_addresses(bound_addresses)
+    try:
+        session.commit()
+    except Exception as error:
+        session.rollback()
+        raise ConflictError("A mail folder with this name already exists.") from error
+    return folder
+
+
+def delete_custom_folder(session: Session, user: User, folder_id: int) -> None:
+    folder = session.get(MailFolder, folder_id)
+    if folder is None:
+        raise NotFoundError("Mail folder not found.")
+    if user.role is UserRole.VIEWER or (user.role is UserRole.SALES and folder.created_by_id not in (None, user.id)):
+        raise ForbiddenError("You may not delete this mail folder.")
+    session.delete(folder)
+    session.commit()
+
+
+def update_messages(session: Session, user: User, message_ids: list[int], *, is_read: bool | None = None, is_starred: bool | None = None, mail_folder_id: int | None = None, clear_mail_folder: bool = False, deleted: bool | None = None) -> list[StoredEmailMessage]:
+    if not message_ids:
+        raise ConflictError("Select at least one email.")
+    if clear_mail_folder and mail_folder_id is not None:
+        raise ConflictError("Choose a folder or clear the folder, not both.")
+    if mail_folder_id is not None and session.get(MailFolder, mail_folder_id) is None:
+        raise NotFoundError("Mail folder not found.")
+    messages = [_load_message(session, message_id) for message_id in sorted(set(message_ids))]
+    for message in messages:
+        ensure_read_access(user, message)
+        if is_read is not None:
+            message.is_read = is_read
+        if is_starred is not None:
+            message.is_starred = is_starred
+        if mail_folder_id is not None:
+            message.mail_folder_id = mail_folder_id
+        if clear_mail_folder:
+            message.mail_folder_id = None
+        if deleted is not None:
+            message.is_deleted = deleted
+    session.commit()
+    return messages
 
 
 async def _store_attachment(session: Session, message: StoredEmailMessage, file_name: str, content_type: str | None, content: bytes) -> EmailAttachment:
@@ -262,6 +426,9 @@ async def _persist_imap_message(session: Session, raw: bytes, *, folder: str, sy
     cc_emails = _addresses(parsed.get("Cc"))
     candidates = [from_email, *to_emails, *cc_emails]
     customer = _find_customer(session, candidates)
+    folder_record = _matching_mail_folder(session, candidates)
+    if customer is None and folder_record is not None and folder_record.customer_id:
+        customer = session.get(Customer, folder_record.customer_id)
     message = StoredEmailMessage(
         customer_id=(customer.id if customer else None),
         folder=folder,
@@ -276,9 +443,13 @@ async def _persist_imap_message(session: Session, raw: bytes, *, folder: str, sy
         to_display=json.dumps(_display_addresses(parsed.get("To"))),
         cc_display=json.dumps(_display_addresses(parsed.get("Cc"))),
         body_text=_body_text(parsed),
+        html_body=_html_body(parsed),
+        bcc_emails="[]",
+        thread_key=_thread_key(parsed),
         sent_at=_sent_at(parsed),
         has_attachments=any(part.get_content_disposition() == "attachment" for part in parsed.walk()),
         is_read=is_read,
+        mail_folder_id=folder_record.id if folder_record else None,
         tracking_enabled=False,
     )
     session.add(message)
@@ -557,16 +728,18 @@ def _html_with_tracking_pixel(body: str, pixel_url: str) -> str:
     )
 
 
-async def send_message(session: Session, user: User, *, recipients: list[str], subject: str, body: str, customer_id: int | None, reply_to_id: int | None, forward_of_id: int | None, attachments: list[tuple[str, str | None, bytes]], tracking_enabled: bool = True) -> StoredEmailMessage:
+async def send_message(session: Session, user: User, *, recipients: list[str], cc_recipients: list[str], bcc_recipients: list[str], subject: str, body: str, html_body: str, customer_id: int | None, reply_to_id: int | None, forward_of_id: int | None, draft_id: int | None, attachments: list[tuple[str, str | None, bytes]], tracking_enabled: bool = True) -> StoredEmailMessage:
     if user.role is UserRole.VIEWER:
         raise ForbiddenError("Viewer accounts cannot send email.")
     settings = _settings()
     recipients = [email.strip().lower() for email in recipients if email.strip()]
+    cc_recipients = [email.strip().lower() for email in cc_recipients if email.strip()]
+    bcc_recipients = [email.strip().lower() for email in bcc_recipients if email.strip()]
     if not recipients:
         raise ConflictError("At least one recipient is required.")
     if len(subject.strip()) > 500 or not subject.strip():
         raise ConflictError("Email subject is required and must be at most 500 characters.")
-    customer = session.get(Customer, customer_id) if customer_id else _find_customer(session, recipients)
+    customer = session.get(Customer, customer_id) if customer_id else _find_customer(session, [*recipients, *cc_recipients, *bcc_recipients])
     if customer_id and customer is None:
         raise NotFoundError("Customer not found.")
     if user.role is UserRole.SALES and customer is not None and customer.owner_id != user.id:
@@ -577,28 +750,73 @@ async def send_message(session: Session, user: User, *, recipients: list[str], s
     forwarded = _load_message(session, forward_of_id) if forward_of_id else None
     if forwarded is not None:
         ensure_read_access(user, forwarded)
+    draft = _load_message(session, draft_id) if draft_id else None
+    if draft is not None:
+        ensure_read_access(user, draft)
+        if not draft.is_draft:
+            raise ConflictError("This email is no longer a draft.")
     tracking_token = _new_tracking_token(session) if tracking_enabled else None
     outbound = EmailMessage()
     outbound["From"] = settings["mail_username"]
     outbound["To"] = ", ".join(recipients)
+    if cc_recipients:
+        outbound["Cc"] = ", ".join(cc_recipients)
+    # smtplib uses this header for envelope delivery and strips Bcc before the
+    # message is serialized, so recipients do not see one another's addresses.
+    if bcc_recipients:
+        outbound["Bcc"] = ", ".join(bcc_recipients)
     outbound["Subject"] = subject.strip()
     outbound["Message-ID"] = f"<{uuid4().hex}@starlink-crm.local>"
     if parent and parent.message_id:
         outbound["In-Reply-To"] = parent.message_id
         outbound["References"] = parent.message_id
-    outbound.set_content(body or "")
-    if tracking_token is not None:
-        outbound.add_alternative(
-            _html_with_tracking_pixel(body, _tracking_pixel_url(settings, tracking_token)), subtype="html"
-        )
+    safe_html = _safe_html(html_body)
+    plain_body = body or (_html_to_text(safe_html) if safe_html else "")
+    outbound.set_content(plain_body)
+    if safe_html or tracking_token is not None:
+        content = safe_html or html.escape(plain_body).replace("\n", "<br>\n")
+        if tracking_token is not None:
+            content = content + f'<img src="{html.escape(_tracking_pixel_url(settings, tracking_token), quote=True)}" width="1" height="1" alt="" style="display:none!important;width:1px;height:1px;border:0" />'
+        outbound.add_alternative(f"<!doctype html><html><body>{content}</body></html>", subtype="html")
     for file_name, content_type, content in attachments:
         safe_name = _safe_name(file_name)
         if not content or len(content) > MAX_ATTACHMENT_BYTES:
             raise ConflictError("Each attachment must be between 1 byte and 10 MB.")
         main_type, sub_type = (content_type or "application/octet-stream").split("/", 1) if "/" in (content_type or "") else ("application", "octet-stream")
         outbound.add_attachment(content, maintype=main_type, subtype=sub_type, filename=safe_name)
+    if draft is not None:
+        for attachment in draft.attachments:
+            content = await attachment_bytes(attachment)
+            main_type, sub_type = (attachment.content_type or "application/octet-stream").split("/", 1) if "/" in (attachment.content_type or "") else ("application", "octet-stream")
+            outbound.add_attachment(content, maintype=main_type, subtype=sub_type, filename=attachment.file_name)
     _smtp_send(settings, outbound)
-    stored = StoredEmailMessage(customer_id=customer.id if customer else (forwarded.customer_id if forwarded else None), created_by_id=user.id, in_reply_to_id=parent.id if parent else None, forwarded_from_id=forwarded.id if forwarded else None, folder="sent", direction="outgoing", sync_key=f"smtp:{uuid4().hex}", message_id=str(outbound["Message-ID"]), subject=subject.strip(), from_email=settings["mail_username"].lower(), from_name=None, to_emails=json.dumps(recipients), cc_emails="[]", to_display=json.dumps(recipients), cc_display="[]", body_text=body or "", sent_at=datetime.now(timezone.utc), has_attachments=bool(attachments), is_read=True, tracking_enabled=tracking_enabled, tracking_token=tracking_token)
+    stored = draft or StoredEmailMessage(sync_key=f"smtp:{uuid4().hex}")
+    stored.customer_id = customer.id if customer else (forwarded.customer_id if forwarded else None)
+    stored.created_by_id = user.id
+    stored.in_reply_to_id = parent.id if parent else None
+    stored.forwarded_from_id = forwarded.id if forwarded else None
+    stored.mail_folder_id = None
+    stored.folder = "sent"
+    stored.direction = "outgoing"
+    stored.message_id = str(outbound["Message-ID"])
+    stored.subject = subject.strip()
+    stored.from_email = settings["mail_username"].lower()
+    stored.from_name = None
+    stored.to_emails = json.dumps(recipients)
+    stored.cc_emails = json.dumps(cc_recipients)
+    stored.bcc_emails = json.dumps(bcc_recipients)
+    stored.to_display = json.dumps(recipients)
+    stored.cc_display = json.dumps(cc_recipients)
+    stored.body_text = plain_body
+    stored.html_body = safe_html
+    stored.thread_key = parent.thread_key if parent and parent.thread_key else (parent.message_id if parent else str(outbound["Message-ID"]))
+    stored.sent_at = datetime.now(timezone.utc)
+    stored.has_attachments = bool(attachments or (draft and draft.attachments))
+    stored.is_read = True
+    stored.is_draft = False
+    stored.is_deleted = False
+    stored.tracking_enabled = tracking_enabled
+    stored.tracking_token = tracking_token
     session.add(stored)
     session.flush()
     try:
@@ -609,6 +827,53 @@ async def send_message(session: Session, user: User, *, recipients: list[str], s
         session.rollback()
         raise
     return _load_message(session, stored.id)
+
+
+async def save_draft(session: Session, user: User, *, draft_id: int | None, recipients: list[str], cc_recipients: list[str], bcc_recipients: list[str], subject: str, body: str, html_body: str, customer_id: int | None, attachments: list[tuple[str, str | None, bytes]]) -> StoredEmailMessage:
+    if user.role is UserRole.VIEWER:
+        raise ForbiddenError("Viewer accounts cannot save email drafts.")
+    draft = _load_message(session, draft_id) if draft_id else None
+    if draft is not None:
+        ensure_read_access(user, draft)
+        if not draft.is_draft:
+            raise ConflictError("This email is no longer a draft.")
+    customer = session.get(Customer, customer_id) if customer_id else _find_customer(session, [*recipients, *cc_recipients, *bcc_recipients])
+    if customer_id and customer is None:
+        raise NotFoundError("Customer not found.")
+    if user.role is UserRole.SALES and customer is not None and customer.owner_id != user.id:
+        raise ForbiddenError("You may only save drafts for your customers.")
+    draft = draft or StoredEmailMessage(sync_key=f"draft:{uuid4().hex}")
+    safe_html = _safe_html(html_body)
+    draft.customer_id = customer.id if customer else None
+    draft.created_by_id = user.id
+    draft.folder = "drafts"
+    draft.direction = "outgoing"
+    draft.subject = subject.strip()[:500]
+    draft.from_email = get_settings()["mail_username"].lower()
+    draft.from_name = None
+    draft.to_emails = _json_addresses(recipients)
+    draft.cc_emails = _json_addresses(cc_recipients)
+    draft.bcc_emails = _json_addresses(bcc_recipients)
+    draft.to_display = draft.to_emails
+    draft.cc_display = draft.cc_emails
+    draft.body_text = body or (_html_to_text(safe_html) if safe_html else "")
+    draft.html_body = safe_html
+    draft.sent_at = datetime.now(timezone.utc)
+    draft.has_attachments = bool(attachments or draft.attachments)
+    draft.is_draft = True
+    draft.is_deleted = False
+    draft.is_read = True
+    draft.tracking_enabled = False
+    session.add(draft)
+    session.flush()
+    try:
+        for file_name, content_type, content in attachments:
+            await _store_attachment(session, draft, file_name, content_type, content)
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    return _load_message(session, draft.id)
 
 
 def record_email_open(session: Session, token: str) -> None:

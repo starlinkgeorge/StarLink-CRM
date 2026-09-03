@@ -1,5 +1,5 @@
 import api from "./api";
-import type { AlibabaInquiryResult, AlibabaIntegrationStatus, AnalyticsPeriod, BusinessAnalyticsOverview, CalculatedFollowupReminderStatus, Customer, CustomerActivity, CustomerCategory, CustomerCenter, CustomerDetail, CustomerFollowupReminderPage, CustomerPage, CustomerScoreHistory, DashboardStats, DashboardTask, FollowUp, FollowUpAttachment, MailFolderCounts, MailMessage, MailMessagePage, OpportunityDealStage, OpportunityDetail, OpportunityListItem, OpportunityPage, OpportunitySalesStage, OpportunityStage, Order, OrderPage, OrderProfitAnalytics, OrderProfitPeriod, OtherSalesAmount, Product, ProductCategory, ProductPage, QuotationDetail, QuotationPage, QuotationStatus, SalesTargetProgress, SystemSettings, Tag, TaskPriority, WonOrderBackfillPreview, WonOrderBackfillResult } from "../types";
+import type { AlibabaInquiryResult, AlibabaIntegrationStatus, AnalyticsPeriod, BusinessAnalyticsOverview, CalculatedFollowupReminderStatus, Customer, CustomerActivity, CustomerCategory, CustomerCenter, CustomerDetail, CustomerFollowupReminderPage, CustomerPage, CustomerScoreHistory, DashboardStats, DashboardTask, FollowUp, FollowUpAttachment, MailFolder, MailFolderCounts, MailMessage, MailMessagePage, OpportunityDealStage, OpportunityDetail, OpportunityListItem, OpportunityPage, OpportunitySalesStage, OpportunityStage, Order, OrderPage, OrderProfitAnalytics, OrderProfitPeriod, OtherSalesAmount, Product, ProductCategory, ProductPage, QuotationDetail, QuotationPage, QuotationStatus, SalesTargetProgress, SystemSettings, Tag, TaskPriority, WonOrderBackfillPreview, WonOrderBackfillResult } from "../types";
 
 export type CustomerCreatePayload = {
   company_name: string; contact_name?: string; country?: string; email?: string; phone?: string;
@@ -13,21 +13,33 @@ export type CustomerCreatePayload = {
 };
 
 export const getDashboardStats = async () => (await api.get<DashboardStats>("/dashboard/stats")).data;
-export const getMailMessages = async (params: { folder?: "inbox" | "sent" | "unread" | "all"; customer_id?: number; query?: string; limit?: number; offset?: number } = {}) => (await api.get<MailMessagePage>("/mail/messages", { params })).data;
+export const getMailMessages = async (params: { folder?: "inbox" | "sent" | "unread" | "drafts" | "starred" | "all"; customer_id?: number; mail_folder_id?: number; query?: string; date_from?: string; date_to?: string; has_attachments?: boolean; is_read?: boolean; is_starred?: boolean; limit?: number; offset?: number } = {}) => (await api.get<MailMessagePage>("/mail/messages", { params })).data;
 export const getMailMessage = async (id: number) => (await api.get<MailMessage>(`/mail/messages/${id}`)).data;
 export const getMailFolderCounts = async () => (await api.get<MailFolderCounts>("/mail/counts")).data;
 export const syncMail = async () => (await api.post<{ imported: number; skipped: number; folders: string[] }>("/mail/sync")).data;
-export const sendMail = async (data: { to_emails: string; subject: string; body: string; customer_id?: number; reply_to_id?: number; forward_of_id?: number; tracking_enabled?: boolean; files?: File[] }) => {
+export const getMailFolders = async () => (await api.get<MailFolder[]>("/mail/folders")).data;
+export const createMailFolder = async (data: { name: string; customer_id?: number; bound_addresses?: string[] }) => (await api.post<MailFolder>("/mail/folders", data)).data;
+export const updateMailFolder = async (id: number, data: { name: string; customer_id?: number; bound_addresses?: string[] }) => (await api.put<MailFolder>(`/mail/folders/${id}`, data)).data;
+export const deleteMailFolder = async (id: number) => { await api.delete(`/mail/folders/${id}`); };
+export const sendMail = async (data: { to_emails: string; cc_emails?: string; bcc_emails?: string; subject: string; body: string; html_body?: string; customer_id?: number; reply_to_id?: number; forward_of_id?: number; draft_id?: number; tracking_enabled?: boolean; files?: File[] }) => {
   const form = new FormData(); form.append("to_emails", data.to_emails); form.append("subject", data.subject); form.append("body", data.body);
+  form.append("cc_emails", data.cc_emails ?? ""); form.append("bcc_emails", data.bcc_emails ?? ""); form.append("html_body", data.html_body ?? "");
   form.append("tracking_enabled", String(data.tracking_enabled ?? true));
   if (data.customer_id) form.append("customer_id", String(data.customer_id)); if (data.reply_to_id) form.append("reply_to_id", String(data.reply_to_id));
   if (data.forward_of_id) form.append("forward_of_id", String(data.forward_of_id));
+  if (data.draft_id) form.append("draft_id", String(data.draft_id));
   data.files?.forEach((file) => form.append("files", file));
   return (await api.post<MailMessage>("/mail/send", form)).data;
+};
+export const saveMailDraft = async (data: { to_emails?: string; cc_emails?: string; bcc_emails?: string; subject?: string; body?: string; html_body?: string; customer_id?: number; draft_id?: number; files?: File[] }) => {
+  const form = new FormData(); form.append("to_emails", data.to_emails ?? ""); form.append("cc_emails", data.cc_emails ?? ""); form.append("bcc_emails", data.bcc_emails ?? ""); form.append("subject", data.subject ?? ""); form.append("body", data.body ?? ""); form.append("html_body", data.html_body ?? "");
+  if (data.customer_id) form.append("customer_id", String(data.customer_id)); if (data.draft_id) form.append("draft_id", String(data.draft_id)); data.files?.forEach((file) => form.append("files", file));
+  return (await api.post<MailMessage>("/mail/drafts", form)).data;
 };
 export const downloadMailAttachment = async (messageId: number, attachmentId: number) => (await api.get<Blob>(`/mail/messages/${messageId}/attachments/${attachmentId}`, { responseType: "blob" })).data;
 export const markMailRead = async (id: number) => (await api.post<MailMessage>(`/mail/messages/${id}/read`)).data;
 export const markMailUnread = async (id: number) => (await api.post<MailMessage>(`/mail/messages/${id}/unread`)).data;
+export const bulkUpdateMail = async (messageIds: number[], data: { is_read?: boolean; is_starred?: boolean; mail_folder_id?: number; clear_mail_folder?: boolean; deleted?: boolean }) => (await api.post<MailMessage[]>("/mail/messages/bulk", messageIds, { params: data })).data;
 export const getSystemSettings = async () => (await api.get<SystemSettings>("/settings")).data;
 export const updateSystemSettings = async (data: SystemSettings) => (await api.put<SystemSettings>("/settings", data)).data;
 export const getDashboardTasks = async () => (await api.get<DashboardTask[]>("/dashboard/tasks/today")).data;

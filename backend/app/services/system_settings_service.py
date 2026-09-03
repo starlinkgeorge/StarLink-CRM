@@ -12,6 +12,7 @@ from app.models.system_setting import SystemSetting
 from app.models.user import User, UserRole
 from app.schemas.system_settings import (
     CompanyProfileSettings,
+    EmailSignatureSettings,
     FollowupRulesSettings,
     QuotationOrderDefaultsSettings,
     SystemSettingsRead,
@@ -48,6 +49,7 @@ def _defaults() -> SystemSettingsRead:
             website=runtime["company_website"],
         ),
         quotation_order_defaults=QuotationOrderDefaultsSettings(),
+        email_signature=EmailSignatureSettings(),
     )
 
 

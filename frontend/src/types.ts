@@ -64,6 +64,7 @@ export interface SystemSettings {
   followup_rules: FollowupRulesSettings;
   company_profile: CompanyProfileSettings;
   quotation_order_defaults: QuotationOrderDefaultsSettings;
+  email_signature: { html: string };
 }
 export type TaskPriority = "high" | "medium" | "low";
 export type TaskStatus = "pending" | "completed";
@@ -292,11 +293,14 @@ export interface QuotationPage { items: QuotationListItem[]; total: number; limi
 export interface MailAttachment { id: number; file_name: string; content_type: string | null; size_bytes: number; created_at: string; }
 export interface MailMessage {
   id: number; customer_id: number | null; created_by_id: number | null; in_reply_to_id: number | null; forwarded_from_id: number | null;
-  folder: "inbox" | "sent"; direction: "incoming" | "outgoing"; subject: string;
+  mail_folder_id: number | null; folder: "inbox" | "sent" | "drafts"; direction: "incoming" | "outgoing"; subject: string;
   from_email: string; from_name: string | null; to_emails: string[]; cc_emails: string[]; to_display: string[]; cc_display: string[]; body_text: string;
+  html_body: string; bcc_emails: string[]; thread_key: string | null;
   sent_at: string | null; has_attachments: boolean; is_read: boolean; tracking_enabled: boolean;
+  is_starred: boolean; is_draft: boolean; is_deleted: boolean;
   first_opened_at: string | null; last_opened_at: string | null; open_count: number;
   created_at: string; attachments: MailAttachment[];
 }
 export interface MailMessagePage { items: MailMessage[]; total: number; }
-export interface MailFolderCounts { inbox: number; sent: number; unread: number; }
+export interface MailFolderCounts { inbox: number; sent: number; unread: number; drafts: number; starred: number; }
+export interface MailFolder { id: number; name: string; customer_id: number | null; bound_addresses: string[]; message_count: number; unread_count: number; }

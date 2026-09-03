@@ -405,3 +405,33 @@ def test_uidvalidity_accepts_standard_imap_response_atom() -> None:
             return "UIDVALIDITY", [b"987654"]
 
     assert mail_service._uid_validity(ResponseAtomImap()) == "987654"
+
+
+def test_custom_folder_draft_and_bulk_flags_keep_existing_mail_data(client: TestClient, monkeypatch) -> None:
+    """New productivity state is additive: it files and flags an existing message."""
+    from app.config import get_settings
+    from app.services import mail_service
+
+    monkeypatch.setenv("MAIL_USERNAME", "crm@example.com")
+    monkeypatch.setenv("MAIL_AUTH_CODE", "test-code")
+    monkeypatch.setenv("APP_PUBLIC_URL", "https://crm.example.test")
+    get_settings.cache_clear()
+    admin = _login(client, "admin@example.com", "AdminPass123!")
+    customer = client.post("/api/v1/customers", json={"company_name": "Folder customer", "email": "folder@example.com"}, headers=admin).json()
+    folder = client.post("/api/v1/mail/folders", json={"name": "Folder customer", "customer_id": customer["id"], "bound_addresses": ["folder@example.com"]}, headers=admin)
+    assert folder.status_code == 201
+    fake = IncrementalFakeImap({1: (_raw_mail("folder-test", sender="folder@example.com"), False)})
+    monkeypatch.setattr(mail_service, "_open_imap", lambda _settings: fake)
+    assert client.post("/api/v1/mail/sync", headers=admin).status_code == 200
+    item = client.get("/api/v1/mail/messages", params={"folder": "inbox"}, headers=admin).json()["items"][0]
+    assert item["customer_id"] == customer["id"]
+    assert item["mail_folder_id"] == folder.json()["id"]
+    updated = client.post("/api/v1/mail/messages/bulk", params={"is_starred": True, "is_read": True}, json=[item["id"]], headers=admin)
+    assert updated.status_code == 200
+    assert updated.json()[0]["is_starred"] is True
+    starred = client.get("/api/v1/mail/messages", params={"folder": "starred"}, headers=admin).json()
+    assert starred["total"] == 1 and starred["items"][0]["is_read"] is True
+    draft = client.post("/api/v1/mail/drafts", data={"to_emails": "folder@example.com", "subject": "Draft", "body": "draft body"}, headers=admin)
+    assert draft.status_code == 201
+    drafts = client.get("/api/v1/mail/messages", params={"folder": "drafts"}, headers=admin).json()
+    assert drafts["total"] == 1 and drafts["items"][0]["is_draft"] is True
