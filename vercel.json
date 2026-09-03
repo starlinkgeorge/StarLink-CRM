@@ -17,12 +17,6 @@
       "entrypoint": "server:app"
     }
   },
-  "crons": [
-    {
-      "path": "/api/v1/mail/cron/sync",
-      "schedule": "*/5 * * * *"
-    }
-  ],
   "rewrites": [
     {
       "source": "/api",
