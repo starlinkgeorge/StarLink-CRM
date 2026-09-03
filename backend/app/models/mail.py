@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -16,20 +16,31 @@ class EmailMessage(CreatedAtMixin, Base):
     customer_id: Mapped[int | None] = mapped_column(ForeignKey("customers.id", ondelete="SET NULL"), index=True)
     created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), index=True)
     in_reply_to_id: Mapped[int | None] = mapped_column(ForeignKey("email_messages.id", ondelete="SET NULL"), index=True)
+    forwarded_from_id: Mapped[int | None] = mapped_column(ForeignKey("email_messages.id", ondelete="SET NULL"), index=True)
     folder: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
     direction: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
     sync_key: Mapped[str] = mapped_column(String(512), nullable=False)
     message_id: Mapped[str | None] = mapped_column(String(512), index=True)
     subject: Mapped[str] = mapped_column(String(500), nullable=False, server_default="")
     from_email: Mapped[str] = mapped_column(String(320), nullable=False, index=True)
+    from_name: Mapped[str | None] = mapped_column(String(500))
     to_emails: Mapped[str] = mapped_column(Text, nullable=False, server_default="[]")
     cc_emails: Mapped[str] = mapped_column(Text, nullable=False, server_default="[]")
+    to_display: Mapped[str] = mapped_column(Text, nullable=False, server_default="[]")
+    cc_display: Mapped[str] = mapped_column(Text, nullable=False, server_default="[]")
     body_text: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
     has_attachments: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    is_read: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false", index=True)
+    tracking_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    tracking_token: Mapped[str | None] = mapped_column(String(128), unique=True, index=True)
+    first_opened_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_opened_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    open_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
 
     customer: Mapped[Optional["Customer"]] = relationship()
     attachments: Mapped[list["EmailAttachment"]] = relationship(back_populates="message", cascade="all, delete-orphan", order_by="EmailAttachment.id")
+    open_events: Mapped[list["EmailOpenEvent"]] = relationship(back_populates="message", cascade="all, delete-orphan", order_by="EmailOpenEvent.id")
 
 
 class EmailAttachment(CreatedAtMixin, Base):
@@ -43,3 +54,35 @@ class EmailAttachment(CreatedAtMixin, Base):
     size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
 
     message: Mapped[EmailMessage] = relationship(back_populates="attachments")
+
+
+class EmailOpenEvent(Base):
+    """A minimal audit row for an external tracking-pixel request.
+
+    Deliberately no IP address, user agent, or recipient identifier is stored.
+    """
+
+    __tablename__ = "email_open_events"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    email_message_id: Mapped[int] = mapped_column(
+        ForeignKey("email_messages.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    opened_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    message: Mapped[EmailMessage] = relationship(back_populates="open_events")
+
+
+class MailboxSyncState(Base):
+    """Persistent IMAP cursor for one server mailbox."""
+
+    __tablename__ = "mailbox_sync_states"
+    __table_args__ = (UniqueConstraint("mailbox", name="uq_mailbox_sync_states_mailbox"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    mailbox: Mapped[str] = mapped_column(String(512), nullable=False)
+    uid_validity: Mapped[str | None] = mapped_column(String(128))
+    last_synced_uid: Mapped[int | None] = mapped_column(BigInteger)
+    last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

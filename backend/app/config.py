@@ -49,6 +49,13 @@ def get_settings() -> dict[str, str]:
         "mail_smtp_port": getenv("MAIL_SMTP_PORT", "465").strip(),
         "mail_username": getenv("MAIL_USERNAME", "").strip(),
         "mail_auth_code": getenv("MAIL_AUTH_CODE", ""),
+        # Dedicated authentication for Vercel's unauthenticated-by-browser cron
+        # request. This secret is never stored in the database.
+        "cron_secret": getenv("CRON_SECRET", ""),
+        # Used only to create public tracking-pixel URLs in outgoing emails.
+        # It intentionally has no default: localhost and deployment-specific
+        # domains must never be embedded in customer email.
+        "app_public_url": getenv("APP_PUBLIC_URL", "").strip().rstrip("/"),
         "product_image_base_url": getenv("PRODUCT_IMAGE_BASE_URL", "").strip().rstrip("/"),
         # Public business contact details have safe defaults so quotation exports
         # stay customer-ready when a deployment omits optional contact variables.

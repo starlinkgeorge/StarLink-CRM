@@ -291,9 +291,12 @@ export interface QuotationPage { items: QuotationListItem[]; total: number; limi
 
 export interface MailAttachment { id: number; file_name: string; content_type: string | null; size_bytes: number; created_at: string; }
 export interface MailMessage {
-  id: number; customer_id: number | null; created_by_id: number | null; in_reply_to_id: number | null;
+  id: number; customer_id: number | null; created_by_id: number | null; in_reply_to_id: number | null; forwarded_from_id: number | null;
   folder: "inbox" | "sent"; direction: "incoming" | "outgoing"; subject: string;
-  from_email: string; to_emails: string[]; cc_emails: string[]; body_text: string;
-  sent_at: string | null; has_attachments: boolean; created_at: string; attachments: MailAttachment[];
+  from_email: string; from_name: string | null; to_emails: string[]; cc_emails: string[]; to_display: string[]; cc_display: string[]; body_text: string;
+  sent_at: string | null; has_attachments: boolean; is_read: boolean; tracking_enabled: boolean;
+  first_opened_at: string | null; last_opened_at: string | null; open_count: number;
+  created_at: string; attachments: MailAttachment[];
 }
 export interface MailMessagePage { items: MailMessage[]; total: number; }
+export interface MailFolderCounts { inbox: number; sent: number; unread: number; }
