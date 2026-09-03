@@ -1,0 +1,16 @@
+name: Mail Sync
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+jobs:
+  sync-mail:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger CRM mail sync
+        run: |
+          curl --fail --show-error --silent \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "https://star-link-crm.vercel.app/api/v1/mail/cron/sync"
