@@ -8,6 +8,7 @@ authorization codes.
 import html
 import imaplib
 import json
+import logging
 import re
 import smtplib
 from datetime import datetime, timezone
@@ -30,6 +31,10 @@ from app.services.storage_service import get_attachment_storage
 
 MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
 MAX_SYNC_MESSAGES = 100
+logger = logging.getLogger(__name__)
+_LIST_RESPONSE_RE = re.compile(
+    r"^\((?P<flags>[^)]*)\)\s+(?P<delimiter>NIL|\"(?:[^\"\\]|\\.)*\"|\S+)\s+(?P<mailbox>.+)$"
+)
 
 
 class MailConfigurationError(Exception):
@@ -207,32 +212,105 @@ def _open_imap(settings: dict[str, str]):
     return client
 
 
+def _decode_list_value(value: bytes | str) -> str:
+    """Keep the server's mailbox representation intact (including modified UTF-7)."""
+    if isinstance(value, bytes):
+        return value.decode("ascii", errors="surrogateescape")
+    return value
+
+
+def _unquote_mailbox(value: str) -> str | None:
+    value = value.strip()
+    if not value or value.upper() == "NIL" or value.startswith("{"):
+        # Literal LIST responses need a continuation value which imaplib does
+        # not expose as one portable mailbox string.  Do not guess a name.
+        return None
+    if value.startswith('"') and value.endswith('"'):
+        value = value[1:-1]
+        return re.sub(r"\\(.)", r"\1", value)
+    return value
+
+
+def _parse_list_response(value: bytes | str) -> tuple[set[str], str] | None:
+    match = _LIST_RESPONSE_RE.match(_decode_list_value(value))
+    if match is None:
+        return None
+    mailbox = _unquote_mailbox(match.group("mailbox"))
+    if mailbox is None:
+        return None
+    flags = {flag.lower() for flag in re.findall(r"\\[^\s()]+", match.group("flags"))}
+    return flags, mailbox
+
+
+def _imap_quote(mailbox: str) -> str:
+    """Return one IMAP astring, never an unquoted list of command arguments."""
+    if mailbox.upper() == "INBOX":
+        return "INBOX"
+    return '"' + mailbox.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def _mailboxes_to_sync(client, configured_sent_folder: str) -> list[tuple[str, str]]:
+    """Choose INBOX plus the server-advertised Sent mailbox, without guessing names."""
+    mailboxes: list[tuple[str, str]] = [("INBOX", "inbox")]
+    sent_mailbox: str | None = None
+    try:
+        status, entries = client.list()
+        if status == "OK":
+            for entry in entries or []:
+                parsed = _parse_list_response(entry)
+                if parsed is not None and "\\sent" in parsed[0]:
+                    sent_mailbox = parsed[1]
+                    break
+        else:
+            logger.warning("IMAP LIST failed while discovering the Sent mailbox: %s", status)
+    except (imaplib.IMAP4.error, OSError) as error:
+        logger.warning("IMAP LIST failed while discovering the Sent mailbox: %s", error)
+
+    if sent_mailbox:
+        mailboxes.append((sent_mailbox, "sent"))
+    elif configured_sent_folder:
+        # The configured name is intentionally still quoted before EXAMINE.
+        mailboxes.append((configured_sent_folder, "sent"))
+    else:
+        logger.warning("No IMAP mailbox with the \\Sent flag was found; skipping Sent synchronization.")
+    return mailboxes
+
+
 async def sync_mailbox(session: Session) -> tuple[int, int, list[str]]:
     settings = _settings()
     client = _open_imap(settings)
     imported = skipped = 0
-    folders = [("INBOX", "inbox"), (settings["mail_imap_sent_folder"], "sent")]
+    folders = _mailboxes_to_sync(client, settings["mail_imap_sent_folder"])
     completed_folders: list[str] = []
     try:
         for mailbox, folder in folders:
-            status, _ = client.select(mailbox, readonly=True)
-            if status != "OK":
-                continue
-            status, data = client.uid("search", None, "ALL")
-            if status != "OK":
-                continue
-            for uid in (data[0].split()[-MAX_SYNC_MESSAGES:] if data else []):
-                status, data = client.uid("fetch", uid, "(RFC822)")
-                if status != "OK" or not data:
+            try:
+                status, _ = client.select(_imap_quote(mailbox), readonly=True)
+                if status != "OK":
+                    logger.warning("Skipping IMAP %s mailbox because EXAMINE returned %s.", folder, status)
                     continue
-                raw = next((item[1] for item in data if isinstance(item, tuple) and isinstance(item[1], bytes)), None)
-                if raw is None:
+                status, data = client.uid("search", None, "ALL")
+                if status != "OK":
+                    logger.warning("Skipping IMAP %s mailbox because UID SEARCH returned %s.", folder, status)
                     continue
-                if await _persist_imap_message(session, raw, folder=folder, sync_key=f"imap:{mailbox}:{uid.decode(errors='replace')}"):
-                    imported += 1
-                else:
-                    skipped += 1
-            completed_folders.append(folder)
+                for uid in (data[0].split()[-MAX_SYNC_MESSAGES:] if data else []):
+                    try:
+                        status, data = client.uid("fetch", uid, "(RFC822)")
+                    except (imaplib.IMAP4.error, OSError) as error:
+                        logger.warning("Skipping one IMAP message in %s because UID FETCH failed: %s", folder, error)
+                        continue
+                    if status != "OK" or not data:
+                        continue
+                    raw = next((item[1] for item in data if isinstance(item, tuple) and isinstance(item[1], bytes)), None)
+                    if raw is None:
+                        continue
+                    if await _persist_imap_message(session, raw, folder=folder, sync_key=f"imap:{mailbox}:{uid.decode(errors='replace')}"):
+                        imported += 1
+                    else:
+                        skipped += 1
+                completed_folders.append(folder)
+            except (imaplib.IMAP4.error, OSError) as error:
+                logger.warning("Skipping IMAP %s mailbox because it cannot be selected: %s", folder, error)
     finally:
         try:
             client.logout()

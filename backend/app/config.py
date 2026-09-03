@@ -42,7 +42,9 @@ def get_settings() -> dict[str, str]:
         # QQ/Foxmail access credentials are intentionally environment-only.
         "mail_imap_host": getenv("MAIL_IMAP_HOST", "imap.qq.com").strip(),
         "mail_imap_port": getenv("MAIL_IMAP_PORT", "993").strip(),
-        "mail_imap_sent_folder": getenv("MAIL_IMAP_SENT_FOLDER", "Sent Messages").strip(),
+        # QQ/Foxmail mailbox names vary by account and locale.  The sync service
+        # discovers a folder flagged \Sent first; this is only an explicit fallback.
+        "mail_imap_sent_folder": getenv("MAIL_IMAP_SENT_FOLDER", "").strip(),
         "mail_smtp_host": getenv("MAIL_SMTP_HOST", "smtp.qq.com").strip(),
         "mail_smtp_port": getenv("MAIL_SMTP_PORT", "465").strip(),
         "mail_username": getenv("MAIL_USERNAME", "").strip(),

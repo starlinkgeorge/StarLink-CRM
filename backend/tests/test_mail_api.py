@@ -1,4 +1,5 @@
 from email.message import EmailMessage
+import imaplib
 
 from fastapi.testclient import TestClient
 
@@ -19,6 +20,9 @@ class FakeImap:
     def select(self, mailbox, readonly=True):
         return ("OK", []) if mailbox == "INBOX" else ("NO", [])
 
+    def list(self):
+        return "OK", []
+
     def uid(self, command, *_args):
         if command == "search":
             return "OK", [b"1"]
@@ -26,6 +30,23 @@ class FakeImap:
 
     def logout(self):
         return "BYE", []
+
+
+class FolderFakeImap(FakeImap):
+    def __init__(self, raw: bytes, entries: list[bytes], failing_mailboxes: set[str] | None = None) -> None:
+        super().__init__(raw)
+        self.entries = entries
+        self.failing_mailboxes = failing_mailboxes or set()
+        self.select_calls: list[str] = []
+
+    def list(self):
+        return "OK", self.entries
+
+    def select(self, mailbox, readonly=True):
+        self.select_calls.append(mailbox)
+        if mailbox in self.failing_mailboxes:
+            raise imaplib.IMAP4.error("EXAMINE parameters!")
+        return "OK", []
 
 
 def test_manual_sync_matches_existing_customer_and_deduplicates(client: TestClient, monkeypatch) -> None:
@@ -93,3 +114,48 @@ def test_sales_cannot_read_an_unlinked_email_created_by_another_user(client: Tes
     assert created.status_code == 201
     sales = _login(client, "mail-sales@example.com", "SalesPass123!")
     assert client.get(f"/api/v1/mail/messages/{sent.json()['id']}", headers=sales).status_code == 403
+
+
+def test_sent_flag_discovery_quotes_mailbox_name_with_spaces() -> None:
+    from app.services import mail_service
+
+    fake = FolderFakeImap(
+        b"unused",
+        [b'(\\HasNoChildren \\Sent) "/" "Sent Messages"'],
+    )
+    assert mail_service._mailboxes_to_sync(fake, "Configured Sent") == [
+        ("INBOX", "inbox"),
+        ("Sent Messages", "sent"),
+    ]
+    assert mail_service._imap_quote("Sent Messages") == '"Sent Messages"'
+    assert mail_service._imap_quote('A "special" folder') == '"A \\"special\\" folder"'
+
+
+def test_sync_keeps_inbox_when_sent_discovery_falls_back_and_selection_fails(client: TestClient, monkeypatch, caplog) -> None:
+    from app.config import get_settings
+    from app.services import mail_service
+
+    monkeypatch.setenv("MAIL_USERNAME", "crm@example.com")
+    monkeypatch.setenv("MAIL_AUTH_CODE", "test-code")
+    monkeypatch.setenv("MAIL_IMAP_SENT_FOLDER", "Sent Messages")
+    get_settings.cache_clear()
+    admin = _login(client, "admin@example.com", "AdminPass123!")
+    raw = EmailMessage()
+    raw["From"] = "Buyer <buyer@example.com>"
+    raw["To"] = "crm@example.com"
+    raw["Subject"] = "Inbox remains available"
+    raw["Message-ID"] = "<mail-test-folder-failure@example.com>"
+    raw.set_content("Inbox content")
+    fake = FolderFakeImap(
+        raw.as_bytes(),
+        [b'(\\HasNoChildren) "/" "Archive"'],
+        failing_mailboxes={'"Sent Messages"'},
+    )
+    monkeypatch.setattr(mail_service, "_open_imap", lambda _settings: fake)
+
+    result = client.post("/api/v1/mail/sync", headers=admin)
+    assert result.status_code == 200
+    assert result.json()["imported"] == 1
+    assert result.json()["folders"] == ["inbox"]
+    assert fake.select_calls == ["INBOX", '"Sent Messages"']
+    assert "Skipping IMAP sent mailbox" in caplog.text
