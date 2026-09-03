@@ -435,3 +435,22 @@ def test_custom_folder_draft_and_bulk_flags_keep_existing_mail_data(client: Test
     assert draft.status_code == 201
     drafts = client.get("/api/v1/mail/messages", params={"folder": "drafts"}, headers=admin).json()
     assert drafts["total"] == 1 and drafts["items"][0]["is_draft"] is True
+
+
+def test_individual_send_is_sequential_deduplicated_and_records_each_success(client: TestClient, monkeypatch) -> None:
+    from app.config import get_settings
+    from app.services import mail_service
+
+    monkeypatch.setenv("MAIL_USERNAME", "crm@example.com")
+    monkeypatch.setenv("MAIL_AUTH_CODE", "test-code")
+    monkeypatch.setenv("APP_PUBLIC_URL", "https://crm.example.test")
+    get_settings.cache_clear()
+    admin = _login(client, "admin@example.com", "AdminPass123!")
+    sent_to: list[str] = []
+    monkeypatch.setattr(mail_service, "_smtp_send", lambda _settings, message: sent_to.append(str(message["To"])))
+    response = client.post("/api/v1/mail/send-individually", data={"to_emails": "a@example.com; b@example.com\na@example.com; invalid", "subject": "Individual", "body": "Body"}, headers=admin)
+    assert response.status_code == 201
+    assert sent_to == ["a@example.com", "b@example.com"]
+    assert len(response.json()["sent"]) == 2
+    page = client.get("/api/v1/mail/messages", params={"folder": "sent"}, headers=admin).json()
+    assert page["total"] == 2

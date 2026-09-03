@@ -35,6 +35,7 @@ from app.services.storage_service import get_attachment_storage
 MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
 MAX_SYNC_MESSAGES = 100
 logger = logging.getLogger(__name__)
+_EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 _LIST_RESPONSE_RE = re.compile(
     r"^\((?P<flags>[^)]*)\)\s+(?P<delimiter>NIL|\"(?:[^\"\\]|\\.)*\"|\S+)\s+(?P<mailbox>.+)$"
 )
@@ -827,6 +828,29 @@ async def send_message(session: Session, user: User, *, recipients: list[str], c
         session.rollback()
         raise
     return _load_message(session, stored.id)
+
+
+def parse_recipient_addresses(value: str) -> list[str]:
+    """Accept pasted comma, semicolon, or line-separated email addresses."""
+    addresses: list[str] = []
+    for candidate in re.split(r"[,;\r\n]+", value):
+        address = candidate.strip().lower()
+        if address and _EMAIL_RE.fullmatch(address) and address not in addresses:
+            addresses.append(address)
+    return addresses
+
+
+async def send_individually(session: Session, user: User, *, recipients: list[str], cc_recipients: list[str], bcc_recipients: list[str], subject: str, body: str, html_body: str, customer_id: int | None, reply_to_id: int | None, forward_of_id: int | None, attachments: list[tuple[str, str | None, bytes]], tracking_enabled: bool) -> tuple[list[StoredEmailMessage], list[str]]:
+    """Send one SMTP message at a time, retaining successes if a later send fails."""
+    sent: list[StoredEmailMessage] = []
+    failed: list[str] = []
+    for recipient in recipients:
+        try:
+            sent.append(await send_message(session, user, recipients=[recipient], cc_recipients=cc_recipients, bcc_recipients=bcc_recipients, subject=subject, body=body, html_body=html_body, customer_id=customer_id, reply_to_id=reply_to_id, forward_of_id=forward_of_id, draft_id=None, attachments=attachments, tracking_enabled=tracking_enabled))
+        except Exception:
+            logger.warning("Individual mail send failed for %s", recipient, exc_info=True)
+            failed.append(recipient)
+    return sent, failed
 
 
 async def save_draft(session: Session, user: User, *, draft_id: int | None, recipients: list[str], cc_recipients: list[str], bcc_recipients: list[str], subject: str, body: str, html_body: str, customer_id: int | None, attachments: list[tuple[str, str | None, bytes]]) -> StoredEmailMessage:

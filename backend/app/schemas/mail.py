@@ -71,6 +71,11 @@ class MailSyncResult(BaseModel):
     already_running: bool = False
 
 
+class IndividualSendResult(BaseModel):
+    sent: list[EmailMessageRead] = Field(default_factory=list)
+    failed_addresses: list[str] = Field(default_factory=list)
+
+
 class MailFolderCounts(BaseModel):
     inbox: int
     sent: int

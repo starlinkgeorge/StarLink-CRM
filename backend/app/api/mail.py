@@ -13,7 +13,7 @@ from app.models.user import User, UserRole
 from app.config import get_settings
 from datetime import datetime, time, timedelta, timezone
 
-from app.schemas.mail import EmailMessagePage, EmailMessageRead, MailFolderCounts, MailFolderCreate, MailFolderRead, MailFolderUpdate, MailSyncResult
+from app.schemas.mail import EmailMessagePage, EmailMessageRead, IndividualSendResult, MailFolderCounts, MailFolderCreate, MailFolderRead, MailFolderUpdate, MailSyncResult
 from app.services import mail_service
 from app.services.errors import ConflictError, ForbiddenError, NotFoundError, StorageConfigurationError
 
@@ -187,6 +187,30 @@ async def send_email(
         for upload in files:
             attachments.append((upload.filename or "attachment", upload.content_type, await upload.read(mail_service.MAX_ATTACHMENT_BYTES + 1)))
         return await mail_service.send_message(session, current_user, recipients=to_emails.replace(";", ",").split(","), cc_recipients=cc_emails.replace(";", ",").split(","), bcc_recipients=bcc_emails.replace(";", ",").split(","), subject=subject, body=body, html_body=html_body, customer_id=customer_id, reply_to_id=reply_to_id, forward_of_id=forward_of_id, draft_id=draft_id, attachments=attachments, tracking_enabled=tracking_enabled)
+    except (NotFoundError, ForbiddenError, ConflictError, mail_service.MailConfigurationError, StorageConfigurationError) as error:
+        _raise(error)
+    finally:
+        for upload in files:
+            await upload.close()
+
+
+@router.post("/send-individually", response_model=IndividualSendResult, status_code=status.HTTP_201_CREATED)
+async def send_email_individually(
+    to_emails: str = Form(..., min_length=3, max_length=3000),
+    subject: str = Form(..., min_length=1, max_length=500),
+    body: str = Form("", max_length=100000), html_body: str = Form("", max_length=200000),
+    cc_emails: str = Form("", max_length=3000), bcc_emails: str = Form("", max_length=3000),
+    tracking_enabled: bool = Form(default=True), customer_id: int | None = Form(default=None),
+    reply_to_id: int | None = Form(default=None), forward_of_id: int | None = Form(default=None),
+    files: list[UploadFile] = File(default=[]), session: Session = Depends(get_db_session), current_user: User = Depends(get_current_user),
+) -> IndividualSendResult:
+    try:
+        recipients = mail_service.parse_recipient_addresses(to_emails)
+        if not recipients:
+            raise ConflictError("Enter at least one valid recipient email address.")
+        attachments = [(upload.filename or "attachment", upload.content_type, await upload.read(mail_service.MAX_ATTACHMENT_BYTES + 1)) for upload in files]
+        sent, failed = await mail_service.send_individually(session, current_user, recipients=recipients, cc_recipients=mail_service.parse_recipient_addresses(cc_emails), bcc_recipients=mail_service.parse_recipient_addresses(bcc_emails), subject=subject, body=body, html_body=html_body, customer_id=customer_id, reply_to_id=reply_to_id, forward_of_id=forward_of_id, attachments=attachments, tracking_enabled=tracking_enabled)
+        return IndividualSendResult(sent=sent, failed_addresses=failed)
     except (NotFoundError, ForbiddenError, ConflictError, mail_service.MailConfigurationError, StorageConfigurationError) as error:
         _raise(error)
     finally:

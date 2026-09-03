@@ -31,6 +31,11 @@ export const sendMail = async (data: { to_emails: string; cc_emails?: string; bc
   data.files?.forEach((file) => form.append("files", file));
   return (await api.post<MailMessage>("/mail/send", form)).data;
 };
+export const sendMailIndividually = async (data: { to_emails: string; cc_emails?: string; bcc_emails?: string; subject: string; body: string; html_body?: string; customer_id?: number; reply_to_id?: number; forward_of_id?: number; tracking_enabled?: boolean; files?: File[] }) => {
+  const form = new FormData(); form.append("to_emails", data.to_emails); form.append("subject", data.subject); form.append("body", data.body); form.append("cc_emails", data.cc_emails ?? ""); form.append("bcc_emails", data.bcc_emails ?? ""); form.append("html_body", data.html_body ?? ""); form.append("tracking_enabled", String(data.tracking_enabled ?? true));
+  if (data.customer_id) form.append("customer_id", String(data.customer_id)); if (data.reply_to_id) form.append("reply_to_id", String(data.reply_to_id)); if (data.forward_of_id) form.append("forward_of_id", String(data.forward_of_id)); data.files?.forEach((file) => form.append("files", file));
+  return (await api.post<{ sent: MailMessage[]; failed_addresses: string[] }>("/mail/send-individually", form)).data;
+};
 export const saveMailDraft = async (data: { to_emails?: string; cc_emails?: string; bcc_emails?: string; subject?: string; body?: string; html_body?: string; customer_id?: number; draft_id?: number; files?: File[] }) => {
   const form = new FormData(); form.append("to_emails", data.to_emails ?? ""); form.append("cc_emails", data.cc_emails ?? ""); form.append("bcc_emails", data.bcc_emails ?? ""); form.append("subject", data.subject ?? ""); form.append("body", data.body ?? ""); form.append("html_body", data.html_body ?? "");
   if (data.customer_id) form.append("customer_id", String(data.customer_id)); if (data.draft_id) form.append("draft_id", String(data.draft_id)); data.files?.forEach((file) => form.append("files", file));
