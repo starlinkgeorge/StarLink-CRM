@@ -9,6 +9,16 @@ import re
 from fastapi.testclient import TestClient
 
 
+def _smtp_html_alternatives(message: EmailMessage) -> list[str]:
+    """Read the serialized SMTP MIME payload, rather than a helper return value."""
+    serialized = message_from_bytes(message.as_bytes(), policy=policy.default)
+    return [
+        part.get_content()
+        for part in serialized.walk()
+        if part.get_content_type() == "text/html"
+    ]
+
+
 def _login(client: TestClient, email: str, password: str) -> dict[str, str]:
     response = client.post("/api/v1/auth/login", json={"email": email, "password": password})
     assert response.status_code == 200
@@ -230,13 +240,14 @@ def test_outgoing_tracking_pixel_is_unique_and_records_open_events(client: TestC
     first = client.post("/api/v1/mail/send", data={"to_emails": "buyer@example.com", "subject": "Tracked", "body": "Hello"}, headers=admin)
     second = client.post("/api/v1/mail/send", data={"to_emails": "buyer2@example.com", "subject": "Tracked too", "body": "Hello"}, headers=admin)
     assert first.status_code == second.status_code == 201
-    html_bodies = [message.get_body(preferencelist=("html",)).get_content() for message in sent_messages]
+    html_bodies = [body for message in sent_messages for body in _smtp_html_alternatives(message)]
     tokens = [re.search(r"/track/([A-Za-z0-9_-]+)\.gif", body).group(1) for body in html_bodies]
     assert len(tokens[0]) >= 40
     assert tokens[0] != tokens[1]
     assert all("https://crm.example.test/api/v1/mail/track/" in body for body in html_bodies)
-    assert all("display:none" not in body for body in html_bodies)
-    assert all('opacity:0' not in body and 'visibility:hidden' not in body for body in html_bodies)
+    assert all('style="display:none!important;width:1px;height:1px;border:0"' in body for body in html_bodies)
+    assert all(body.index("/track/") < body.lower().index("</body>") for body in html_bodies)
+    assert all(body.lower().endswith("</body></html>\n") for body in html_bodies)
 
     opened = client.get(f"/api/v1/mail/track/{tokens[0]}.gif")
     assert opened.status_code == 200
@@ -298,10 +309,21 @@ def test_tracking_can_be_disabled_and_internal_mail_view_does_not_open(client: T
     monkeypatch.setattr(mail_service, "_smtp_send", lambda _settings, message: sent_messages.append(message))
     admin = _login(client, "admin@example.com", "AdminPass123!")
 
-    disabled = client.post("/api/v1/mail/send", data={"to_emails": "buyer@example.com", "subject": "No tracking", "tracking_enabled": "false"}, headers=admin)
+    disabled = client.post(
+        "/api/v1/mail/send",
+        data={
+            "to_emails": "buyer@example.com",
+            "subject": "No tracking",
+            "html_body": "<p><strong>Rich text without tracking</strong></p>",
+            "tracking_enabled": "false",
+        },
+        headers=admin,
+    )
     assert disabled.status_code == 201
     assert disabled.json()["tracking_enabled"] is False
-    assert sent_messages[0].get_body(preferencelist=("html",)) is None
+    disabled_html = _smtp_html_alternatives(sent_messages[0])
+    assert disabled_html == ["<!doctype html><html><body><p><strong>Rich text without tracking</strong></p></body></html>\n"]
+    assert "/api/v1/mail/track/" not in disabled_html[0]
     assert client.get(f"/api/v1/mail/messages/{disabled.json()['id']}", headers=admin).json()["open_count"] == 0
 
     tracked = client.post("/api/v1/mail/send", data={"to_emails": "buyer@example.com", "subject": "Tracked"}, headers=admin)
@@ -322,7 +344,7 @@ def test_tracking_can_be_disabled_and_internal_mail_view_does_not_open(client: T
 
 
 def test_rich_html_individual_reply_and_forward_each_keep_open_tracking(client: TestClient, monkeypatch) -> None:
-    """The editor HTML is sanitized before, not after, its per-message pixel is appended."""
+    """Serialized SMTP HTML retains editor formatting and its final a264 pixel."""
     from app.config import get_settings
     from app.services import mail_service
 
@@ -358,13 +380,15 @@ def test_rich_html_individual_reply_and_forward_each_keep_open_tracking(client: 
     )
     assert reply.status_code == forwarded.status_code == 201
 
-    html_bodies = [message.get_body(preferencelist=("html",)).get_content() for message in captured]
+    html_bodies = [body for message in captured for body in _smtp_html_alternatives(message)]
     assert "<strong>中文 Bold</strong>" in html_bodies[0]
     assert "<u>underlined</u>" in html_bodies[0]
     tokens = [re.search(r"/track/([A-Za-z0-9_-]+)\.gif", body).group(1) for body in html_bodies]
     assert len(tokens) == 5
     assert len(set(tokens)) == 5
     assert all("https://crm.example.test/api/v1/mail/track/" in body for body in html_bodies)
+    assert all('style="display:none!important;width:1px;height:1px;border:0"' in body for body in html_bodies)
+    assert all(body.index("/track/") < body.lower().index("</body>") for body in html_bodies)
     assert all(item["tracking_enabled"] is True for item in individual.json()["sent"])
 
     opened = client.get(f"/api/v1/mail/track/{tokens[-1]}.gif")
@@ -373,6 +397,40 @@ def test_rich_html_individual_reply_and_forward_each_keep_open_tracking(client: 
     assert forwarded_detail["open_count"] == 1
     assert forwarded_detail["first_opened_at"] is not None
     assert forwarded_detail["last_opened_at"] is not None
+
+
+def test_tracking_pixel_is_inside_an_existing_html_body_in_serialized_smtp_message(client: TestClient, monkeypatch) -> None:
+    from app.config import get_settings
+    from app.services import mail_service
+
+    monkeypatch.setenv("MAIL_USERNAME", "crm@example.com")
+    monkeypatch.setenv("MAIL_AUTH_CODE", "test-code")
+    monkeypatch.setenv("APP_PUBLIC_URL", "https://crm.example.test")
+    get_settings.cache_clear()
+    captured: list[EmailMessage] = []
+    monkeypatch.setattr(mail_service, "_smtp_send", lambda _settings, message: captured.append(message))
+    admin = _login(client, "admin@example.com", "AdminPass123!")
+
+    response = client.post(
+        "/api/v1/mail/send",
+        data={
+            "to_emails": "buyer@example.com",
+            "subject": "Full HTML",
+            "html_body": "<html><body><p><strong>中文</strong> <u>underlined</u></p></body></html>",
+        },
+        headers=admin,
+    )
+    assert response.status_code == 201
+    html_body = _smtp_html_alternatives(captured[0])[0]
+    assert "<strong>中文</strong>" in html_body
+    assert "<u>underlined</u>" in html_body
+    assert re.search(
+        r'<img src="https://crm\.example\.test/api/v1/mail/track/[A-Za-z0-9_-]+\.gif" '
+        r'width="1" height="1" alt="" style="display:none!important;width:1px;height:1px;border:0" /></body>',
+        html_body,
+        re.IGNORECASE,
+    )
+    assert html_body.lower().endswith("</html>\n")
 
 
 def test_incremental_sync_initial_window_then_all_new_uids_and_seen_state(client: TestClient, monkeypatch) -> None:
