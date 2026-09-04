@@ -780,7 +780,10 @@ async def send_message(session: Session, user: User, *, recipients: list[str], c
     if safe_html or tracking_token is not None:
         content = safe_html or html.escape(plain_body).replace("\n", "<br>\n")
         if tracking_token is not None:
-            content = content + f'<img src="{html.escape(_tracking_pixel_url(settings, tracking_token), quote=True)}" width="1" height="1" alt="" style="display:none!important;width:1px;height:1px;border:0" />'
+            # Some email clients intentionally skip images hidden with
+            # ``display:none``. A transparent one-pixel image remains eligible
+            # for normal remote-image loading without being visible.
+            content = content + f'<img src="{html.escape(_tracking_pixel_url(settings, tracking_token), quote=True)}" width="1" height="1" alt="" aria-hidden="true" style="width:1px;height:1px;opacity:0;line-height:0;font-size:0;border:0" />'
         outbound.add_alternative(f"<!doctype html><html><body>{content}</body></html>", subtype="html")
     for file_name, content_type, content in attachments:
         safe_name = _safe_name(file_name)

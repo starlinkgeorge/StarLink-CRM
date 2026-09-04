@@ -54,7 +54,16 @@ def track_email_open(token: str, session: Session = Depends(get_db_session)) -> 
     return Response(
         content=TRANSPARENT_GIF,
         media_type="image/gif",
-        headers={"Cache-Control": "no-store, max-age=0", "Pragma": "no-cache"},
+        # Cover browser, intermediary CDN, and Vercel-specific cache layers.
+        # Recipient-side image-proxy caching remains outside CRM control.
+        headers={
+            "Cache-Control": "no-store, no-cache, max-age=0, must-revalidate",
+            "CDN-Cache-Control": "no-store",
+            "Vercel-CDN-Cache-Control": "no-store",
+            "Surrogate-Control": "no-store",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        },
     )
 
 

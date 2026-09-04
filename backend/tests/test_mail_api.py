@@ -235,10 +235,15 @@ def test_outgoing_tracking_pixel_is_unique_and_records_open_events(client: TestC
     assert len(tokens[0]) >= 40
     assert tokens[0] != tokens[1]
     assert all("https://crm.example.test/api/v1/mail/track/" in body for body in html_bodies)
+    assert all("display:none" not in body for body in html_bodies)
+    assert all('aria-hidden="true"' in body for body in html_bodies)
 
     opened = client.get(f"/api/v1/mail/track/{tokens[0]}.gif")
     assert opened.status_code == 200
     assert opened.headers["content-type"].startswith("image/gif")
+    assert "no-store" in opened.headers["cache-control"]
+    assert opened.headers["cdn-cache-control"] == "no-store"
+    assert opened.headers["vercel-cdn-cache-control"] == "no-store"
     assert opened.content.startswith(b"GIF89a")
     after_first_open = client.get(f"/api/v1/mail/messages/{first.json()['id']}", headers=admin).json()
     assert after_first_open["open_count"] == 1
