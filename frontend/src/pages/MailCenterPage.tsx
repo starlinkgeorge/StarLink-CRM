@@ -22,7 +22,6 @@ const date = (value: string | null) => value
   ? new Intl.DateTimeFormat("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Shanghai" }).format(new Date(value))
   : "—";
 const plainToHtml = (value: string) => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>");
-const escapeText = (value: string) => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 function TrackingStatus({ message, detailed = false }: { message: MailMessage; detailed?: boolean }) {
   if (message.direction !== "outgoing") return null;
@@ -90,12 +89,8 @@ export function MailCenterPage() {
   const open = async (message: MailMessage) => { const detail = await getMailMessage(message.id); setSelected(detail); if (!detail.is_read) await bulkUpdateMail([detail.id], { is_read: true }); await load(); };
   const openReaderWindow = () => {
     if (!selected) return;
-    const reader = window.open("", "_blank", "popup,width=1280,height=900");
+    const reader = window.open(`/mail/messages/${selected.id}`, "_blank", "popup,width=1280,height=900");
     if (!reader) { setError("浏览器阻止了新窗口，请允许此站点打开弹窗后重试。"); return; }
-    reader.opener = null;
-    const body = selected.html_body || plainToHtml(selected.body_text);
-    reader.document.write(`<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>${escapeText(selected.subject || "邮件")}</title><style>body{max-width:980px;margin:0 auto;padding:40px;font-family:"Microsoft YaHei",Arial,sans-serif;color:#172033;line-height:1.75}header{border-bottom:1px solid #dbe2ea;margin-bottom:28px;padding-bottom:20px}h1{font-size:24px;margin:0 0 14px}p{margin:4px 0;color:#43526a}.body{overflow-wrap:anywhere}img{max-width:100%;height:auto}</style></head><body><header><h1>${escapeText(selected.subject || "(无主题)")}</h1><p>发件人：${escapeText(selected.from_name || selected.from_email)} &lt;${escapeText(selected.from_email)}&gt;</p><p>收件人：${escapeText(selected.to_display.join(", ") || selected.to_emails.join(", "))}</p>${selected.cc_emails.length ? `<p>抄送：${escapeText(selected.cc_emails.join(", "))}</p>` : ""}<p>${escapeText(date(selected.sent_at))}</p></header><main class="body">${body}</main></body></html>`);
-    reader.document.close();
   };
   const sync = async () => { setSyncing(true); setError(""); try { const result = await syncMail(); await load(); setNotice(result.imported ? `同步完成，新增 ${result.imported} 封邮件` : "已同步，没有新邮件"); } catch (caught) { setError((caught as { response?: { data?: { detail?: string } } }).response?.data?.detail || "同步失败，请检查邮箱配置。"); } finally { setSyncing(false); } };
   const send = async (event: FormEvent, individually: boolean, recipientOverride?: string[]) => {

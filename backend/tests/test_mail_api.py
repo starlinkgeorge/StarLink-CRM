@@ -256,6 +256,36 @@ def test_outgoing_tracking_pixel_is_unique_and_records_open_events(client: TestC
     assert after_second_open["last_opened_at"] >= after_second_open["first_opened_at"]
 
 
+def test_sent_imap_copy_with_rewritten_message_id_keeps_crm_tracking_record(client: TestClient, monkeypatch) -> None:
+    """A provider's Sent copy must not shadow CRM's token-bearing outgoing row."""
+    from app.config import get_settings
+    from app.services import mail_service
+
+    monkeypatch.setenv("MAIL_USERNAME", "crm@example.com")
+    monkeypatch.setenv("MAIL_AUTH_CODE", "test-code")
+    monkeypatch.setenv("APP_PUBLIC_URL", "https://crm.example.test")
+    get_settings.cache_clear()
+    captured: list[EmailMessage] = []
+    monkeypatch.setattr(mail_service, "_smtp_send", lambda _settings, message: captured.append(message))
+    admin = _login(client, "admin@example.com", "AdminPass123!")
+    sent = client.post("/api/v1/mail/send", data={"to_emails": "buyer@example.com", "subject": "Tracked", "body": "Hello"}, headers=admin)
+    assert sent.status_code == 201
+
+    sent_copy = captured[0]
+    del sent_copy["Message-ID"]
+    sent_copy["Message-ID"] = "<provider-rewritten@example.com>"
+    fake = IncrementalFakeImap({99: (sent_copy.as_bytes(), True)})
+    monkeypatch.setattr(mail_service, "_open_imap", lambda _settings: fake)
+    monkeypatch.setattr(mail_service, "_mailboxes_to_sync", lambda _client, _configured: [("Sent Messages", "sent")])
+
+    result = client.post("/api/v1/mail/sync", headers=admin)
+    assert result.status_code == 200
+    assert result.json()["imported"] == 0
+    sent_page = client.get("/api/v1/mail/messages", params={"folder": "sent"}, headers=admin).json()
+    assert sent_page["total"] == 1
+    assert sent_page["items"][0]["tracking_enabled"] is True
+
+
 def test_tracking_can_be_disabled_and_internal_mail_view_does_not_open(client: TestClient, monkeypatch) -> None:
     from app.config import get_settings
     from app.services import mail_service

@@ -36,6 +36,7 @@ MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
 MAX_SYNC_MESSAGES = 100
 logger = logging.getLogger(__name__)
 _EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
+_TRACKING_PIXEL_TOKEN_RE = re.compile(r"/api/v1/mail/track/([A-Za-z0-9_-]{40,128})\.gif", re.IGNORECASE)
 _LIST_RESPONSE_RE = re.compile(
     r"^\((?P<flags>[^)]*)\)\s+(?P<delimiter>NIL|\"(?:[^\"\\]|\\.)*\"|\S+)\s+(?P<mailbox>.+)$"
 )
@@ -444,6 +445,22 @@ async def _persist_imap_message(session: Session, raw: bytes, *, folder: str, sy
     existing = session.scalar(select(StoredEmailMessage.id).where(StoredEmailMessage.sync_key == sync_key))
     if existing is None and message_id:
         existing = session.scalar(select(StoredEmailMessage.id).where(StoredEmailMessage.message_id == message_id))
+    if existing is None and folder == "sent":
+        # A few providers rewrite or omit Message-ID in their Sent copy.  CRM
+        # outgoing messages already have a unique tracking token embedded in
+        # their HTML alternative, so use it as a second de-duplication key.
+        # This prevents the IMAP copy from becoming a second Sent row without
+        # tracking state, while never assigning a token to an incoming email.
+        for part in parsed.walk():
+            if part.get_content_type() != "text/html":
+                continue
+            match = _TRACKING_PIXEL_TOKEN_RE.search(_part_text(part))
+            if match:
+                existing = session.scalar(
+                    select(StoredEmailMessage.id).where(StoredEmailMessage.tracking_token == match.group(1))
+                )
+                if existing is not None:
+                    break
     if existing is not None:
         return False
     from_header = _header(parsed.get("From"))

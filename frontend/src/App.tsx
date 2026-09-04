@@ -19,6 +19,7 @@ import { SettingsPage } from "./pages/SettingsPage";
 import { OrdersPage } from "./pages/OrdersPage";
 import { OrderDetailPage } from "./pages/OrderDetailPage";
 import { MailCenterPage } from "./pages/MailCenterPage";
+import { MailReaderPage } from "./pages/MailReaderPage";
 import { AuthProvider } from "./store/auth";
 
 function LegacyCustomerQuotationCreateRedirect() {
@@ -34,6 +35,7 @@ export function App() {
       <Route path="/analytics" element={<BusinessAnalyticsPage />} />
       <Route path="/followup-reminders" element={<FollowupRemindersPage />} />
       <Route path="/mail" element={<MailCenterPage />} />
+      <Route path="/mail/messages/:messageId" element={<MailReaderPage />} />
       <Route path="/customers" element={<CustomerArchivePage />} /><Route path="/customers/new" element={<NewCustomerPage />} /><Route path="/customers/:customerId/quotations/new" element={<LegacyCustomerQuotationCreateRedirect />} /><Route path="/customers/:id" element={<CustomerDetailPage />} />
       <Route path="/opportunities" element={<OpportunitiesPage />} /><Route path="/opportunities/:id" element={<OpportunityDetailPage />} />
       <Route path="/products" element={<ProductsPage />} /><Route path="/products/:id" element={<ProductDetailPage />} />
