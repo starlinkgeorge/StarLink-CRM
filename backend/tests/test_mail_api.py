@@ -613,3 +613,42 @@ def test_individual_send_is_sequential_deduplicated_and_records_each_success(cli
     assert len(response.json()["sent"]) == 2
     page = client.get("/api/v1/mail/messages", params={"folder": "sent"}, headers=admin).json()
     assert page["total"] == 2
+
+
+def test_temp_tracking_ab_debug_is_admin_only_and_sends_distinct_html_variants(client: TestClient, monkeypatch) -> None:
+    """The temporary diagnostic must retain the normal SMTP/MIME/DB path."""
+    from app.config import get_settings
+    from app.services import mail_service
+
+    monkeypatch.setenv("MAIL_USERNAME", "crm@example.com")
+    monkeypatch.setenv("MAIL_AUTH_CODE", "test-code")
+    monkeypatch.setenv("APP_PUBLIC_URL", "https://star-link-crm.vercel.app")
+    get_settings.cache_clear()
+    admin = _login(client, "admin@example.com", "AdminPass123!")
+    created = client.post(
+        "/api/v1/users",
+        json={"name": "Sales", "email": "mail-ab-sales@example.com", "password": "SalesPass123!", "role": "Sales"},
+        headers=admin,
+    )
+    assert created.status_code == 201
+    sales = _login(client, "mail-ab-sales@example.com", "SalesPass123!")
+    assert client.post("/api/v1/mail/debug/tracking-ab", headers=sales).status_code == 403
+
+    captured: list[EmailMessage] = []
+    monkeypatch.setattr(mail_service, "_smtp_send", lambda _settings, message: captured.append(message))
+    response = client.post("/api/v1/mail/debug/tracking-ab", headers=admin)
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["recipient"] == "starlink_ceo@foxmail.com"
+    assert payload["tiptap"]["subject"] == "TRACKING-AB-A-TIPTAP"
+    assert payload["legacy"]["subject"] == "TRACKING-AB-B-LEGACY"
+    assert len(captured) == 2
+
+    tiptap_html = _smtp_html_alternatives(captured[0])[0]
+    legacy_html = _smtp_html_alternatives(captured[1])[0]
+    assert "<p>Tracking A/B mobile diagnostic</p>" in tiptap_html
+    assert "<p>Tracking A/B mobile diagnostic</p>" not in legacy_html
+    assert "<body>Tracking A/B mobile diagnostic<img" in legacy_html
+    tokens = [re.search(r"/track/([A-Za-z0-9_-]+)\.gif", content).group(1) for content in (tiptap_html, legacy_html)]
+    assert tokens[0] != tokens[1]
+    assert all(len(token) >= 40 for token in tokens)

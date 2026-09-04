@@ -37,6 +37,10 @@ MAX_SYNC_MESSAGES = 100
 logger = logging.getLogger(__name__)
 _EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 _TRACKING_PIXEL_TOKEN_RE = re.compile(r"/api/v1/mail/track/([A-Za-z0-9_-]{40,128})\.gif", re.IGNORECASE)
+# TEMP DEBUG: Remove this one-off A/B diagnostic helper after the mobile
+# Foxmail/QQ tracking investigation is complete.
+TEMP_DEBUG_TRACKING_AB_RECIPIENT = "starlink_ceo@foxmail.com"
+TEMP_DEBUG_TRACKING_AB_BODY = "Tracking A/B mobile diagnostic"
 _LIST_RESPONSE_RE = re.compile(
     r"^\((?P<flags>[^)]*)\)\s+(?P<delimiter>NIL|\"(?:[^\"\\]|\\.)*\"|\S+)\s+(?P<mailbox>.+)$"
 )
@@ -930,6 +934,43 @@ async def send_individually(session: Session, user: User, *, recipients: list[st
             logger.warning("Individual mail send failed for %s", recipient, exc_info=True)
             failed.append(recipient)
     return sent, failed
+
+
+async def send_tracking_ab_debug(session: Session, user: User) -> tuple[StoredEmailMessage, StoredEmailMessage]:
+    """TEMP DEBUG: send the controlled production tracking A/B pair.
+
+    This deliberately goes through the same ``send_message`` path as CRM mail.
+    The TipTap case supplies a sanitized HTML fragment; the legacy case supplies
+    no HTML so ``send_message`` uses its retained a264-compatible plain HTML
+    alternative.  This helper is not used by normal compose, reply, forward,
+    or individual-send flows.
+    """
+    common = {
+        "session": session,
+        "user": user,
+        "recipients": [TEMP_DEBUG_TRACKING_AB_RECIPIENT],
+        "cc_recipients": [],
+        "bcc_recipients": [],
+        "body": TEMP_DEBUG_TRACKING_AB_BODY,
+        "customer_id": None,
+        "reply_to_id": None,
+        "forward_of_id": None,
+        "draft_id": None,
+        "attachments": [],
+        "tracking_enabled": True,
+    }
+    tiptap = await send_message(
+        **common,
+        subject="TRACKING-AB-A-TIPTAP",
+        html_body=f"<p>{html.escape(TEMP_DEBUG_TRACKING_AB_BODY)}</p>",
+    )
+    legacy = await send_message(
+        **common,
+        subject="TRACKING-AB-B-LEGACY",
+        # This selects the existing a264-compatible plain-text HTML branch.
+        html_body="",
+    )
+    return tiptap, legacy
 
 
 async def save_draft(session: Session, user: User, *, draft_id: int | None, recipients: list[str], cc_recipients: list[str], bcc_recipients: list[str], subject: str, body: str, html_body: str, customer_id: int | None, attachments: list[tuple[str, str | None, bytes]]) -> StoredEmailMessage:

@@ -13,7 +13,17 @@ from app.models.user import User, UserRole
 from app.config import get_settings
 from datetime import datetime, time, timedelta, timezone
 
-from app.schemas.mail import EmailMessagePage, EmailMessageRead, IndividualSendResult, MailFolderCounts, MailFolderCreate, MailFolderRead, MailFolderUpdate, MailSyncResult
+from app.schemas.mail import (
+    EmailMessagePage,
+    EmailMessageRead,
+    IndividualSendResult,
+    MailFolderCounts,
+    MailFolderCreate,
+    MailFolderRead,
+    MailFolderUpdate,
+    MailSyncResult,
+    TrackingAbDebugResult,
+)
 from app.services import mail_service
 from app.services.errors import ConflictError, ForbiddenError, NotFoundError, StorageConfigurationError
 
@@ -152,6 +162,29 @@ async def sync_email(session: Session = Depends(get_db_session), current_user: U
         imported, skipped, folders = await mail_service.sync_mailbox(session)
         return MailSyncResult(imported=imported, skipped=skipped, folders=folders)
     except (mail_service.MailConfigurationError, StorageConfigurationError, ConflictError, mail_service.MailSyncInProgressError) as error:
+        _raise(error)
+
+
+@router.post("/debug/tracking-ab", response_model=TrackingAbDebugResult, status_code=status.HTTP_201_CREATED)
+async def send_tracking_ab_debug(
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> TrackingAbDebugResult:
+    """TEMP DEBUG: Admin-only, fixed-recipient tracking A/B diagnostic.
+
+    Remove this route after the real mobile-mail-client diagnosis is complete.
+    It has no UI caller and cannot accept a recipient or arbitrary content.
+    """
+    if current_user.role is not UserRole.ADMIN:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only administrators may run the mail tracking diagnostic.")
+    try:
+        tiptap, legacy = await mail_service.send_tracking_ab_debug(session, current_user)
+        return TrackingAbDebugResult(
+            recipient=mail_service.TEMP_DEBUG_TRACKING_AB_RECIPIENT,
+            tiptap=EmailMessageRead.model_validate(tiptap),
+            legacy=EmailMessageRead.model_validate(legacy),
+        )
+    except (NotFoundError, ForbiddenError, ConflictError, mail_service.MailConfigurationError, StorageConfigurationError) as error:
         _raise(error)
 
 

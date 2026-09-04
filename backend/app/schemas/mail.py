@@ -76,6 +76,14 @@ class IndividualSendResult(BaseModel):
     failed_addresses: list[str] = Field(default_factory=list)
 
 
+class TrackingAbDebugResult(BaseModel):
+    """TEMP DEBUG response for the one-off mobile tracking A/B diagnosis."""
+
+    recipient: str
+    tiptap: EmailMessageRead
+    legacy: EmailMessageRead
+
+
 class MailFolderCounts(BaseModel):
     inbox: int
     sent: int
