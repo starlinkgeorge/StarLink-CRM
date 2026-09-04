@@ -63,7 +63,10 @@ def _safe_html(value: str | None) -> str:
     # ``font color`` and ``align``.  Arbitrary CSS is deliberately removed.
     source = re.sub(r"(?i)\sstyle\s*=\s*(?:\"[^\"]*\"|'[^']*'|[^\s>]+)", "", source)
     allowed = r"(?:a|b|strong|i|em|u|font|span|div|p|br|ul|ol|li|blockquote|h[1-6]|table|thead|tbody|tr|td|th)"
-    source = re.sub(rf"(?is)</?(?!{allowed}(?:\s|/?>))[^>]+>", "", source)
+    # Keep the optional closing slash inside the lookahead.  With ``</?`` at
+    # the start, regex backtracking could treat an allowed closing tag such as
+    # ``</strong>`` as an unknown ``< /strong>`` tag and remove it.
+    source = re.sub(rf"(?is)<(?!/?{allowed}(?:\s|/?>))/?[^>]+>", "", source)
     return source[:200000]
 
 

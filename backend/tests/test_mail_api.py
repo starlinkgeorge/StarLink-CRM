@@ -286,6 +286,60 @@ def test_tracking_can_be_disabled_and_internal_mail_view_does_not_open(client: T
     assert failed_recording.content.startswith(b"GIF89a")
 
 
+def test_rich_html_individual_reply_and_forward_each_keep_open_tracking(client: TestClient, monkeypatch) -> None:
+    """The editor HTML is sanitized before, not after, its per-message pixel is appended."""
+    from app.config import get_settings
+    from app.services import mail_service
+
+    monkeypatch.setenv("MAIL_USERNAME", "crm@example.com")
+    monkeypatch.setenv("MAIL_AUTH_CODE", "test-code")
+    monkeypatch.setenv("APP_PUBLIC_URL", "https://crm.example.test")
+    get_settings.cache_clear()
+    captured: list[EmailMessage] = []
+    monkeypatch.setattr(mail_service, "_smtp_send", lambda _settings, message: captured.append(message))
+    admin = _login(client, "admin@example.com", "AdminPass123!")
+
+    original = client.post(
+        "/api/v1/mail/send",
+        data={"to_emails": "buyer@example.com", "subject": "Rich HTML", "html_body": "<p><strong>中文 Bold</strong> <u>underlined</u></p>"},
+        headers=admin,
+    )
+    assert original.status_code == 201
+    individual = client.post(
+        "/api/v1/mail/send-individually",
+        data={"to_emails": "one@example.com; two@example.com", "subject": "Individual", "html_body": "<p><em>Separate</em></p>"},
+        headers=admin,
+    )
+    assert individual.status_code == 201
+    reply = client.post(
+        "/api/v1/mail/send",
+        data={"to_emails": "buyer@example.com", "subject": "Re: Rich HTML", "html_body": "<p>Reply</p>", "reply_to_id": original.json()["id"]},
+        headers=admin,
+    )
+    forwarded = client.post(
+        "/api/v1/mail/send",
+        data={"to_emails": "forward@example.com", "subject": "Fwd: Rich HTML", "html_body": "<p>Forward</p>", "forward_of_id": original.json()["id"]},
+        headers=admin,
+    )
+    assert reply.status_code == forwarded.status_code == 201
+
+    html_bodies = [message.get_body(preferencelist=("html",)).get_content() for message in captured]
+    assert "<strong>中文 Bold</strong>" in html_bodies[0]
+    assert "<u>underlined</u>" in html_bodies[0]
+    tokens = [re.search(r"/track/([A-Za-z0-9_-]+)\.gif", body).group(1) for body in html_bodies]
+    assert len(tokens) == 5
+    assert len(set(tokens)) == 5
+    assert all("https://crm.example.test/api/v1/mail/track/" in body for body in html_bodies)
+    assert all(item["tracking_enabled"] is True for item in individual.json()["sent"])
+
+    opened = client.get(f"/api/v1/mail/track/{tokens[-1]}.gif")
+    assert opened.status_code == 200 and opened.content.startswith(b"GIF89a")
+    forwarded_detail = client.get(f"/api/v1/mail/messages/{forwarded.json()['id']}", headers=admin).json()
+    assert forwarded_detail["open_count"] == 1
+    assert forwarded_detail["first_opened_at"] is not None
+    assert forwarded_detail["last_opened_at"] is not None
+
+
 def test_incremental_sync_initial_window_then_all_new_uids_and_seen_state(client: TestClient, monkeypatch) -> None:
     from app.config import get_settings
     from app.services import mail_service
