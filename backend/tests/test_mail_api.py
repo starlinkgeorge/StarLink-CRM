@@ -236,7 +236,7 @@ def test_outgoing_tracking_pixel_is_unique_and_records_open_events(client: TestC
     assert tokens[0] != tokens[1]
     assert all("https://crm.example.test/api/v1/mail/track/" in body for body in html_bodies)
     assert all("display:none" not in body for body in html_bodies)
-    assert all('aria-hidden="true"' in body for body in html_bodies)
+    assert all('opacity:0' not in body and 'visibility:hidden' not in body for body in html_bodies)
 
     opened = client.get(f"/api/v1/mail/track/{tokens[0]}.gif")
     assert opened.status_code == 200
@@ -454,6 +454,18 @@ def test_mime_text_decoding_fallbacks_cover_common_chinese_encodings() -> None:
     assert mail_service._body_text(base64_message) == "Base64 中文"
     assert mail_service._body_text(quoted_printable_message) == "QP 中文"
     assert mail_service._body_text(unknown_charset_message) == "Fallback 中文"
+
+
+def test_mime_text_decoding_recovers_chinese_from_a_wrong_latin1_declaration() -> None:
+    """ISO-8859-1 is permissive, so a GBK fallback needs an explicit heuristic."""
+    from app.services import mail_service
+
+    wrong_declared = message_from_bytes(
+        b"Content-Type: text/plain; charset=iso-8859-1\nContent-Transfer-Encoding: base64\n\n"
+        + base64.b64encode("错误声明也应显示中文".encode("gbk")),
+        policy=policy.default,
+    )
+    assert mail_service._body_text(wrong_declared) == "错误声明也应显示中文"
 
 
 def test_uidvalidity_accepts_standard_imap_response_atom() -> None:

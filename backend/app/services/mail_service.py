@@ -87,6 +87,7 @@ def _settings() -> dict[str, str]:
 def _decode_bytes(value: bytes, declared_charset: str | None = None) -> str:
     """Decode real-world MIME bytes without propagating malformed charset errors."""
     candidates = [declared_charset, "utf-8", "gb18030", "gbk", "gb2312", "iso-8859-1"]
+    decoded: dict[str, str] = {}
     tried: set[str] = set()
     for charset in candidates:
         if not charset:
@@ -96,9 +97,32 @@ def _decode_bytes(value: bytes, declared_charset: str | None = None) -> str:
             continue
         tried.add(normalized)
         try:
-            return value.decode(normalized)
+            decoded[normalized] = value.decode(normalized)
         except (LookupError, UnicodeDecodeError):
             continue
+    if not decoded:
+        return value.decode("utf-8", errors="replace")
+
+    declared = (declared_charset or "").strip().lower().replace("_", "-")
+    preferred = decoded.get(declared)
+    # Some older Chinese mail systems incorrectly declare GBK/GB18030 bytes as
+    # ISO-8859-1.  Latin-1 never raises a decoding error, so blindly trusting
+    # it creates mojibake (for example ``ÖÐÎÄ``) instead of reaching the GB
+    # fallbacks.  Prefer a successful CJK decode only for this suspicious
+    # misdeclaration; genuine Latin-1 content continues to use its declaration.
+    if declared in {"iso-8859-1", "latin-1", "latin1", "windows-1252", "cp1252"} and preferred:
+        high_latin = sum(0x80 <= ord(character) <= 0xFF for character in preferred)
+        looks_suspicious = high_latin >= max(2, len(preferred) // 3)
+        if looks_suspicious:
+            for charset in ("utf-8", "gb18030", "gbk", "gb2312"):
+                candidate = decoded.get(charset)
+                if candidate and any("\u3400" <= character <= "\u9fff" for character in candidate):
+                    return candidate
+    if preferred is not None:
+        return preferred
+    for charset in ("utf-8", "gb18030", "gbk", "gb2312", "iso-8859-1"):
+        if charset in decoded:
+            return decoded[charset]
     return value.decode("utf-8", errors="replace")
 
 
@@ -783,7 +807,12 @@ async def send_message(session: Session, user: User, *, recipients: list[str], c
             # Some email clients intentionally skip images hidden with
             # ``display:none``. A transparent one-pixel image remains eligible
             # for normal remote-image loading without being visible.
-            content = content + f'<img src="{html.escape(_tracking_pixel_url(settings, tracking_token), quote=True)}" width="1" height="1" alt="" aria-hidden="true" style="width:1px;height:1px;opacity:0;line-height:0;font-size:0;border:0" />'
+            # Do not use display:none, visibility:hidden, or opacity:0 here:
+            # several mailbox clients omit fetching images marked as hidden.
+            # The GIF itself is transparent and its physical size is one pixel,
+            # so it remains visually inert while being eligible for normal image
+            # loading.
+            content = content + f'<img src="{html.escape(_tracking_pixel_url(settings, tracking_token), quote=True)}" width="1" height="1" border="0" alt="" />'
         outbound.add_alternative(f"<!doctype html><html><body>{content}</body></html>", subtype="html")
     for file_name, content_type, content in attachments:
         safe_name = _safe_name(file_name)
